@@ -1,0 +1,27 @@
+# Entorno y Secretos
+.env
+.env.local
+.env.*.local
+
+# Caché y logs de Antigravity/ATL
+.atl/
+.agents/skills/*/.skill-registry.cache.json
+
+# Directorios de pruebas/scratch locales
+scratch/
+
+# Dependencias de Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker
+.docker/
+waha_session_storage/
+n8n_local_storage/
+
+# Archivos del sistema operativo
+Thumbs.db
+Desktop.ini
+.DS_Store

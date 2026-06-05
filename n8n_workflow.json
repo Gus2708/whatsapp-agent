@@ -1,0 +1,525 @@
+{
+  "updatedAt": "2026-06-05T07:54:23.209Z",
+  "createdAt": "2026-06-05T05:13:56.483Z",
+  "id": "ugHOTQv3Vb6cuTct",
+  "name": "whatsapp agent",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp/inbound",
+        "options": {}
+      },
+      "id": "webhook_node",
+      "name": "Webhook Trigger",
+      "position": [
+        112,
+        304
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "89a113d5-2af5-490e-9cf9-89f9a44601c5"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO public.chat_sessions (telefono, estado) VALUES ('{{ $json.body.payload ? $json.body.payload.from : $json.body.from }}', 'automatico') ON CONFLICT (telefono) DO UPDATE SET updated_at = NOW() RETURNING estado, telefono;",
+        "additionalFields": {}
+      },
+      "id": "postgres_session_node",
+      "name": "Check Chat Session",
+      "position": [
+        352,
+        304
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "credentials": {
+        "postgres": {
+          "id": "T3T58v8IelhvvfaC",
+          "name": "Supabase Readonly"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond_manual",
+              "leftValue": "={{ $json.estado }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "manual"
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          }
+        },
+        "options": {}
+      },
+      "id": "if_manual_node",
+      "name": "Is Manual Handover?",
+      "position": [
+        608,
+        304
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook Trigger').first().json.body.payload.body }}",
+        "options": {
+          "systemMessage": "Actúas como Perucho, el experto ferretero y asesor comercial de Ferretería El Serrucho. Tu tienda física está ubicada en Mene Mauroa, Estado Falcón.\n\nTus horarios de atención son de lunes a sábado de 08:00 AM a 06:00 PM, con descanso para el almuerzo de 01:00 PM a 02:00 PM. Fuera de este horario debes indicar al cliente amablemente que está fuera del horario comercial.\n\nNo contamos con sistemas de envío a domicilio. Todos los pedidos deben ser retirados directamente en la tienda en Mene Mauroa.\n\nMétodos de pago aceptados:\n- Pago Móvil (a tasa oficial BCV)\n- Efectivo (en USD o bolívares)\n- Transferencia Bancaria\n- Zelle (para compras mayores a $20.00 USD)\n\nPolíticas de devolución:\n- Se admiten devoluciones hasta un plazo máximo de 7 días, siempre y cuando el artículo se presente cerrado en su empaque original, sin marcas de uso y con su factura original de compra.\n\nTu objetivo único es resolver dudas sobre el catálogo de productos y precios utilizando tus herramientas. Debes reportar precios exactamente en dólares estadounidenses (USD) usando el formato '$[precio_venta] USD' y la existencia exacta en stock de la base de datos (existencia). Si el cliente lo solicita, puedes obtener la tasa de cambio del BCV para indicarle el precio equivalente en Bolívares.\n\nTienes estrictamente prohibido aplicar o calcular cualquier tipo de impuesto o IVA (16%), ni alterar los precios recuperados. Entrega la información tal cual la base de datos la reporta.\n\nTampoco respondas a preguntas ajenas a la ferretería, como cultura general, entretenimiento, programación, etc.\n\nMEMORIA A LARGO PLAZO (Engram):\n- Al comenzar cada conversación, DEBES usar la herramienta buscar_memoria_engram buscando el número de teléfono del cliente para saber si ya lo has atendido antes.\n- Si el cliente te da un dato clave durante la charla, guardalo INMEDIATAMENTE usando la herramienta guardar_memoria_engram.\n- Si un cliente te pregunta por un producto que no tiene existencia o no está en el catálogo, usa buscar_memoria_engram para buscar alternativas sugeridas.\n\nSi no encuentras el producto en la base de datos tras buscarlo, o si el cliente tiene un problema complejo o solicita explícitamente hablar con una persona, responde exactamente con la palabra clave: [ESCALAR_HUMANO]."
+        }
+      },
+      "id": "ai_agent_node",
+      "name": "AI Agent",
+      "position": [
+        864,
+        400
+      ],
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1
+    },
+    {
+      "parameters": {
+        "model": "google/gemma-4-31b-it:free",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "openrouter_model_node",
+      "name": "OpenRouter Chat Model",
+      "position": [
+        784,
+        592
+      ],
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "credentials": {
+        "openRouterApi": {
+          "id": "xFLxJHbtfTPubbiV",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.telefono }}",
+        "tableName": "n8n_chat_histories",
+        "contextWindowLength": 5
+      },
+      "id": "postgres_memory_node",
+      "name": "Postgres Chat Memory",
+      "position": [
+        928,
+        592
+      ],
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.4,
+      "credentials": {
+        "postgres": {
+          "id": "T3T58v8IelhvvfaC",
+          "name": "Supabase Readonly"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond_escalar",
+              "leftValue": "={{ $json.output }}",
+              "operator": {
+                "operation": "contains",
+                "type": "string"
+              },
+              "rightValue": "[ESCALAR_HUMANO]"
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "id": "if_escalar_node",
+      "name": "Check Escalation",
+      "position": [
+        1264,
+        400
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=UPDATE public.chat_sessions SET estado = 'manual', updated_at = NOW() WHERE telefono = '{{ $('Webhook Trigger').first().json.body.payload.from }}';",
+        "additionalFields": {}
+      },
+      "id": "postgres_set_manual_node",
+      "name": "Set Chat Manual",
+      "position": [
+        1456,
+        256
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "credentials": {
+        "postgres": {
+          "id": "T3T58v8IelhvvfaC",
+          "name": "Supabase Readonly"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha_serrucho:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "REDACTED_WAHA_API_KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ session: 'default', chatId: $('Webhook Trigger').first().json.body.payload.from, text: 'En un momento uno de nuestros asesores comerciales continuará atendiéndote de forma personalizada. ¡Muchas gracias por tu paciencia!' }) }}",
+        "options": {}
+      },
+      "onError": "continueRegularOutput",
+      "id": "waha_handover_node",
+      "name": "Send Handover Message",
+      "position": [
+        1664,
+        256
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha_serrucho:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "REDACTED_WAHA_API_KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ session: 'default', chatId: $('Webhook Trigger').first().json.body.payload.from, text: $json.output }) }}",
+        "options": {}
+      },
+      "id": "waha_agent_node",
+      "name": "Send Agent Response",
+      "position": [
+        1456,
+        464
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "id": "manual_handover_noop",
+      "name": "Manual Handover Active",
+      "position": [
+        864,
+        208
+      ],
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1
+    },
+    {
+      "id": "http_tool_node",
+      "name": "buscar_productos_tool",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        1072,
+        592
+      ],
+      "parameters": {
+        "name": "buscar_productos",
+        "description": "Busca productos de ferretería en la base de datos por nombre, descripción o similitud. Retorna una lista de productos con su código_interno, descripción, precio_venta en dólares y existencia.",
+        "language": "javaScript",
+        "jsCode": "// Busca productos en la base de datos por nombre o descripción\nconst axios = require('axios');\nconst url = 'https://rgniqjfooifchyctnbzu.supabase.co/rest/v1/rpc/buscar_productos';\nconst response = await axios.post(url, { p_busqueda }, {\n  headers: {\n    'apikey': 'REDACTED_SUPABASE_ANON_KEY',\n    'Authorization': 'Bearer REDACTED_SUPABASE_ANON_KEY',\n    'Content-Type': 'application/json'\n  }\n});\nreturn JSON.stringify(response.data);",
+        "specifyInputSchema": true,
+        "schemaType": "fromJson",
+        "jsonSchemaExample": "{\n  \"p_busqueda\": \"martillo\"\n}",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"p_busqueda\": {\n      \"type\": \"string\",\n      \"description\": \"Nombre o descripción del producto a buscar\"\n    }\n  },\n  \"required\": [\n    \"p_busqueda\"\n  ]\n}"
+      }
+    },
+    {
+      "id": "tasa_tool_node",
+      "name": "obtener_tasa_bcv_tool",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        1072,
+        704
+      ],
+      "parameters": {
+        "name": "obtener_tasa_bcv",
+        "description": "Obtiene la tasa de cambio oficial del BCV (Bolívares por Dólar) actual. No requiere parámetros de entrada. Retorna la tasa bcv_usd.",
+        "language": "javaScript",
+        "jsCode": "// Obtiene la tasa de cambio oficial del BCV\nconst axios = require('axios');\nconst url = 'https://rgniqjfooifchyctnbzu.supabase.co/rest/v1/tazas?nombre=eq.actual&select=bcv_usd';\nconst response = await axios.get(url, {\n  headers: {\n    'apikey': 'REDACTED_SUPABASE_ANON_KEY',\n    'Authorization': 'Bearer REDACTED_SUPABASE_ANON_KEY'\n  }\n});\nreturn JSON.stringify(response.data);",
+        "specifyInputSchema": true,
+        "schemaType": "fromJson",
+        "jsonSchemaExample": "{}",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {}\n}"
+      }
+    },
+    {
+      "id": "buscar_memoria_engram_tool",
+      "name": "buscar_memoria_engram_tool",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        1072,
+        832
+      ],
+      "parameters": {
+        "name": "buscar_memoria_engram",
+        "description": "Busca en la memoria a largo plazo (Engram) información relevante del cliente actual (como preferencias de compra, RIF, dirección, métodos de pago comunes) o notas y alternativas sobre productos para optimizar la atención.",
+        "language": "javaScript",
+        "jsCode": "// Busca en la memoria a largo plazo (Engram)\nconst axios = require('axios');\nconst q_encoded = encodeURIComponent(q);\nconst url = `http://host.docker.internal:7437/search?q=${q_encoded}&project=whatsapp-agent&scope=project&limit=5`;\nconst response = await axios.get(url);\nreturn JSON.stringify(response.data);",
+        "specifyInputSchema": true,
+        "schemaType": "fromJson",
+        "jsonSchemaExample": "{\n  \"q\": \"584129999999\"\n}",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"q\": {\n      \"type\": \"string\",\n      \"description\": \"Término de búsqueda (número de teléfono del cliente, nombre de producto, etc.)\"\n    }\n  },\n  \"required\": [\n    \"q\"\n  ]\n}"
+      }
+    },
+    {
+      "id": "guardar_memoria_engram_tool",
+      "name": "guardar_memoria_engram_tool",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        1072,
+        944
+      ],
+      "parameters": {
+        "name": "guardar_memoria_engram",
+        "description": "Guarda o actualiza un dato clave, preferencia o nota del cliente o producto en la memoria a largo plazo (Engram) para que esté disponible en futuras conversaciones.",
+        "language": "javaScript",
+        "jsCode": "// Guarda un dato en la memoria a largo plazo (Engram)\nconst axios = require('axios');\nconst response = await axios.post('http://host.docker.internal:7437/observations', {\n  session_id: session_id,\n  project: 'whatsapp-agent',\n  scope: 'project',\n  type: type,\n  title: title,\n  content: content,\n  topic_key: topic_key\n}, {\n  headers: { 'Content-Type': 'application/json' }\n});\nreturn JSON.stringify(response.data);",
+        "specifyInputSchema": true,
+        "schemaType": "fromJson",
+        "jsonSchemaExample": "{\n  \"session_id\": \"584129999999\",\n  \"type\": \"preference\",\n  \"title\": \"Método de pago\",\n  \"content\": \"Pago Móvil\",\n  \"topic_key\": \"cliente:584129999999\"\n}",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"session_id\": {\n      \"type\": \"string\",\n      \"description\": \"Identificador único de la sesión (número de teléfono del cliente)\"\n    },\n    \"type\": {\n      \"type\": \"string\",\n      \"description\": \"Tipo de memoria (preference, decision, bugfix, architecture, learning, etc.)\"\n    },\n    \"title\": {\n      \"type\": \"string\",\n      \"description\": \"Título corto y descriptivo de la memoria\"\n    },\n    \"content\": {\n      \"type\": \"string\",\n      \"description\": \"Contenido detallado de la memoria (preferencias, notas, datos del cliente)\"\n    },\n    \"topic_key\": {\n      \"type\": \"string\",\n      \"description\": \"Clave temática para agrupar memorias relacionadas (ej. cliente:584129999999, producto:martillo)\"\n    }\n  },\n  \"required\": [\n    \"session_id\",\n    \"type\",\n    \"title\",\n    \"content\",\n    \"topic_key\"\n  ]\n}"
+      }
+    }
+  ],
+  "connections": {
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Check Escalation",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Check Chat Session": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Is Manual Handover?",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Check Escalation": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Set Chat Manual",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Send Agent Response",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Is Manual Handover?": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Manual Handover Active",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "AI Agent",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "index": 0,
+            "node": "AI Agent",
+            "type": "ai_languageModel"
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "index": 0,
+            "node": "AI Agent",
+            "type": "ai_memory"
+          }
+        ]
+      ]
+    },
+    "Set Chat Manual": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Send Handover Message",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Check Chat Session",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "buscar_productos_tool": {
+      "ai_tool": [
+        [
+          {
+            "index": 0,
+            "node": "AI Agent",
+            "type": "ai_tool"
+          }
+        ]
+      ]
+    },
+    "obtener_tasa_bcv_tool": {
+      "ai_tool": [
+        [
+          {
+            "index": 0,
+            "node": "AI Agent",
+            "type": "ai_tool"
+          }
+        ]
+      ]
+    },
+    "buscar_memoria_engram_tool": {
+      "ai_tool": [
+        [
+          {
+            "index": 0,
+            "node": "AI Agent",
+            "type": "ai_tool"
+          }
+        ]
+      ]
+    },
+    "guardar_memoria_engram_tool": {
+      "ai_tool": [
+        [
+          {
+            "index": 0,
+            "node": "AI Agent",
+            "type": "ai_tool"
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": {},
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "c60105c9-9c06-463e-a4be-4451bee605df",
+  "activeVersionId": "c60105c9-9c06-463e-a4be-4451bee605df",
+  "versionCounter": 34,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-06-05T05:13:56.487Z",
+      "createdAt": "2026-06-05T05:13:56.487Z",
+      "role": "workflow:owner",
+      "workflowId": "ugHOTQv3Vb6cuTct",
+      "projectId": "0bwgQJYbYsIvgtFZ",
+      "project": {
+        "updatedAt": "2026-06-05T04:01:35.590Z",
+        "createdAt": "2026-06-05T03:59:28.066Z",
+        "id": "0bwgQJYbYsIvgtFZ",
+        "name": "El Serrucho Ferreteria <elserruchoca@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "81133dc8-0eae-45c0-873d-6a72f6f021e0"
+      }
+    }
+  ],
+  "tags": []
+}

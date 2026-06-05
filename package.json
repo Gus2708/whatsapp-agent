@@ -1,0 +1,21 @@
+{
+  "name": "whatsapp-agent-serrucho",
+  "version": "1.0.0",
+  "description": "Agente de automatización de WhatsApp e IA para Ferretería El Serrucho",
+  "main": "setup.js",
+  "scripts": {
+    "setup": "node setup.js",
+    "start": "powershell -ExecutionPolicy Bypass -File ./start_agent.ps1"
+  },
+  "keywords": [
+    "whatsapp",
+    "agent",
+    "n8n",
+    "supabase",
+    "engram",
+    "waha"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {}
+}

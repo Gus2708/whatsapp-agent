@@ -1,0 +1,25 @@
+{
+  "comercio": {
+    "nombre": "Ferretería El Serrucho",
+    "ubicacion_central": "Mene Mauroa, Estado Falcón",
+    "horarios_atencion": {
+      "dias": "Lunes a Sábado",
+      "horario": "08:00 a 18:00 (Con descanso para almuerzo de 13:00 a 14:00)"
+    }
+  },
+  "politicas_despacho": {
+    "disponible": false,
+    "mensaje": "No contamos con servicio de envíos a domicilio. Todos los pedidos deben ser retirados en nuestra tienda física."
+  },
+  "metodos_pago_aceptados": [
+    "Pago Móvil (tasa oficial BCV)",
+    "Efectivo (USD / Moneda Local)",
+    "Transferencia Bancaria",
+    "Zelle (para compras mayores a $20.00 USD)"
+  ],
+  "politicas_devolucion": {
+    "admitida": true,
+    "plazo_maximo_dias": 7,
+    "restricciones": "El artículo debe presentarse cerrado en su empaque de origen, sin marcas físicas de uso y con la factura original de compra."
+  }
+}

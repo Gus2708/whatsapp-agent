@@ -1,0 +1,58 @@
+version: '3.8'
+
+networks:
+  serrucho_net:
+    driver: bridge
+
+volumes:
+  n8n_data:
+    external: true
+  waha_session_storage:
+
+services:
+  waha:
+    image: devlikeapro/waha:latest
+    container_name: waha_serrucho
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    networks:
+      - serrucho_net
+    environment:
+      - WAHA_DASHBOARD_ENABLED=true
+      - WAHA_DASHBOARD_USERNAME=admin_serrucho
+      - WAHA_DASHBOARD_PASSWORD=REDACTED_WAHA_PASSWORD
+      - WHATSAPP_SWAGGER_USERNAME=admin_serrucho
+      - WHATSAPP_SWAGGER_PASSWORD=REDACTED_WAHA_PASSWORD
+      - WAHA_API_KEY=REDACTED_WAHA_API_KEY
+      - WHATSAPP_API_KEY=REDACTED_WAHA_API_KEY
+      - WHATSAPP_DEFAULT_ENGINE=WEBJS
+    volumes:
+      - waha_session_storage:/app/.sessions
+
+  n8n:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: n8n_serrucho
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    networks:
+      - serrucho_net
+    depends_on:
+      - waha
+    environment:
+      - NODE_ENV=production
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
+      - N8N_LOG_LEVEL=debug
+      - NODE_FUNCTION_ALLOW_BUILTIN=*
+      - NODE_FUNCTION_ALLOW_EXTERNAL=*
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./n8n_workflow.json:/etc/n8n/n8n_workflow.json:ro
