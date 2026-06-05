@@ -26,7 +26,20 @@ services:
       - WHATSAPP_SWAGGER_PASSWORD=REDACTED_WAHA_PASSWORD
       - WAHA_API_KEY=REDACTED_WAHA_API_KEY
       - WHATSAPP_API_KEY=REDACTED_WAHA_API_KEY
-      - WHATSAPP_DEFAULT_ENGINE=WEBJS
+      # WEBJS tiene problemas en Docker Linux. NOWEB es más estable en contenedores.
+      - WHATSAPP_DEFAULT_ENGINE=NOWEB
+      # Reinicia automáticamente las sesiones guardadas al (re)arrancar el contenedor.
+      # Combinado con restart:unless-stopped y la auth persistida en el volumen,
+      # la sesión "default" vuelve a WORKING sola sin re-escanear el QR.
+      - WHATSAPP_RESTART_ALL_SESSIONS=True
+      # Store de NOWEB: necesario para historial/contactos y mayor estabilidad de sesión.
+      - WHATSAPP_DEFAULT_CONFIG_NOWEB_STORE_ENABLED=True
+      - WHATSAPP_DEFAULT_CONFIG_NOWEB_STORE_FULLSYNC=True
+      # Webhook global -> al escanear el QR los mensajes entrantes van directo a n8n.
+      # Se usa host.docker.internal (no 'n8n_serrucho') porque WAHA rechaza hostnames
+      # con guion bajo; esta ruta alcanza n8n por el puerto publicado en el host.
+      - WHATSAPP_HOOK_URL=http://host.docker.internal:5678/webhook/whatsapp/inbound
+      - WHATSAPP_HOOK_EVENTS=message
     volumes:
       - waha_session_storage:/app/.sessions
 

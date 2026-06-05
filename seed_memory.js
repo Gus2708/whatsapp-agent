@@ -43,19 +43,16 @@ const observations = [
   }
 ];
 
-function postObservation(obs) {
-  return new Promise((resolve, reject) => {
-    const payload = JSON.stringify({
-      project,
-      scope: 'project',
-      session_id: 'seed-session',
-      ...obs
-    });
+const SESSION_ID = 'seed-session';
 
+// Helper genérico para POST JSON contra la API HTTP de Engram
+function postJson(path, body) {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify(body);
     const options = {
       hostname: 'localhost',
       port,
-      path: '/observations',
+      path,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -68,7 +65,7 @@ function postObservation(obs) {
       res.on('data', (chunk) => { data += chunk; });
       res.on('end', () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(JSON.parse(data));
+          resolve(data ? JSON.parse(data) : {});
         } else {
           reject(new Error(`Código ${res.statusCode}: ${data}`));
         }
@@ -81,8 +78,28 @@ function postObservation(obs) {
   });
 }
 
+// Engram >=1.x exige que la sesión exista antes de guardar observaciones.
+// Es idempotente desde el punto de vista del llamador: si ya existe, se ignora.
+async function ensureSession() {
+  try {
+    await postJson('/sessions', { id: SESSION_ID, project, scope: 'project' });
+  } catch (e) {
+    // Si la sesión ya existe, el servidor responde con error: lo ignoramos.
+  }
+}
+
+function postObservation(obs) {
+  return postJson('/observations', {
+    project,
+    scope: 'project',
+    session_id: SESSION_ID,
+    ...obs
+  });
+}
+
 async function run() {
   console.log('🌱 Sembrando memorias base en Engram...');
+  await ensureSession();
   for (const obs of observations) {
     try {
       await postObservation(obs);

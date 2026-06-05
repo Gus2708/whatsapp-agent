@@ -1,11 +1,5 @@
 {
-  "updatedAt": "2026-06-05T07:54:23.209Z",
-  "createdAt": "2026-06-05T05:13:56.483Z",
-  "id": "ugHOTQv3Vb6cuTct",
   "name": "whatsapp agent",
-  "description": null,
-  "active": true,
-  "isArchived": false,
   "nodes": [
     {
       "parameters": {
@@ -39,7 +33,7 @@
       "typeVersion": 2.6,
       "credentials": {
         "postgres": {
-          "id": "T3T58v8IelhvvfaC",
+          "id": "1dtm0jLulZEFrKtB",
           "name": "Supabase Readonly"
         }
       },
@@ -83,7 +77,7 @@
         "promptType": "define",
         "text": "={{ $('Webhook Trigger').first().json.body.payload.body }}",
         "options": {
-          "systemMessage": "Actúas como Perucho, el experto ferretero y asesor comercial de Ferretería El Serrucho. Tu tienda física está ubicada en Mene Mauroa, Estado Falcón.\n\nTus horarios de atención son de lunes a sábado de 08:00 AM a 06:00 PM, con descanso para el almuerzo de 01:00 PM a 02:00 PM. Fuera de este horario debes indicar al cliente amablemente que está fuera del horario comercial.\n\nNo contamos con sistemas de envío a domicilio. Todos los pedidos deben ser retirados directamente en la tienda en Mene Mauroa.\n\nMétodos de pago aceptados:\n- Pago Móvil (a tasa oficial BCV)\n- Efectivo (en USD o bolívares)\n- Transferencia Bancaria\n- Zelle (para compras mayores a $20.00 USD)\n\nPolíticas de devolución:\n- Se admiten devoluciones hasta un plazo máximo de 7 días, siempre y cuando el artículo se presente cerrado en su empaque original, sin marcas de uso y con su factura original de compra.\n\nTu objetivo único es resolver dudas sobre el catálogo de productos y precios utilizando tus herramientas. Debes reportar precios exactamente en dólares estadounidenses (USD) usando el formato '$[precio_venta] USD' y la existencia exacta en stock de la base de datos (existencia). Si el cliente lo solicita, puedes obtener la tasa de cambio del BCV para indicarle el precio equivalente en Bolívares.\n\nTienes estrictamente prohibido aplicar o calcular cualquier tipo de impuesto o IVA (16%), ni alterar los precios recuperados. Entrega la información tal cual la base de datos la reporta.\n\nTampoco respondas a preguntas ajenas a la ferretería, como cultura general, entretenimiento, programación, etc.\n\nMEMORIA A LARGO PLAZO (Engram):\n- Al comenzar cada conversación, DEBES usar la herramienta buscar_memoria_engram buscando el número de teléfono del cliente para saber si ya lo has atendido antes.\n- Si el cliente te da un dato clave durante la charla, guardalo INMEDIATAMENTE usando la herramienta guardar_memoria_engram.\n- Si un cliente te pregunta por un producto que no tiene existencia o no está en el catálogo, usa buscar_memoria_engram para buscar alternativas sugeridas.\n\nSi no encuentras el producto en la base de datos tras buscarlo, o si el cliente tiene un problema complejo o solicita explícitamente hablar con una persona, responde exactamente con la palabra clave: [ESCALAR_HUMANO]."
+          "systemMessage": "Actúas como Perucho, el experto ferretero y asesor comercial de Ferretería El Serrucho. Tu tienda física está ubicada en Mene Mauroa, Estado Falcón.\n\nTus horarios de atención son de lunes a sábado de 08:00 AM a 06:00 PM, con descanso para el almuerzo de 01:00 PM a 02:00 PM. Fuera de este horario debes indicar al cliente amablemente que está fuera del horario comercial.\n\nNo contamos con sistemas de envío a domicilio. Todos los pedidos deben ser retirados directamente en la tienda en Mene Mauroa.\n\nMétodos de pago aceptados:\n- Pago Móvil (a tasa oficial BCV)\n- Efectivo (en USD o bolívares)\n- Transferencia Bancaria\n- Zelle (para compras mayores a $20.00 USD)\n\nPolíticas de devolución:\n- Se admiten devoluciones hasta un plazo máximo de 7 días, siempre y cuando el artículo se presente cerrado en su empaque original, sin marcas de uso y con su factura original de compra.\n\nTu objetivo único es resolver dudas sobre el catálogo de productos y precios utilizando tus herramientas. Debes reportar precios exactamente en dólares estadounidenses (USD) usando el formato '$[precio_venta] USD' y la existencia exacta en stock de la base de datos (existencia). Si el cliente lo solicita, puedes obtener la tasa de cambio del BCV para indicarle el precio equivalente en Bolívares.\n\nTienes estrictamente prohibido aplicar o calcular cualquier tipo de impuesto o IVA (16%), ni alterar los precios recuperados. Entrega la información tal cual la base de datos la reporta.\n\nTampoco respondas a preguntas ajenas a la ferretería, como cultura general, entretenimiento, programación, etc.\n\nMEMORIA A LARGO PLAZO (Engram):\n- Al comenzar cada conversación, DEBES usar la herramienta buscar_memoria_engram buscando el número de teléfono del cliente para saber si ya lo has atendido antes.\n- Si el cliente te da un dato clave durante la charla, guardalo INMEDIATAMENTE usando la herramienta guardar_memoria_engram.\n- Si un cliente te pregunta por un producto que no tiene existencia o no está en el catálogo, usa buscar_memoria_engram para buscar alternativas sugeridas.\n\nSi no encuentras el producto en la base de datos tras buscarlo, o si el cliente tiene un problema complejo o solicita explícitamente hablar con una persona, responde exactamente con la palabra clave: [ESCALAR_HUMANO].\n\n═══ FORMATO DE RESPUESTA EN WHATSAPP (OBLIGATORIO) ═══\nWhatsApp NO renderiza Markdown. Sigue estas reglas SIEMPRE:\n- PROHIBIDO usar tablas Markdown (nada de |---|---| ni columnas).\n- Negrita = UN solo asterisco: *así*. NUNCA dobles asteriscos (**así** se ve mal).\n- Cursiva = _así_. Tachado = ~así~.\n- Para listar productos usa una línea por producto con este patrón:\n  🔧 *NOMBRE DEL PRODUCTO* — $PRECIO USD · Stock: N\n  (si está agotado, escribe \"agotado\" en vez del número)\n- Sé breve y cálido. Muestra como máximo 4 o 5 productos por respuesta; si hay más, ofrece afinar la búsqueda.\n- No muestres el código interno salvo que el cliente lo pida.\n- Usa emojis con moderación (ferretería: 🔧🔩🪚🧰🛠️).\n- Reporta SIEMPRE el precio tal cual viene de la base de datos como '$[precio] USD'. Si existencia es 0 o el producto no está disponible, dilo claramente y, si puedes, ofrece una alternativa que sí tenga stock."
         }
       },
       "id": "ai_agent_node",
@@ -97,7 +91,7 @@
     },
     {
       "parameters": {
-        "modelName": "models/gemini-1.5-flash",
+        "model": "openai/gpt-4o-mini",
         "options": {
           "temperature": 0.3
         }
@@ -108,35 +102,28 @@
         784,
         592
       ],
-      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
-      "typeVersion": 1.1,
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
       "credentials": {
-        "googlePalmApi": {
-          "id": "DH4JMXdZsfUuNN00",
-          "name": "Google Gemini API"
+        "openRouterApi": {
+          "id": "4tgq95GQzWAS8kMd",
+          "name": "OpenRouter (free)"
         }
       }
     },
     {
-      "parameters": {
-        "sessionIdType": "customKey",
-        "sessionKey": "={{ $json.telefono }}",
-        "tableName": "n8n_chat_histories",
-        "contextWindowLength": 5
-      },
       "id": "postgres_memory_node",
-      "name": "Postgres Chat Memory",
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
       "position": [
         928,
         592
       ],
-      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
-      "typeVersion": 1.4,
-      "credentials": {
-        "postgres": {
-          "id": "T3T58v8IelhvvfaC",
-          "name": "Supabase Readonly"
-        }
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Webhook Trigger').first().json.body.payload.from }}",
+        "contextWindowLength": 10
       }
     },
     {
@@ -188,7 +175,7 @@
       "typeVersion": 2.6,
       "credentials": {
         "postgres": {
-          "id": "T3T58v8IelhvvfaC",
+          "id": "1dtm0jLulZEFrKtB",
           "name": "Supabase Readonly"
         }
       },
@@ -237,7 +224,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ session: 'default', chatId: $('Webhook Trigger').first().json.body.payload.from, text: $json.output }) }}",
+        "jsonBody": "={{ JSON.stringify({ session: 'default', chatId: $('Webhook Trigger').first().json.body.payload.from, text: ($json.output || '').replace(/\\*\\*/g, '*').trim() }) }}",
         "options": {}
       },
       "id": "waha_agent_node",
@@ -274,7 +261,7 @@
         "name": "buscar_productos",
         "description": "Busca productos de ferretería en la base de datos por nombre, descripción o similitud. Retorna una lista de productos con su código_interno, descripción, precio_venta en dólares y existencia.",
         "language": "javaScript",
-        "jsCode": "// Busca productos en la base de datos por nombre o descripción\nconst axios = require('axios');\nconst url = 'https://rgniqjfooifchyctnbzu.supabase.co/rest/v1/rpc/buscar_productos';\nconst response = await axios.post(url, { p_busqueda }, {\n  headers: {\n    'apikey': 'REDACTED_SUPABASE_ANON_KEY',\n    'Authorization': 'Bearer REDACTED_SUPABASE_ANON_KEY',\n    'Content-Type': 'application/json'\n  }\n});\nreturn JSON.stringify(response.data);",
+        "jsCode": "// Busca productos por nombre/descripcion. Limpia el resultado para evitar alucinaciones.\nconst axios = require('axios');\nconst { p_busqueda } = query;\nconst url = 'https://rgniqjfooifchyctnbzu.supabase.co/rest/v1/rpc/buscar_productos';\nconst resp = await axios.post(url, { p_busqueda }, {\n  headers: { 'apikey': 'REDACTED_SUPABASE_ANON_KEY', 'Authorization': 'Bearer REDACTED_SUPABASE_ANON_KEY', 'Content-Type': 'application/json' }\n});\nconst productos = (resp.data || []).map(p => {\n  const stock = Number(p.existencia);\n  return {\n    codigo: p.codigo_interno,\n    nombre: p.descripcion,\n    precio_usd: Number(p.precio_venta),\n    existencia: stock > 0 ? stock : 0,\n    disponible: stock > 0\n  };\n});\nif (productos.length === 0) return 'No se encontraron productos para: ' + p_busqueda;\nreturn JSON.stringify(productos);",
         "specifyInputSchema": true,
         "schemaType": "fromJson",
         "jsonSchemaExample": "{\n  \"p_busqueda\": \"martillo\"\n}",
@@ -294,7 +281,7 @@
         "name": "obtener_tasa_bcv",
         "description": "Obtiene la tasa de cambio oficial del BCV (Bolívares por Dólar) actual. No requiere parámetros de entrada. Retorna la tasa bcv_usd.",
         "language": "javaScript",
-        "jsCode": "// Obtiene la tasa de cambio oficial del BCV\nconst axios = require('axios');\nconst url = 'https://rgniqjfooifchyctnbzu.supabase.co/rest/v1/tazas?nombre=eq.actual&select=bcv_usd';\nconst response = await axios.get(url, {\n  headers: {\n    'apikey': 'REDACTED_SUPABASE_ANON_KEY',\n    'Authorization': 'Bearer REDACTED_SUPABASE_ANON_KEY'\n  }\n});\nreturn JSON.stringify(response.data);",
+        "jsCode": "// Obtiene la tasa oficial BCV (Bs por USD).\nconst axios = require('axios');\nconst url = 'https://rgniqjfooifchyctnbzu.supabase.co/rest/v1/tazas?nombre=eq.actual&select=bcv_usd';\nconst resp = await axios.get(url, {\n  headers: { 'apikey': 'REDACTED_SUPABASE_ANON_KEY', 'Authorization': 'Bearer REDACTED_SUPABASE_ANON_KEY' }\n});\nconst tasa = resp.data && resp.data[0] && resp.data[0].bcv_usd;\nreturn JSON.stringify({ bcv_usd: tasa });",
         "specifyInputSchema": true,
         "schemaType": "fromJson",
         "jsonSchemaExample": "{}",
@@ -314,7 +301,7 @@
         "name": "buscar_memoria_engram",
         "description": "Busca en la memoria a largo plazo (Engram) información relevante del cliente actual (como preferencias de compra, RIF, dirección, métodos de pago comunes) o notas y alternativas sobre productos para optimizar la atención.",
         "language": "javaScript",
-        "jsCode": "// Busca en la memoria a largo plazo (Engram)\nconst axios = require('axios');\nconst q_encoded = encodeURIComponent(q);\nconst url = `http://host.docker.internal:7437/search?q=${q_encoded}&project=whatsapp-agent&scope=project&limit=5`;\nconst response = await axios.get(url);\nreturn JSON.stringify(response.data);",
+        "jsCode": "// Busca en la memoria a largo plazo (Engram).\nconst axios = require('axios');\nconst { q } = query;\nconst url = 'http://host.docker.internal:7437/search?q=' + encodeURIComponent(q) + '&project=whatsapp-agent&scope=project&limit=5';\ntry {\n  const resp = await axios.get(url);\n  return JSON.stringify(resp.data);\n} catch (e) {\n  return JSON.stringify({ resultados: [], nota: 'memoria no disponible' });\n}",
         "specifyInputSchema": true,
         "schemaType": "fromJson",
         "jsonSchemaExample": "{\n  \"q\": \"584129999999\"\n}",
@@ -334,7 +321,7 @@
         "name": "guardar_memoria_engram",
         "description": "Guarda o actualiza un dato clave, preferencia o nota del cliente o producto en la memoria a largo plazo (Engram) para que esté disponible en futuras conversaciones.",
         "language": "javaScript",
-        "jsCode": "// Guarda un dato en la memoria a largo plazo (Engram)\nconst axios = require('axios');\nconst response = await axios.post('http://host.docker.internal:7437/observations', {\n  session_id: session_id,\n  project: 'whatsapp-agent',\n  scope: 'project',\n  type: type,\n  title: title,\n  content: content,\n  topic_key: topic_key\n}, {\n  headers: { 'Content-Type': 'application/json' }\n});\nreturn JSON.stringify(response.data);",
+        "jsCode": "// Guarda un dato del cliente/producto en la memoria a largo plazo (Engram).\nconst axios = require('axios');\nconst { session_id, type, title, content, topic_key } = query;\ntry {\n  await axios.post('http://host.docker.internal:7437/sessions', { id: session_id, project: 'whatsapp-agent', scope: 'project' });\n} catch (e) { /* sesion ya existe */ }\ntry {\n  const resp = await axios.post('http://host.docker.internal:7437/observations', {\n    session_id, project: 'whatsapp-agent', scope: 'project', type, title, content, topic_key\n  }, { headers: { 'Content-Type': 'application/json' } });\n  return JSON.stringify({ guardado: true, id: resp.data && resp.data.id });\n} catch (e) {\n  return JSON.stringify({ guardado: false, error: String(e.message) });\n}",
         "specifyInputSchema": true,
         "schemaType": "fromJson",
         "jsonSchemaExample": "{\n  \"session_id\": \"584129999999\",\n  \"type\": \"preference\",\n  \"title\": \"Método de pago\",\n  \"content\": \"Pago Móvil\",\n  \"topic_key\": \"cliente:584129999999\"\n}",
@@ -412,17 +399,6 @@
         ]
       ]
     },
-    "Postgres Chat Memory": {
-      "ai_memory": [
-        [
-          {
-            "index": 0,
-            "node": "AI Agent",
-            "type": "ai_memory"
-          }
-        ]
-      ]
-    },
     "Set Chat Manual": {
       "main": [
         [
@@ -488,38 +464,21 @@
           }
         ]
       ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "index": 0,
+            "node": "AI Agent",
+            "type": "ai_memory"
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
-  },
-  "staticData": null,
-  "meta": {},
-  "nodeGroups": [],
-  "pinData": {},
-  "versionId": "c60105c9-9c06-463e-a4be-4451bee605df",
-  "activeVersionId": "c60105c9-9c06-463e-a4be-4451bee605df",
-  "versionCounter": 34,
-  "triggerCount": 1,
-  "shared": [
-    {
-      "updatedAt": "2026-06-05T05:13:56.487Z",
-      "createdAt": "2026-06-05T05:13:56.487Z",
-      "role": "workflow:owner",
-      "workflowId": "ugHOTQv3Vb6cuTct",
-      "projectId": "0bwgQJYbYsIvgtFZ",
-      "project": {
-        "updatedAt": "2026-06-05T04:01:35.590Z",
-        "createdAt": "2026-06-05T03:59:28.066Z",
-        "id": "0bwgQJYbYsIvgtFZ",
-        "name": "El Serrucho Ferreteria <elserruchoca@gmail.com>",
-        "type": "personal",
-        "icon": null,
-        "description": null,
-        "creatorId": "81133dc8-0eae-45c0-873d-6a72f6f021e0"
-      }
-    }
-  ],
-  "tags": []
+  }
 }
