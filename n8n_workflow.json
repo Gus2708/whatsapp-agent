@@ -190,7 +190,7 @@
           "parameters": [
             {
               "name": "X-API-Key",
-              "value": "REDACTED_WAHA_API_KEY"
+              "value": "{{$env.WAHA_API_KEY}}"
             }
           ]
         },
@@ -218,7 +218,7 @@
           "parameters": [
             {
               "name": "X-API-Key",
-              "value": "REDACTED_WAHA_API_KEY"
+              "value": "{{$env.WAHA_API_KEY}}"
             }
           ]
         },
@@ -261,7 +261,7 @@
         "name": "buscar_productos",
         "description": "Busca productos de ferretería en la base de datos por nombre, descripción o similitud. Retorna una lista de productos con su código_interno, descripción, precio_venta en dólares y existencia.",
         "language": "javaScript",
-        "jsCode": "// Busca productos por nombre/descripcion. Limpia el resultado para evitar alucinaciones.\nconst axios = require('axios');\nconst { p_busqueda } = query;\nconst url = 'https://rgniqjfooifchyctnbzu.supabase.co/rest/v1/rpc/buscar_productos';\nconst resp = await axios.post(url, { p_busqueda }, {\n  headers: { 'apikey': 'REDACTED_SUPABASE_ANON_KEY', 'Authorization': 'Bearer REDACTED_SUPABASE_ANON_KEY', 'Content-Type': 'application/json' }\n});\nconst productos = (resp.data || []).map(p => {\n  const stock = Number(p.existencia);\n  return {\n    codigo: p.codigo_interno,\n    nombre: p.descripcion,\n    precio_usd: Number(p.precio_venta),\n    existencia: stock > 0 ? stock : 0,\n    disponible: stock > 0\n  };\n});\nif (productos.length === 0) return 'No se encontraron productos para: ' + p_busqueda;\nreturn JSON.stringify(productos);",
+        "jsCode": "// Busca productos por nombre/descripcion. Limpia el resultado para evitar alucinaciones.\nconst axios = require('axios');\nconst { p_busqueda } = query;\nconst url = 'https://rgniqjfooifchyctnbzu.supabase.co/rest/v1/rpc/buscar_productos';\nconst resp = await axios.post(url, { p_busqueda }, {\n  headers: { 'apikey': process.env.SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + process.env.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }\n});\nconst productos = (resp.data || []).map(p => {\n  const stock = Number(p.existencia);\n  return {\n    codigo: p.codigo_interno,\n    nombre: p.descripcion,\n    precio_usd: Number(p.precio_venta),\n    existencia: stock > 0 ? stock : 0,\n    disponible: stock > 0\n  };\n});\nif (productos.length === 0) return 'No se encontraron productos para: ' + p_busqueda;\nreturn JSON.stringify(productos);",
         "specifyInputSchema": true,
         "schemaType": "fromJson",
         "jsonSchemaExample": "{\n  \"p_busqueda\": \"martillo\"\n}",
@@ -281,7 +281,7 @@
         "name": "obtener_tasa_bcv",
         "description": "Obtiene la tasa de cambio oficial del BCV (Bolívares por Dólar) actual. No requiere parámetros de entrada. Retorna la tasa bcv_usd.",
         "language": "javaScript",
-        "jsCode": "// Obtiene la tasa oficial BCV (Bs por USD).\nconst axios = require('axios');\nconst url = 'https://rgniqjfooifchyctnbzu.supabase.co/rest/v1/tazas?nombre=eq.actual&select=bcv_usd';\nconst resp = await axios.get(url, {\n  headers: { 'apikey': 'REDACTED_SUPABASE_ANON_KEY', 'Authorization': 'Bearer REDACTED_SUPABASE_ANON_KEY' }\n});\nconst tasa = resp.data && resp.data[0] && resp.data[0].bcv_usd;\nreturn JSON.stringify({ bcv_usd: tasa });",
+        "jsCode": "// Obtiene la tasa oficial BCV (Bs por USD).\nconst axios = require('axios');\nconst url = 'https://rgniqjfooifchyctnbzu.supabase.co/rest/v1/tazas?nombre=eq.actual&select=bcv_usd';\nconst resp = await axios.get(url, {\n  headers: { 'apikey': process.env.SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + process.env.SUPABASE_ANON_KEY }\n});\nconst tasa = resp.data && resp.data[0] && resp.data[0].bcv_usd;\nreturn JSON.stringify({ bcv_usd: tasa });",
         "specifyInputSchema": true,
         "schemaType": "fromJson",
         "jsonSchemaExample": "{}",

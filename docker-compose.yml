@@ -20,12 +20,12 @@ services:
       - serrucho_net
     environment:
       - WAHA_DASHBOARD_ENABLED=true
-      - WAHA_DASHBOARD_USERNAME=admin_serrucho
-      - WAHA_DASHBOARD_PASSWORD=REDACTED_WAHA_PASSWORD
-      - WHATSAPP_SWAGGER_USERNAME=admin_serrucho
-      - WHATSAPP_SWAGGER_PASSWORD=REDACTED_WAHA_PASSWORD
-      - WAHA_API_KEY=REDACTED_WAHA_API_KEY
-      - WHATSAPP_API_KEY=REDACTED_WAHA_API_KEY
+      - WAHA_DASHBOARD_USERNAME=${WAHA_DASHBOARD_USERNAME}
+      - WAHA_DASHBOARD_PASSWORD=${WAHA_DASHBOARD_PASSWORD}
+      - WHATSAPP_SWAGGER_USERNAME=${WAHA_DASHBOARD_USERNAME}
+      - WHATSAPP_SWAGGER_PASSWORD=${WAHA_DASHBOARD_PASSWORD}
+      - WAHA_API_KEY=${WAHA_API_KEY}
+      - WHATSAPP_API_KEY=${WAHA_API_KEY}
       # WEBJS tiene problemas en Docker Linux. NOWEB es más estable en contenedores.
       - WHATSAPP_DEFAULT_ENGINE=NOWEB
       # Reinicia automáticamente las sesiones guardadas al (re)arrancar el contenedor.
@@ -65,6 +65,8 @@ services:
       - N8N_LOG_LEVEL=debug
       - NODE_FUNCTION_ALLOW_BUILTIN=*
       - NODE_FUNCTION_ALLOW_EXTERNAL=*
+      - WAHA_API_KEY=${WAHA_API_KEY}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
     volumes:
       - n8n_data:/home/node/.n8n
       - /var/run/docker.sock:/var/run/docker.sock

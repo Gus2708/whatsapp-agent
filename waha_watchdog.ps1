@@ -9,7 +9,17 @@
 #   $t = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 3)
 #   Register-ScheduledTask -TaskName "WAHA Watchdog Serrucho" -Action $a -Trigger $t -RunLevel Highest -Description "Mantiene viva la sesión de WhatsApp del bot Perucho"
 
-$ApiKey  = "REDACTED_WAHA_API_KEY"
+# Cargar variables del archivo .env del proyecto
+$envFile = "C:\Proyect\whatsapp-agent\.env"
+if (Test-Path $envFile) {
+  Get-Content $envFile | ForEach-Object {
+    if ($_ -match '^\s*([^#][^=]+)=(.*)$') {
+      [System.Environment]::SetEnvironmentVariable($Matches[1].Trim(), $Matches[2].Trim(), 'Process')
+    }
+  }
+}
+
+$ApiKey  = $env:WAHA_API_KEY
 $Base    = "http://localhost:3000"
 $Session = "default"
 $LogFile = "C:\Proyect\whatsapp-agent\waha_watchdog.log"
