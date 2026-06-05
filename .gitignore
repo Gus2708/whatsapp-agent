@@ -21,6 +21,15 @@ yarn-error.log*
 waha_session_storage/
 n8n_local_storage/
 
+# Logs
+waha_watchdog.log
+
+# QR / imágenes temporales
+qr_whatsapp.png
+
+# MCP config local
+.mcp.json
+
 # Archivos del sistema operativo
 Thumbs.db
 Desktop.ini

@@ -1,0 +1,100 @@
+﻿[
+    {
+        "codigo":  "CEMCSC",
+        "desc":  "CEMENTO GRIS CSC 42.5KG",
+        "precio":  11,
+        "stock":  555,
+        "vendido":  1336
+    },
+    {
+        "codigo":  "01112",
+        "desc":  "CEMENTO GRIS CATATUMBO SELLADO TIPO II IDEAL",
+        "precio":  12,
+        "stock":  25,
+        "vendido":  726
+    },
+    {
+        "codigo":  "05156",
+        "desc":  "TUBO HERRERÍA 2X1X0.80X6MTS",
+        "precio":  10,
+        "stock":  305,
+        "vendido":  315
+    },
+    {
+        "codigo":  "00768",
+        "desc":  "CABILLA ESTRIADA 12MMX12MTS",
+        "precio":  16.5,
+        "stock":  1,
+        "vendido":  246
+    },
+    {
+        "codigo":  "01404",
+        "desc":  "CLAVOS",
+        "precio":  2,
+        "stock":  747,
+        "vendido":  227
+    },
+    {
+        "codigo":  "01174",
+        "desc":  "CERCHA DE 10X6MTS",
+        "precio":  11,
+        "stock":  57,
+        "vendido":  221
+    },
+    {
+        "codigo":  "01729",
+        "desc":  "DISCO C/METAL  FINO 4-1/2X3.2 COVO",
+        "precio":  1,
+        "stock":  211,
+        "vendido":  172
+    },
+    {
+        "codigo":  "00192",
+        "desc":  "ALAMBRON ESTRIADO 5MM X 6MTS",
+        "precio":  2,
+        "stock":  284,
+        "vendido":  166
+    },
+    {
+        "codigo":  "02554",
+        "desc":  "LAMINA DE ZINC 0.20 X 0.80 12 PIES X3.66 MTS IMPORT",
+        "precio":  8.5,
+        "stock":  154,
+        "vendido":  128
+    },
+    {
+        "codigo":  "00189",
+        "desc":  "ALAMBRON  ESTRIADO 8MM  X 6MTS",
+        "precio":  4,
+        "stock":  150,
+        "vendido":  111
+    },
+    {
+        "codigo":  "101006",
+        "desc":  "ALAMBRE GH 700GR",
+        "precio":  2.5,
+        "stock":  168,
+        "vendido":  107
+    },
+    {
+        "codigo":  "00873",
+        "desc":  "CAJETIN OCTAGONAL COMB PLASTICO BLANCO",
+        "precio":  0.75,
+        "stock":  26,
+        "vendido":  102
+    },
+    {
+        "codigo":  "01420",
+        "desc":  "CODO 1/2 90 SCHEDULE",
+        "precio":  0.5,
+        "stock":  74,
+        "vendido":  84
+    },
+    {
+        "codigo":  "02580",
+        "desc":  "LAMINA ZINC ONDULADO AZUL 0.25X810X3.66MTS",
+        "precio":  10.5,
+        "stock":  280,
+        "vendido":  77
+    }
+]
