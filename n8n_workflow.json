@@ -1,11 +1,5 @@
 {
-  "updatedAt": "2026-06-06T12:59:13.371Z",
-  "createdAt": "2026-06-05T05:13:56.483Z",
-  "id": "ugHOTQv3Vb6cuTct",
   "name": "whatsapp agent",
-  "description": null,
-  "active": true,
-  "isArchived": false,
   "nodes": [
     {
       "parameters": {
@@ -31,18 +25,19 @@
             {
               "id": "cond_has_text",
               "leftValue": "={{ $json.body.payload ? $json.body.payload.body : $json.body.body }}",
+              "rightValue": "",
               "operator": {
-                "operation": "isNotEmpty",
-                "type": "string"
-              },
-              "rightValue": ""
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
             }
           ],
           "options": {
             "caseSensitive": true,
             "leftValue": "",
             "typeValidation": "loose",
-            "version": 2
+            "version": 3
           }
         },
         "options": {}
@@ -86,9 +81,7 @@
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "=INSERT INTO public.chat_sessions (telefono, estado, msg_count, window_start) VALUES ('{{ $json.body.payload ? $json.body.payload.from : $json.body.from }}', 'automatico', 1, NOW()) ON CONFLICT (telefono) DO UPDATE SET updated_at = NOW(), msg_count = CASE WHEN NOW() - chat_sessions.window_start > INTERVAL '60 seconds' THEN 1 ELSE chat_sessions.msg_count + 1 END, window_start = CASE WHEN NOW() - chat_sessions.window_start > INTERVAL '60 seconds' THEN NOW() ELSE chat_sessions.window_start END RETURNING estado, msg_count, telefono;",
-        "additionalFields": {}
+        "jsCode": "// Check Chat Session via Supabase REST (reemplaza el nodo Postgres roto).\n// Upsert por telefono con rate-limit por ventana de 60s. Devuelve {estado, msg_count, telefono}.\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };\nlet telefono = null;\ntry { telefono = $('Webhook Trigger').first().json.body.payload.from; } catch (e) {}\nlet estado = 'automatico', msg_count = 1;\ntry {\n  if (telefono) {\n    const r = await axios.get(SB + '/rest/v1/chat_sessions?telefono=eq.' + encodeURIComponent(telefono) + '&select=estado,msg_count,window_start', { headers: H });\n    const row = r.data && r.data[0];\n    const now = Date.now();\n    let window_start;\n    if (row) {\n      estado = row.estado || 'automatico';\n      const ws = row.window_start ? new Date(row.window_start).getTime() : 0;\n      if (now - ws > 60000) { msg_count = 1; window_start = new Date().toISOString(); }\n      else { msg_count = (Number(row.msg_count) || 0) + 1; window_start = row.window_start; }\n    } else {\n      msg_count = 1; window_start = new Date().toISOString();\n    }\n    await axios.post(SB + '/rest/v1/chat_sessions?on_conflict=telefono', { telefono, estado, msg_count, window_start, updated_at: new Date().toISOString() }, { headers: H });\n  }\n} catch (e) {}\nreturn [{ json: { estado, msg_count, telefono } }];\n"
       },
       "id": "postgres_session_node",
       "name": "Check Chat Session",
@@ -96,14 +89,8 @@
         432,
         304
       ],
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
-      "credentials": {
-        "postgres": {
-          "id": "1dtm0jLulZEFrKtB",
-          "name": "Supabase Readonly"
-        }
-      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "onError": "continueRegularOutput"
     },
     {
@@ -114,18 +101,18 @@
             {
               "id": "cond_rate_limit",
               "leftValue": "={{ $json.msg_count }}",
+              "rightValue": 10,
               "operator": {
-                "operation": "gt",
-                "type": "number"
-              },
-              "rightValue": 10
+                "type": "number",
+                "operation": "gt"
+              }
             }
           ],
           "options": {
             "caseSensitive": true,
             "leftValue": "",
             "typeValidation": "loose",
-            "version": 2
+            "version": 3
           }
         },
         "options": {}
@@ -186,9 +173,9 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "={{ $('Webhook Trigger').first().json.body.payload.body }}",
+        "text": "={{ \"[CONTEXTO INTERNO, no mostrar al cliente] telefono_cliente=\" + $('Webhook Trigger').first().json.body.payload.from + \" | nombre_guardado=\" + ($('Cliente Memoria').first().json.cliente_nombre || 'desconocido') + \" | notas_guardadas=\" + ($('Cliente Memoria').first().json.cliente_notas || 'ninguna') + \" ||| Mensaje del cliente: \" + $('Webhook Trigger').first().json.body.payload.body }}",
         "options": {
-          "systemMessage": "Eres *Perucho* 👨🏻‍🔧, el asesor ferretero experto de *Ferretería El Serrucho* 🪚, en Mene Mauroa, Estado Falcón. Eres un ferretero servicial, cálido, paciente y muy cercano, con el trato amable típico de Mene Mauroa. Usas emojis con calidez (👨🏻‍🔧 🪚 👀 👨🏻‍💻 😎 🔧).\n\n═══ DATOS DE LA TIENDA ═══\n- Horario: lunes a sábado, 8:00 AM–6:00 PM (almuerzo 1:00–2:00 PM). Domingos y feriados: cerrado.\n- Solo retiro en tienda física (NO hay delivery ni envíos).\n- Pagos: Pago Móvil (BCV), Efectivo (USD o Bs), Transferencia, Zelle (compras > $20 USD).\n- Devoluciones: hasta 7 días, producto sellado en su empaque, sin uso y con factura.\n\n═══ PRESENTACIÓN (solo primer mensaje) ═══\nSi es el PRIMER mensaje del cliente, INICIA tu respuesta con esta breve presentación y CONTINÚA INMEDIATAMENTE, en el MISMO mensaje, atendiendo lo que pide. NUNCA envíes solo el saludo: siempre acompáñalo con la respuesta (si pregunta por un producto, búscalo y muéstralo justo debajo del saludo).\nSaludo: \"Hola Soy *Perucho* 👨🏻‍🔧 El bot de IA experto ferretero de *El Serrucho* 🪚\"\nSi la conversación ya empezó, NO te vuelvas a presentar; responde directo.\n\n\n═══ PRECIOS — REGLA DE ORO (NO CALCULES NADA TÚ) ═══\nCada producto tiene DOS precios:\n1. *Precio Divisas* (USD): precio base, para pago en dólares.\n2. *Precio Bs (BCV)*: para pago en bolívares se cobra un recargo del 40%.\nLas herramientas YA te entregan estos precios calculados y formateados (campos *_texto). USA ESOS TEXTOS TAL CUAL, cópialos exactamente. JAMÁS hagas tú multiplicaciones, sumas, ni inventes cifras. PROHIBIDO calcular IVA o cualquier otro recargo extra.\n\n═══ FORMATO DE UN PRODUCTO (WhatsApp) ═══\nWhatsApp no usa Markdown de tablas. Negrita = UN asterisco *así* (nunca **doble**). Presenta cada producto EXACTAMENTE con esta estructura:\n\n*Nombre Del Producto*\nDisponibilidad: ✅\nPrecio Divisas: (precio_divisas_texto)\nPrecio Bs (BCV): (precio_bs_texto)\n\nReglas:\n- Nombre en *negrita* y en Formato Tipo Título (no TODO MAYÚSCULAS).\n- Muestra \"Disponibilidad: ✅\". NUNCA reveles el número exacto de unidades.\n- Copia los textos de precio EXACTOS que devuelve la herramienta.\n- Muestra máximo 3 o 4 opciones (las más vendidas primero). Si hay más, ofrece afinar la búsqueda.\n- Cierra cálido, ofreciendo ayuda. Ej: \"¿Te gusta esta opción o prefieres que un empleado experto te atienda mejor? 👨🏻‍🔧\"\n\n═══ PRESUPUESTOS (herramienta hacer_presupuesto) ═══\nREGLA ABSOLUTA: si el cliente menciona 2 o más productos con cantidades, es OBLIGATORIO llamar hacer_presupuesto. JAMÁS inventes precios ni calcules totales tú mismo. Si no llamas la herramienta, estarás dando datos falsos.\nCuando el cliente pida VARIOS productos con cantidades, o \"cuánto sería todo / el total\", USA hacer_presupuesto.\nPasa el parámetro *productos* como UN SOLO TEXTO con formato \"nombre:cantidad\" separando por comas.\nEjemplo: si pide 2 sacos de cemento, 4 cerchas y 10 tubos → productos = \"cemento gris:2, cercha 10x6:4, tubo herreria 1x1:10\"\nLa herramienta devuelve *presupuesto_texto* YA CALCULADO. Responde EXACTAMENTE así:\n\nOk veamos si entiendo bien tu lista y si le atiné al presupuesto 👨🏻‍💻\n\n(PEGA presupuesto_texto SIN CAMBIAR NINGÚN NÚMERO NI SÍMBOLO)\n\nDime si está todo correcto y si quieres proceder con un empleado especializado para facturar 😎. Avísame si hay algún error o quieres cambiar algo, ¡estamos para servirte! 👨🏻‍🔧🪚\n\nREGLA: copia presupuesto_texto carácter por carácter. NUNCA recalcules ni cambies un dígito. Si nota trae texto, menciónalo al final.\n\n\n═══ BÚSQUEDA Y RELEVANCIA ═══\nREGLA ABSOLUTA (la más importante): para CUALQUIER pregunta sobre un producto, precio, disponibilidad o cotización, es OBLIGATORIO llamar la herramienta (buscar_productos o hacer_presupuesto) ANTES de responder. JAMÁS des un precio de tu memoria, JAMÁS inventes cifras ni nombres. Si respondes sin llamar la herramienta, estarás dando datos FALSOS al cliente y eso está terminantemente prohibido. Solo reporta lo que la herramienta devuelve.\n- REGLA DE ORO DE BÚSQUEDA: Siempre usa buscar_productos primero si te preguntan por algún producto o artículo. No asumas que no lo vendemos sin buscarlo primero. Solo declina la venta si el artículo cae estrictamente en una categoría prohibida (como celulares, ropa, electrodomésticos) y buscar_productos no arrojó resultados. Si la búsqueda arroja resultados, significa que sí lo vendemos y debes ofrecerlos.\n- CONSERVA los términos exactos del cliente al buscar o cotizar (marcas, medidas, modelos como \"CSC\", \"12mm\", \"Catatumbo\", \"Ingco\"). NO los simplifiques ni los quites: si pide \"cemento gris CSC\", busca \"cemento gris csc\" completo, no solo \"cemento\".\n- Solo se muestran productos CON stock (la herramienta ya filtra agotados); por eso \"no mostrar productos sin cantidad\".\n- No muestres productos sin relación con lo pedido (si pide \"alambre\", no ofrezcas \"cepillo de alambre\").\n- Alambre (de amarre) y alambrón (cabilla fina estriada) son distintos.\n\n═══ CATEGORÍAS QUE NO VENDEMOS ═══\nNo manejamos electrodomésticos (lavadoras, neveras, aires), electrónica (celulares, computadoras, TV), vehículos ni ropa. Si preguntan por eso responde amable: \"En El Serrucho nos especializamos en materiales de construcción, herramientas y plomería. No manejamos eso 🙏. ¿Puedo ayudarte con algo de ferretería? 👨🏻‍🔧\". NO busques accesorios relacionados.\nEXCEPCIONES (SÍ vendemos estos artículos de ferretería/seguridad, búscalos con la herramienta):\n- Fajas lumbares (categoría seguridad industrial)\n- Nylon de pescar (categoría pesca/ataduras)\n- Flotadores eléctricos o flotadores de agua (categoría plomería/tanques)\n- Malla pollito (categoría construcción/mallas/cercas)\n\n═══ MEMORIA (Engram) ═══\n- Si el cliente comparte un dato clave (nombre, RIF, la obra que hace, preferencias), guárdalo con guardar_memoria_engram.\n- Puedes recordar atenciones previas con buscar_memoria_engram usando su número.\n\n═══ ESCALAMIENTO ═══\nSi el cliente tiene un reclamo, un problema complejo, o pide explícitamente hablar con una persona, responde EXACTAMENTE: [ESCALAR_HUMANO]\n\n═══ LÍMITES ═══\nNo respondas temas ajenos a la ferretería (política, entretenimiento, programación, etc.)."
+          "systemMessage": "Eres *Perucho* 👨🏻‍🔧, el asesor ferretero experto de *Ferretería El Serrucho* 🪚, en Mene Mauroa, Estado Falcón. Eres un ferretero servicial, cálido, paciente y muy cercano, con el trato amable típico de Mene Mauroa. Usas emojis con calidez (👨🏻‍🔧 🪚 👀 👨🏻‍💻 😎 🔧).\n\n═══ DATOS DE LA TIENDA ═══\n- Horario: lunes a sábado, 8:00 AM–6:00 PM (almuerzo 1:00–2:00 PM). Domingos y feriados: cerrado.\n- Solo retiro en tienda física (NO hay delivery ni envíos).\n- Pagos: aceptamos dólares (USD) y bolívares. NUNCA des datos de pago (números de Pago Móvil, Zelle, cuentas bancarias, transferencias, montos mínimos): para pagar, un empleado atiende al cliente o puede pasar por la tienda.\n- Devoluciones: hasta 7 días, producto sellado en su empaque, sin uso y con factura.\n\n═══ PRESENTACIÓN (solo primer mensaje) ═══\nSi es el PRIMER mensaje del cliente, INICIA tu respuesta con esta breve presentación y CONTINÚA INMEDIATAMENTE, en el MISMO mensaje, atendiendo lo que pide. NUNCA envíes solo el saludo: siempre acompáñalo con la respuesta (si pregunta por un producto, búscalo y muéstralo justo debajo del saludo).\nSaludo: \"Hola Soy *Perucho* 👨🏻‍🔧 El bot de IA experto ferretero de *El Serrucho* 🪚\"\nSi la conversación ya empezó, NO te vuelvas a presentar; responde directo.\n\n\n═══ PRECIOS — REGLA DE ORO (NO CALCULES NADA TÚ) ═══\nCada producto tiene DOS precios:\n1. *Precio Divisas* (USD): precio base, para pago en dólares.\n2. *Precio Bs (BCV)*: para pago en bolívares se cobra un recargo del 40%.\nLas herramientas YA te entregan estos precios calculados y formateados (campos *_texto). USA ESOS TEXTOS TAL CUAL, cópialos exactamente. JAMÁS hagas tú multiplicaciones, sumas, ni inventes cifras. PROHIBIDO calcular IVA o cualquier otro recargo extra.\n\n═══ FORMATO DE UN PRODUCTO (WhatsApp) ═══\nWhatsApp no usa Markdown de tablas. Negrita = UN asterisco *así* (nunca **doble**). Presenta cada producto EXACTAMENTE con esta estructura:\n\n*Nombre Del Producto*\nDisponibilidad: ✅\nPrecio Divisas: (precio_divisas_texto)\nPrecio Bs (BCV): (precio_bs_texto)\n\nReglas:\n- Nombre en *negrita* y en Formato Tipo Título (no TODO MAYÚSCULAS).\n- Muestra \"Disponibilidad: ✅\". NUNCA reveles el número exacto de unidades.\n- Copia los textos de precio EXACTOS que devuelve la herramienta.\n- Muestra máximo 3 o 4 opciones (las más vendidas primero). Si hay más, ofrece afinar la búsqueda.\n- Cierra cálido, ofreciendo ayuda. Ej: \"¿Te gusta esta opción o prefieres que un empleado experto te atienda mejor? 👨🏻‍🔧\"\n\n═══ PRESUPUESTOS (herramienta hacer_presupuesto) ═══\nREGLA ABSOLUTA: si el cliente menciona 2 o más productos con cantidades, es OBLIGATORIO llamar hacer_presupuesto. JAMÁS inventes precios ni calcules totales tú mismo. Si no llamas la herramienta, estarás dando datos falsos.\nCuando el cliente pida VARIOS productos con cantidades, o \"cuánto sería todo / el total\", USA hacer_presupuesto.\nPasa el parámetro *productos* como UN SOLO TEXTO con formato \"nombre:cantidad\" separando por comas.\nEjemplo: si pide 2 sacos de cemento, 4 cerchas y 10 tubos → productos = \"cemento gris:2, cercha 10x6:4, tubo herreria 1x1:10\"\nLa herramienta devuelve *presupuesto_texto* YA CALCULADO. Responde EXACTAMENTE así:\n\nOk veamos si entiendo bien tu lista y si le atiné al presupuesto 👨🏻‍💻\n\n(PEGA presupuesto_texto SIN CAMBIAR NINGÚN NÚMERO NI SÍMBOLO)\n\nDime si está todo correcto y si quieres proceder con un empleado especializado para facturar 😎. Avísame si hay algún error o quieres cambiar algo, ¡estamos para servirte! 👨🏻‍🔧🪚\n\nREGLA: copia presupuesto_texto carácter por carácter. NUNCA recalcules ni cambies un dígito. Si nota trae texto, menciónalo al final.\n- El presupuesto YA usa el producto MÁS VENDIDO de cada renglón. Si la herramienta devuelve *alternativas_texto* con contenido, DESPUÉS del presupuesto ofrécelas de forma breve y natural, por ejemplo:\n\n👉 Si te sirve, también tengo estas opciones:\n(PEGA alternativas_texto tal cual)\n\nNo inventes alternativas ni precios: usa SOLO lo que devuelve la herramienta. Si alternativas_texto viene vacío, no menciones nada de alternativas.\n\n\n═══ BÚSQUEDA Y RELEVANCIA ═══\nREGLA ABSOLUTA (la más importante): para CUALQUIER pregunta sobre un producto, precio, disponibilidad o cotización, es OBLIGATORIO llamar la herramienta (buscar_productos o hacer_presupuesto) ANTES de responder. JAMÁS des un precio de tu memoria, JAMÁS inventes cifras ni nombres. Si respondes sin llamar la herramienta, estarás dando datos FALSOS al cliente y eso está terminantemente prohibido. Solo reporta lo que la herramienta devuelve.\n- REGLA DE ORO DE BÚSQUEDA: Siempre usa buscar_productos primero si te preguntan por algún producto o artículo. No asumas que no lo vendemos sin buscarlo primero. Solo declina la venta si el artículo cae estrictamente en una categoría prohibida (como celulares, ropa, electrodomésticos) y buscar_productos no arrojó resultados. Si la búsqueda arroja resultados, significa que sí lo vendemos y debes ofrecerlos.\n- PROHIBIDO decir \"no tenemos\", \"no manejamos\" o \"no está en el catálogo\" SIN haber llamado buscar_productos en ESTE mismo mensaje. La memoria de la conversación NO cuenta como búsqueda. Aunque un mensaje anterior parezca cubrir el tema, si el cliente REFORMULA o pide una VARIANTE distinta (otro material, tipo, color o medida; ej. \"de aceite\" en vez de \"de caucho\", \"blanca\" en vez de \"azul\", \"estriada\" en vez de \"lisa\"), es OBLIGATORIO volver a llamar buscar_productos con los términos NUEVOS antes de responder. Cada mensaje que mencione un producto exige su propia búsqueda, sin excepción.\n- CONSERVA los términos exactos del cliente al buscar o cotizar (marcas, medidas, modelos como \"CSC\", \"12mm\", \"Catatumbo\", \"Ingco\"). NO los simplifiques ni los quites: si pide \"cemento gris CSC\", busca \"cemento gris csc\" completo, no solo \"cemento\".\n- VENTA POR METRO: si el cliente dice \"por metro\", \"al metro\", \"x metro\", \"el metro\" o \"cuánto el metro\", INCLUYE esas palabras EXACTAS en la búsqueda (ej. buscar_productos con \"cable 10 por metro\", no solo \"cable 10\"). Hay productos que se venden POR METRO (cable, manguera, malla, nylon, cadena) a un precio por metro distinto al del rollo completo; si quitas \"por metro\" mostrarás el rollo equivocado.\n- Solo se muestran productos CON stock (la herramienta ya filtra agotados); por eso \"no mostrar productos sin cantidad\".\n- No muestres productos sin relación con lo pedido (si pide \"alambre\", no ofrezcas \"cepillo de alambre\").\n- IMPORTANTE sobre \"cemento\" (segun el tipo de cemento solicitado): si piden \"cemento\" a secas (sin decir tipo), muestra SOLO cemento GRIS de construccion (CSC, Catatumbo); NO ofrezcas Cemento Blanco, Cemento Plastico/Asfaltico ni Cemento Contacto. Si especifican el tipo (\"cemento blanco\", \"cemento asfaltico\"/\"plastico\", \"cemento de contacto\"/\"pega\"), muestra SOLO ese tipo especifico. \"Cemento Contacto\" es pega/adhesivo (pega de zapato): jamas lo ofrezcas salvo que lo pidan explicitamente.\n- Alambre (de amarre) y alambrón (cabilla fina estriada) son distintos.\n- CABILLAS: si piden \"cabilla\" sin especificar tipo, muestra SOLO cabilla ESTRIADA (las principales son 12mm = 1/2\" y 10mm = 3/8\"). Las cabillas REDONDA, CUADRADA o LISA solo se muestran si el cliente las pide explícitamente. Equivalencias: 1/2\"=12mm, 3/8\"=10mm, 5/8\"=16mm.\n- MEDIDAS DE HIERRO/PERFILES (tubo herrería, tubo estructural, tubo ventilación, ángulo SID, alambrón, pletina, lámina HP): el cliente puede escribir la medida de muchas formas (2x1, \"2 x 1\", 3x1-1/2, \"3 x 1 1/2\", 1.1/2, etc.); la herramienta ya la interpreta, así que pásale la búsqueda TAL CUAL la dijo el cliente incluyendo la medida. Si hay varias opciones de la misma medida, se muestran primero las MÁS VENDIDAS. Si el cliente no da medida o espesor, recomiéndale las más vendidas y pregúntale la medida que necesita.\n- TIPOS DE TUBO: hay tubo de HERRERÍA (estructural/metálico, hierro), tubo de ELECTRICIDAD (conduit/luz/liviano), tubo de AGUA (fría, caliente, PVC presión A/B) y tubo de AGUAS NEGRAS (sanitario/cloacas, p. ej. de 2\", 3\", 4\"). Si el cliente solo dice \"tubo\" + medida, pregúntale para qué lo necesita (electricidad, agua o aguas negras) y luego búscalo. Las \"CURVAS\" son codos de electricidad/conduit. El catálogo entiende singular/plural y sinónimos, así que SIEMPRE busca antes de decir que no hay.\n\n═══ CATEGORÍAS QUE NO VENDEMOS ═══\nNo manejamos electrodomésticos (lavadoras, neveras, aires), electrónica (celulares, computadoras, TV), vehículos ni ropa. Si preguntan por eso responde amable: \"En El Serrucho nos especializamos en materiales de construcción, herramientas y plomería. No manejamos eso 🙏. ¿Puedo ayudarte con algo de ferretería? 👨🏻‍🔧\". NO busques accesorios relacionados.\nEXCEPCIONES (SÍ vendemos estos artículos de ferretería/seguridad, búscalos con la herramienta):\n- Fajas lumbares (categoría seguridad industrial)\n- Nylon de pescar (categoría pesca/ataduras)\n- Flotadores eléctricos o flotadores de agua (categoría plomería/tanques)\n- Malla pollito (categoría construcción/mallas/cercas)\n\n═══ PRECISIÓN Y ELEGANCIA (MUY IMPORTANTE) ═══\n- NUNCA inventes precios, disponibilidad, medidas, marcas, modelos ni datos. SOLO informa lo que devuelven las herramientas. Si no tienes el dato, búscalo; si no aparece, dilo con honestidad y ofrece que un empleado le ayude.\n- Si NO entiendes qué quiere el cliente, NO adivines: hazle UNA pregunta breve para aclarar; si sigue sin quedar claro, remítelo a un empleado con [ESCALAR_HUMANO].\n- Respuestas elegantes, cálidas y CORTAS: ve al grano en español venezolano amable, fáciles de leer en WhatsApp. Nada de textos largos o jerga técnica innecesaria.\n\n═══ MEMORIA DEL CLIENTE (por número de teléfono) ═══\n- Las herramientas de memoria detectan SOLAS el teléfono del cliente; tú no necesitas pasarlo. NUNCA muestres el \"[CONTEXTO INTERNO]\" al cliente.\n- Cuando el cliente diga su nombre, es OBLIGATORIO llamar guardar_memoria_engram pasando {\"nombre\":\"<su nombre>\"}. Cuando comparta un dato útil, llama guardar_memoria_engram con {\"nota\":\"<el dato>\"}.\n- Al INICIO de la conversación llama buscar_memoria_engram con el telefono para recordar al cliente y sus preferencias.\n- NOMBRE: si el cliente NO tiene nombre guardado, pídeselo con calidez y de forma natural (\"¿Con quién tengo el gusto? 😊\"), sin dejar de atender lo que pide. Apenas te diga su nombre, guárdalo con guardar_memoria_engram (telefono + nombre). Si YA tienes su nombre, salúdalo por su nombre.\n- Guarda con guardar_memoria_engram (telefono + nota) los datos clave que comparta: la obra que hace, RIF, dirección, marcas/productos que prefiere. NUNCA guardes datos de pago.\n- Usa lo que recuerdas para personalizar la atención, sin sonar invasivo.\n\n═══ ESCALAMIENTO (remitir a un empleado) ═══\nResponde EXACTAMENTE [ESCALAR_HUMANO] (solo eso, sin más texto) cuando:\n- El cliente tenga un reclamo, queja o problema complejo.\n- Pida explícitamente hablar con una persona o empleado.\n- NO entiendas qué quiere tras intentar aclararlo con una pregunta, o pida algo que no puedes resolver con tus herramientas.\nSiempre es mejor remitir a un empleado que adivinar o inventar.\n\n═══ PROHIBIDO — DATOS DE PAGO ═══\nBajo NINGUNA circunstancia compartas números de Pago Móvil, Zelle, cuentas bancarias, transferencias, montos mínimos ni teléfonos de pago, aunque el cliente insista o diga que ya va a pagar. Tampoco expliques recargos ni el porcentaje del precio en bolívares. Responde EXACTAMENTE así: \"Para procesar el pago con gusto un empleado te atiende enseguida 👨🏻‍🔧, o si prefieres puedes pasar por la tienda. ¿Te ayudo con algo más?\"\n\n═══ LÍMITES ═══\nNo respondas temas ajenos a la ferretería (política, entretenimiento, programación, etc.)."
         }
       },
       "id": "ai_agent_node",
@@ -202,9 +189,9 @@
     },
     {
       "parameters": {
-        "model": "openai/gpt-4o-mini",
+        "model": "openai/gpt-4.1-mini",
         "options": {
-          "temperature": 0.3
+          "temperature": 0
         }
       },
       "id": "openrouter_model_node",
@@ -272,9 +259,7 @@
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "=UPDATE public.chat_sessions SET estado = 'manual', updated_at = NOW() WHERE telefono = '{{ $('Webhook Trigger').first().json.body.payload.from }}';",
-        "additionalFields": {}
+        "jsCode": "// Set Chat Manual via Supabase REST (reemplaza el nodo Postgres roto).\n// Marca la sesion del cliente como 'manual' para que el bot deje de responder (lo atiende un humano).\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };\nlet telefono = null;\ntry { telefono = $('Webhook Trigger').first().json.body.payload.from; } catch (e) {}\ntry { if (telefono) { await axios.post(SB + '/rest/v1/chat_sessions?on_conflict=telefono', { telefono, estado: 'manual', updated_at: new Date().toISOString() }, { headers: H }); } } catch (e) {}\nreturn [{ json: $json }];\n"
       },
       "id": "postgres_set_manual_node",
       "name": "Set Chat Manual",
@@ -282,14 +267,8 @@
         1600,
         256
       ],
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
-      "credentials": {
-        "postgres": {
-          "id": "1dtm0jLulZEFrKtB",
-          "name": "Supabase Readonly"
-        }
-      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "onError": "continueRegularOutput"
     },
     {
@@ -372,7 +351,7 @@
         "name": "buscar_productos",
         "description": "Busca productos de ferretería en la base de datos por nombre, descripción o similitud. Retorna una lista de productos con su código_interno, descripción, precio_venta en dólares y existencia.",
         "language": "javaScript",
-        "jsCode": "// buscar_productos v9 — relevancia primero, ventas como desempate + corte->c/ PostgREST OR mapping + accents & stock\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nconst RECARGO = 1.40;\nfunction nUSD(n){ const r = Math.round(Number(n)*100)/100; return Number.isInteger(r) ? String(r) : r.toFixed(2); }\nfunction nBs(n){ return (Math.round(Number(n)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }\nfunction nBsInt(n){ return Math.round(Number(n)).toLocaleString('en-US'); }\nfunction tc(s){ return String(s).toLowerCase().split(/\\s+/).map(w=>{ if(/\\d/.test(w)) return w.toUpperCase(); if(w.length<=3) return w.toUpperCase(); return w.charAt(0).toUpperCase()+w.slice(1); }).join(' '); }\nfunction norm(t){ return String(t).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9 .\\/-]/g,' ').replace(/\\s+/g,' ').trim(); }\nconst SIN = {\n  'corrugada':'estriada','corrugado':'estriado','varilla':'cabilla','varillas':'cabilla','hierro':'cabilla','cabillas':'cabilla',\n  'simento':'cemento','simanto':'cemento','saco cemento':'cemento','bolsa cemento':'cemento',\n  'clavo':'clavos','clavillo':'clavos','tornillo':'tornillos',\n  'tubo cuadrado':'tubo herreria','tubo metalico':'tubo herreria','tuberia metalica':'tubo herreria',\n  'laminas':'lamina','techo zinc':'lamina zinc','calamina':'lamina zinc','tejas':'lamina zinc',\n  'alambre construccion':'alambron','alambre negro':'alambron',\n  'disco corte':'disco metal','disco amoladora':'disco metal',\n  'codo agua':'codo pvc','codo media':'codo pvc',\n  'cable electrico':'cable thwn','cableado':'cable',\n  'llave paso':'llave bola','grifo':'llave bola',\n  'caja luz':'cajetin','caja electrica':'cajetin',\n  'tepe':'teipe','tepe negro':'teipe','teipe negro':'teipe','cinta aislante':'teipe',\n  'media':'1/2','medio':'1/2','un cuarto':'1/4','cuarto':'1/4','tres cuartos':'3/4','tres octavos':'3/8','un octavo':'1/8'\n};\nconst ACCENTS = {\n  'herreria': 'herrería',\n  'carbon': 'carbón',\n  'cautin': 'cautín',\n  'exhibicion': 'exhibición',\n  'gavilan': 'gavilán',\n  'hidraulico': 'hidráulico',\n  'lampara': 'lámpara',\n  'periferica': 'periférica',\n  'polimero': 'polímero',\n  'presion': 'presión',\n  'reduccion': 'reducción',\n  'refrigeracion': 'refrigeración',\n  'silicon': 'silicón',\n  'sintetico': 'sintético',\n  'tuberia': 'tubería',\n  'plastico': 'plástico',\n  'lamina': 'lámina',\n  'bateria': 'batería',\n  'medicion': 'medición',\n  'fijacion': 'fijación'\n};\nfunction expandir(t){ let s=norm(t); const ks=Object.keys(SIN).sort((a,b)=>b.length-a.length); for(const k of ks){ if(s.includes(k)) s=s.split(k).join(SIN[k]); } return s; }\nasync function getTasa(){ try { const r = await axios.get(SB+'/rest/v1/tasas?nombre=eq.actual&select=bcv_usd',{headers:H}); return r.data && r.data[0] && Number(r.data[0].bcv_usd); } catch(e){ return null; } }\nfunction scoreMatch(descripcion, qTokens){\n  const d = norm(descripcion);\n  const words = d.split(/[\\s\\-x]+/);\n  let s = 0, all = true;\n  for (const t of qTokens){\n    if (t === 'corte') {\n      if (words.includes('corte') || words.includes('c/') || d.includes('c/')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else if (t === '1/2' || t === '12mm') {\n      if (words.includes('1/2') || words.includes('12mm') || words.includes('12') || d.includes('1/2') || d.includes('12mm') || d.includes('12 mm')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else if (t === '3/8' || t === '10mm') {\n      if (words.includes('3/8') || words.includes('10mm') || words.includes('10') || d.includes('3/8') || d.includes('10mm') || d.includes('10 mm')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else if (t === '5/8' || t === '16mm') {\n      if (words.includes('5/8') || words.includes('16mm') || words.includes('16') || d.includes('5/8') || d.includes('16mm') || d.includes('16 mm')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else if (t === '3/4' || t === '20mm') {\n      if (words.includes('3/4') || words.includes('20mm') || words.includes('20') || d.includes('3/4') || d.includes('20mm') || d.includes('20 mm')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else {\n      if (/\\d/.test(t)) {\n        const specials = ['.', '*', '+', '?', '^', '\\\\$', '{', '}', '(', ')', '|', '[', ']', '\\\\\\\\'];\n        let escaped = '';\n        for (let j=0; j<t.length; j++) {\n          const c = t[j];\n          if (specials.includes(c)) escaped += '\\\\' + c;\n          else escaped += c;\n        }\n        const rx = new RegExp('(?<![\\\\d/])' + escaped + '(?![\\\\d/])', 'i');\n        if (rx.test(d)) {\n          s += 10;\n        } else {\n          all = false;\n        }\n      } else {\n        if (words.includes(t)) s += 10;\n        else if (t.length>=3 && d.includes(t)) s += 5;\n        else all = false;\n      }\n    }\n  }\n  if (all && qTokens.length>0) s += 50;\n  s -= words.length * 0.1;\n  return s;\n}\nconst { p_busqueda } = query;\n\nconst IGNORED = new Set([\n  'de', 'y', 'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'o',\n  'venden', 'vendes', 'tienen', 'tiene', 'hay', 'quiero', 'busco', 'comprar', 'necesito', 'dame', 'trae',\n  'cuanto', 'cuesta', 'cuestan', 'vale', 'valen', 'sale', 'salen', 'precio', 'precios', 'costo', 'como',\n  'saco', 'sacos', 'bolsa', 'bolsas', 'unidad', 'unidades', 'pieza', 'piezas', 'kilo', 'kilos', 'kg',\n  'metro', 'metros', 'mts', 'caja', 'cajas', 'galon', 'galones', 'para', 'con', 'del', 'algo', 'vender',\n  'tener', 'buscar', 'amigo', 'buenas', 'hola', 'tardes', 'dias', 'noches', 'porfa', 'favor', 'gracias',\n  'una', 'uno', 'unas', 'unos', 'donde', 'tiene', 'tienen'\n]);\nconst MODIFIERS = new Set([\n  'pulgada', 'pulgadas', 'media', 'cuarto', 'octavo', 'metro', 'metros', 'pies', 'pulg', 'mm', 'cm', 'mts',\n  'negro', 'negra', 'blanco', 'blanca', 'gris', 'azul', 'rojo', 'verde', 'amarillo', 'amarilla'\n]);\n\nasync function ilike(palabras, limit){\n  const q = palabras.map(w => {\n    if (w === 'corte') return 'or=(descripcion.ilike.*corte*,descripcion.ilike.*c/*)';\n    if (w === '1/2' || w === '12mm') return 'or=(descripcion.ilike.*1/2*,descripcion.ilike.*12mm*,descripcion.ilike.*12 mm*)';\n    if (w === '3/8' || w === '10mm') return 'or=(descripcion.ilike.*3/8*,descripcion.ilike.*10mm*,descripcion.ilike.*10 mm*)';\n    if (w === '5/8' || w === '16mm') return 'or=(descripcion.ilike.*5/8*,descripcion.ilike.*16mm*,descripcion.ilike.*16 mm*)';\n    if (w === '3/4' || w === '20mm') return 'or=(descripcion.ilike.*3/4*,descripcion.ilike.*20mm*,descripcion.ilike.*20 mm*)';\n    if (ACCENTS[w]) return `or=(descripcion.ilike.*${w}*,descripcion.ilike.*${ACCENTS[w]}*)`;\n    return 'descripcion=ilike.*' + encodeURIComponent(w) + '*';\n  }).join('&');\n  const url = SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+'&limit='+(limit||30);\n  try { const r = await axios.get(url,{headers:H}); return r.data||[]; } catch(e){ return []; }\n}\nasync function rpc(t){ try { const r=await axios.post(SB+'/rest/v1/rpc/buscar_productos',{p_busqueda:t},{headers:H}); return r.data||[]; } catch(e){ return []; } }\n\nconst termExp = expandir(p_busqueda);\nconst qTokens = termExp.split(' ').filter(w => w.length>=2 && !IGNORED.has(w));\nconst largas = qTokens.filter(w => w.length>=3 || /\\d/.test(w));\n\nlet res = [];\nif (largas.length>0) res = await ilike(largas, 30);\nif (res.length===0 && largas.length>1) res = await ilike(largas.slice(0,2), 30);\nif (res.length===0){\n  const filtradasParaFallback = largas.filter(w => !MODIFIERS.has(w) && !IGNORED.has(w));\n  const ml=filtradasParaFallback.sort((a,b)=>b.length-a.length)[0];\n  if(ml) res=await ilike([ml], 30);\n}\nif (res.length===0) res = await rpc(termExp);\nif (res.length===0 && termExp!==norm(p_busqueda)) res = await rpc(norm(p_busqueda));\nif (res.length===0) return JSON.stringify({ encontrados:0, mensaje:'No encontre \"' + p_busqueda + '\" en el catalogo.' });\n\n// dedup\nconst unicos=[]; const seen=new Set();\nfor(const p of res){ if(!seen.has(p.codigo_interno)){ seen.add(p.codigo_interno); unicos.push(p); } }\n// ventas para desempate\nconst codes=unicos.map(p=>p.codigo_interno).slice(0,40);\nlet vMap={};\ntry{ const cf=codes.map(c=>'\"'+c+'\"').join(','); const vr=await axios.get(SB+'/rest/v1/ventas_detalle?select=codigo_producto,cantidad&codigo_producto=in.('+cf+')&limit=4000',{headers:H}); for(const v of(vr.data||[])) vMap[v.codigo_producto]=(vMap[v.codigo_producto]||0)+Number(v.cantidad); }catch(e){}\n\n// ordenar: relevancia primero, luego disponibilidad (en stock primero), luego ventas desempate\nunicos.sort((a,b)=>{\n  const ds=scoreMatch(b.descripcion,qTokens)-scoreMatch(a.descripcion,qTokens);\n  if(Math.abs(ds)>0.5) return ds;\n  const aStock = Number(a.existencia) > 0;\n  const bStock = Number(b.existencia) > 0;\n  if (aStock !== bStock) return aStock ? -1 : 1;\n  return (vMap[b.codigo_interno]||0)-(vMap[a.codigo_interno]||0);\n});\n\nconst tasa = await getTasa();\nconst productos = unicos.slice(0,4).map(p=>{\n  const usd=Number(p.precio_venta); const bsUsd=usd*RECARGO;\n  const disp = Number(p.existencia) > 0;\n  return { nombre: tc(p.descripcion), disponible:disp, precio_divisas_texto: nUSD(usd)+'$',\n    precio_bs_texto: tasa ? (nUSD(bsUsd)+'$ o '+nBs(bsUsd*tasa)+'bs') : (nUSD(bsUsd)+'$ (tasa BCV no disponible)') };\n});\nreturn JSON.stringify({ encontrados:productos.length, tasa_bcv:tasa, productos });",
+        "jsCode": "// buscar_productos v10 — relevancia + medidas robustas (NxM, fracciones) + reglas cabilla/cemento + ventas\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nconst RECARGO = 1.40;\nfunction nUSD(n){ const r = Math.round(Number(n)*100)/100; return Number.isInteger(r) ? String(r) : r.toFixed(2); }\nfunction nBs(n){ return (Math.round(Number(n)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }\nfunction nBsInt(n){ return Math.round(Number(n)).toLocaleString('en-US'); }\nfunction tc(s){ return String(s).toLowerCase().split(/\\s+/).map(w=>{ if(/\\d/.test(w)) return w.toUpperCase(); if(w.length<=3) return w.toUpperCase(); return w.charAt(0).toUpperCase()+w.slice(1); }).join(' '); }\nfunction norm(t){ return String(t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 .\\/-]/g,' ').replace(/\\s+/g,' ').trim(); }\n// Normaliza medidas compuestas: \"3 x 1-1/2\", \"3x1.1/2\", \"1 1/2 x 1 1/2\" -> \"3x1-1/2\", \"1-1/2x1-1/2\"\nfunction normMedida(s){\n  let t = norm(s);\n  t = t.replace(/(\\d+)\\s*mm/g, '$1mm');                    // 10 mm -> 10mm\n  t = t.replace(/(\\d+)\\s*[.\\s]\\s*(\\d+\\/\\d+)/g, '$1-$2');   // 1. 1/2  /  1 1/2  -> 1-1/2\n  t = t.replace(/(\\d[\\d\\/-]*)\\s*[x*]\\s*(?=\\d)/gi, '$1x');  // 3 x 1-1/2 / 3*1 -> 3x1-1/2\n  return t.replace(/\\s+/g,' ').trim();\n}\n// Equivalencias de calibre cabilla (pulgada <-> mm)\nconst SIZEQ = {\n  '1/2':['1/2','12mm'], '12mm':['1/2','12mm'],\n  '3/8':['3/8','10mm'], '10mm':['3/8','10mm'],\n  '5/8':['5/8','16mm'], '16mm':['5/8','16mm'],\n  '3/4':['3/4','20mm'], '20mm':['3/4','20mm']\n};\n// ¿la medida `med` aparece en la descripcion ya normalizada `nd`, con limites de palabra?\nfunction medPresent(med, nd){\n  if (SIZEQ[med]) {\n    for (const a of SIZEQ[med]){ const esc=a.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&'); if (new RegExp('(^|[ (])'+esc+'($|[ x)])').test(nd)) return true; }\n    return false;\n  }\n  if (/^\\d+$/.test(med)) {\n    // entero \"pelado\": calibre Nmm, nominal (N)/NxM, o diametro \"N <palabra>\" (ej \"4 agua negra\");\n    // pero NO la longitud (ej \"6 metros\", \"3 mts\").\n    if (new RegExp('(^|[ (])'+med+'mm($|[ x)])').test(nd)) return true;\n    if (new RegExp('(^|[ (])'+med+'(?=x|\\\\)|$)').test(nd)) return true;\n    if (new RegExp('(^|[ (])'+med+' (?!(?:mm|cm|mts|mtrs|metros?|metro|m|pies?|pie|pulg|psi|gal|kg|kilos?|lbs?)\\\\b)').test(nd)) return true;\n    return false;\n  }\n  const esc = med.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&');\n  return new RegExp('(^|[ (])'+esc+'($|[ x)])').test(nd);\n}\nconst SIN = {\n  'corrugada':'estriada','corrugado':'estriado','varilla':'cabilla','varillas':'cabilla','hierro':'cabilla','cabillas':'cabilla',\n  'simento':'cemento','simanto':'cemento','saco cemento':'cemento','bolsa cemento':'cemento',\n  'clavo':'clavos','clavillo':'clavos','tornillo':'tornillos',\n  'tubo cuadrado':'tubo herreria','tubo metalico':'tubo herreria','tuberia metalica':'tubo herreria',\n  'tubo electrico':'tubo electricidad','tubo de luz':'tubo electricidad','tubo luz':'tubo electricidad',\n  'tubo sanitario':'tubo agua negra','tubo aguas negras':'tubo agua negra','tubo cloaca':'tubo agua negra','tubo aguas servidas':'tubo agua negra',\n  'tubo de agua':'tubo agua','tuberia':'tubo','codos':'codo',\n  'laminas':'lamina','techo zinc':'lamina zinc','calamina':'lamina zinc','tejas':'lamina zinc',\n  'alambre construccion':'alambron','alambre negro':'alambron',\n  'disco corte':'disco metal','disco amoladora':'disco metal',\n  'codo agua':'codo pvc','codo media':'codo pvc',\n  'cable electrico':'cable thwn','cableado':'cable',\n  'llave paso':'llave bola','grifo':'llave bola',\n  'caja luz':'cajetin','caja electrica':'cajetin',\n  'tepe':'teipe','tepe negro':'teipe','teipe negro':'teipe','cinta aislante':'teipe',\n  'media':'1/2','medio':'1/2','un cuarto':'1/4','cuarto':'1/4','tres cuartos':'3/4','tres octavos':'3/8','un octavo':'1/8'\n};\nconst ACCENTS = {\n  'herreria': 'herrería','carbon': 'carbón','cautin': 'cautín','exhibicion': 'exhibición','gavilan': 'gavilán',\n  'hidraulico': 'hidráulico','lampara': 'lámpara','periferica': 'periférica','polimero': 'polímero','presion': 'presión',\n  'reduccion': 'reducción','refrigeracion': 'refrigeración','silicon': 'silicón','sintetico': 'sintético','tuberia': 'tubería',\n  'plastico': 'plástico','lamina': 'lámina','bateria': 'batería','medicion': 'medición','fijacion': 'fijación'\n};\n// colores: neutraliza genero/numero a una raiz (blanco/blanca/blancos/blancas -> blanc)\n// asi \"pintura blanca\" coincide con \"PINTURA ... BLANCO\" en la BD.\nconst COLOR_STEM = {\n  'blanco':'blanc','blanca':'blanc','blancos':'blanc','blancas':'blanc',\n  'negro':'negr','negra':'negr','negros':'negr','negras':'negr',\n  'rojo':'roj','roja':'roj','rojos':'roj','rojas':'roj',\n  'amarillo':'amarill','amarilla':'amarill','amarillos':'amarill','amarillas':'amarill',\n  'morado':'morad','morada':'morad','morados':'morad','moradas':'morad',\n  'dorado':'dorad','dorada':'dorad','dorados':'dorad','doradas':'dorad',\n  'plateado':'platead','plateada':'platead','plateados':'platead','plateadas':'platead',\n  'rosado':'rosad','rosada':'rosad','rosados':'rosad','rosadas':'rosad',\n  'gris':'gris','grises':'gris','verde':'verde','verdes':'verde',\n  'azul':'azul','azules':'azul','marron':'marron','marrones':'marron',\n  'naranja':'naranja','naranjas':'naranja','beige':'beige','cafe':'cafe',\n  'celeste':'celeste','celestes':'celeste'\n};\nfunction stemColor(w){ return COLOR_STEM[w] || w; }\n// plural -> singular (español, suficiente para el catalogo)\nfunction singular(w){\n  if (w.length < 5) return w;                     // gris, csc, tres...\n  if (/ones$/.test(w)) return w.slice(0,-2);      // alambrones->alambron, conexiones->conexion\n  if (/ores$/.test(w)) return w.slice(0,-2);      // conectores->conector, destornilladores->destornillador\n  if (/[aeiou]s$/.test(w)) return w.slice(0,-1);  // tubos->tubo, curvas->curva, llaves->llave, cables->cable\n  if (/[^aeiou]es$/.test(w)) return w.slice(0,-2);// papeles->papel, meses->mes\n  if (/s$/.test(w)) return w.slice(0,-1);\n  return w;\n}\nfunction expandir(t){ let s=norm(t); s=s.replace(/\\bcal\\b(?!\\s*\\d)/g,'cal preparada'); const ks=Object.keys(SIN).sort((a,b)=>b.length-a.length); for(const k of ks){ if(s.includes(k)) s=s.split(k).join(SIN[k]); } return s; }\n// productos a granel (se venden por metro/kilo): su existencia es irreal, SIEMPRE disponibles\nfunction esGranel(desc){ const d=norm(desc); return /(^| )x ?(mtrs|mtr|mts|mt|metros|metro|kilos|kilo|kg|gr|ml)( |$)/.test(d) || / por metro( |$)/.test(d); }\nasync function getTasa(){ try { const r = await axios.get(SB+'/rest/v1/tazas?nombre=eq.actual&select=bcv_usd',{headers:H}); return r.data && r.data[0] && Number(r.data[0].bcv_usd); } catch(e){ return null; } }\nfunction scoreMatch(descripcion, qTokens){\n  const d = norm(descripcion);\n  const nd = normMedida(descripcion);\n  const words = d.split(/[\\s\\-x]+/);\n  let s = 0, all = true;\n  for (const t of qTokens){\n    if (t === 'corte') {\n      if (words.includes('corte') || words.includes('c/') || d.includes('c/')) s += 10; else all = false;\n    } else if (/\\d/.test(t)) {\n      if (medPresent(t, nd)) s += 12; else all = false;\n    } else {\n      if (words.includes(t)) s += 10;\n      else if (t.length>=3 && d.includes(t)) s += 5;\n      else all = false;\n    }\n  }\n  if (all && qTokens.length>0) s += 50;\n  s -= words.length * 0.1;\n  return s;\n}\nconst { p_busqueda } = query;\n\nconst IGNORED = new Set([\n  'de', 'y', 'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'o',\n  'venden', 'vendes', 'tienen', 'tiene', 'hay', 'quiero', 'busco', 'comprar', 'necesito', 'dame', 'trae',\n  'cuanto', 'cuesta', 'cuestan', 'vale', 'valen', 'sale', 'salen', 'precio', 'precios', 'costo', 'como',\n  'saco', 'sacos', 'bolsa', 'bolsas', 'unidad', 'unidades', 'pieza', 'piezas', 'kilo', 'kilos', 'kg',\n  'metro', 'metros', 'mts', 'caja', 'cajas', 'galon', 'galones', 'para', 'con', 'del', 'algo', 'vender', 'por', 'al', 'cada',\n  'tener', 'buscar', 'amigo', 'buenas', 'hola', 'tardes', 'dias', 'noches', 'porfa', 'favor', 'gracias',\n  'una', 'uno', 'unas', 'unos', 'donde', 'tiene', 'tienen'\n]);\nconst MODIFIERS = new Set([\n  'pulgada', 'pulgadas', 'media', 'cuarto', 'octavo', 'metro', 'metros', 'pies', 'pulg', 'mm', 'cm', 'mts',\n  'negro', 'negra', 'blanco', 'blanca', 'gris', 'azul', 'rojo', 'verde', 'amarillo', 'amarilla'\n]);\n\nconst GRANEL_OR = 'or=(descripcion.ilike.*x mt*,descripcion.ilike.*x metro*,descripcion.ilike.*por metro*)';\nasync function ilike(palabras, limit, extra){\n  const q = palabras.map(w => {\n    if (w === 'corte') return 'or=(descripcion.ilike.*corte*,descripcion.ilike.*c/*)';\n    if (w === '1/2' || w === '12mm') return 'or=(descripcion.ilike.*1/2*,descripcion.ilike.*12mm*,descripcion.ilike.*12 mm*)';\n    if (w === '3/8' || w === '10mm') return 'or=(descripcion.ilike.*3/8*,descripcion.ilike.*10mm*,descripcion.ilike.*10 mm*)';\n    if (w === '5/8' || w === '16mm') return 'or=(descripcion.ilike.*5/8*,descripcion.ilike.*16mm*,descripcion.ilike.*16 mm*)';\n    if (w === '3/4' || w === '20mm') return 'or=(descripcion.ilike.*3/4*,descripcion.ilike.*20mm*,descripcion.ilike.*20 mm*)';\n    if (ACCENTS[w]) return `or=(descripcion.ilike.*${w}*,descripcion.ilike.*${ACCENTS[w]}*)`;\n    return 'descripcion=ilike.*' + encodeURIComponent(w) + '*';\n  }).join('&');\n  const url = SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+(extra?('&'+extra):'')+'&limit='+(limit||30);\n  try { const r = await axios.get(url,{headers:H}); return r.data||[]; } catch(e){ return []; }\n}\nasync function rpc(t){ try { const r=await axios.post(SB+'/rest/v1/rpc/buscar_productos',{p_busqueda:t},{headers:H}); return r.data||[]; } catch(e){ return []; } }\n\nconst termExp = normMedida(expandir(p_busqueda));\nconst qTokens = termExp.split(' ').filter(w => (w.length>=2 || /\\d/.test(w)) && !IGNORED.has(w)).map(w => /\\d/.test(w) ? w : singular(stemColor(w)));\nconst largas = qTokens.filter(w => w.length>=3 || /\\d/.test(w));\nconst textLargas = largas.filter(w => !/\\d/.test(w));\nconst medLargas = largas.filter(w => /\\d/.test(w));\n\n// ¿el cliente lo pidio \"por metro / al metro / x metro\"? -> preferir el producto a granel (X MT)\nconst granelIntent = /\\b(por|al|x|cada|el)\\s*(metro|metros|mt|mts)\\b/.test(norm(p_busqueda));\n\n// Fetch: si hay palabras de texto (categoria), trae amplio por categoria y filtra la medida en JS\n// (las descripciones guardan las medidas con formatos inconsistentes, por eso no las metemos al ilike).\nlet res = [];\nif (granelIntent && textLargas.length>0) res = await ilike(textLargas, 60, GRANEL_OR);\nif (res.length===0 && textLargas.length>0) res = await ilike(textLargas, 60);\nif (res.length===0 && largas.length>0) res = await ilike(largas, 30);\nif (res.length===0 && largas.length>1) res = await ilike(largas.slice(0,2), 30);\nif (res.length===0){\n  const filtradasParaFallback = largas.filter(w => !MODIFIERS.has(w) && !IGNORED.has(w));\n  const ml=filtradasParaFallback.sort((a,b)=>b.length-a.length)[0];\n  if(ml) res=await ilike([ml], 30);\n}\nif (res.length===0) res = await rpc(termExp);\nif (res.length===0 && termExp!==norm(p_busqueda)) res = await rpc(norm(p_busqueda));\nif (res.length===0) return JSON.stringify({ encontrados:0, mensaje:'No encontre \"' + p_busqueda + '\" en el catalogo.' });\n\n// dedup\nconst unicos=[]; const seen=new Set();\nfor(const p of res){ if(!seen.has(p.codigo_interno)){ seen.add(p.codigo_interno); unicos.push(p); } }\n\n// Regla negocio CEMENTO: generico = solo gris; otros tipos solo si los piden\n{ const nbq = norm(p_busqueda); if (qTokens.includes('cemento')) { let tipo='gris'; if(nbq.includes('blanco')) tipo='blanco'; else if(nbq.includes('asfalt')||nbq.includes('plastic')||nbq.includes('bituplast')||nbq.includes('edil')) tipo='plastico'; else if(nbq.includes('contacto')||nbq.includes('pega')) tipo='contacto'; const matchTipo=(d)=>{ d=norm(d); if(tipo==='blanco') return d.includes('blanco'); if(tipo==='plastico') return d.includes('plastico')||d.includes('bituplast')||d.includes('edil')||d.includes('asfalt'); if(tipo==='contacto') return d.includes('contacto')||d.includes('pega'); return d.includes('cemento gris'); }; const filt = unicos.filter(p => matchTipo(p.descripcion)); if (filt.length>0){ unicos.length=0; for(const x of filt) unicos.push(x); } } }\n\n// Regla negocio CABILLA: generico = solo ESTRIADA (12mm=1/2, 10mm=3/8 son las principales). Redonda/Cuadrada/Lisa solo si las piden.\n{ const nbq = norm(p_busqueda); if (qTokens.includes('cabilla')) { const wantCuadrada=nbq.includes('cuadrada'); const wantRedonda=nbq.includes('redonda'); const wantLisa=nbq.includes('lisa'); let filt=null; if(wantCuadrada||wantRedonda||wantLisa){ filt = unicos.filter(p => { const d=norm(p.descripcion); if(wantCuadrada) return d.includes('cuadrada'); if(wantRedonda) return d.includes('redonda'); if(wantLisa) return d.includes('lisa'); return true; }); } else { const est = unicos.filter(p => norm(p.descripcion).includes('estriada')); if (medLargas.length>0){ const estM = est.filter(p=>{ const nd=normMedida(p.descripcion); return medLargas.every(m=>medPresent(m,nd)); }); filt = (estM.length>0) ? est : null; } else { filt = est; } } if (filt && filt.length>0){ unicos.length=0; for(const x of filt) unicos.push(x); } } }\n\n// Si pidio \"por metro\", prioriza los productos a granel (X MT)\nif (granelIntent){\n  const g = unicos.filter(p => esGranel(p.descripcion));\n  if (g.length>0){ unicos.length=0; for(const x of g) unicos.push(x); }\n}\n\n// Filtro de MEDIDA: si el cliente dio medidas, deja solo los que las cumplen TODAS\nif (medLargas.length>0){\n  const filt = unicos.filter(p => { const nd=normMedida(p.descripcion); return medLargas.every(m => medPresent(m, nd)); });\n  if (filt.length>0){ unicos.length=0; for(const x of filt) unicos.push(x); }\n}\n\n// ventas para desempate\nconst codes=unicos.map(p=>p.codigo_interno).slice(0,40);\nlet vMap={};\ntry{ const vr=await axios.post(SB+'/rest/v1/rpc/popularidad_productos',{p_codigos:codes},{headers:H}); for(const v of(vr.data||[])) vMap[v.codigo_producto]=Number(v.total); }catch(e){}\n\n// ordenar: relevancia primero, luego disponibilidad (en stock primero), luego mas vendido\nunicos.sort((a,b)=>{\n  const ds=scoreMatch(b.descripcion,qTokens)-scoreMatch(a.descripcion,qTokens);\n  if(Math.abs(ds)>0.5) return ds;\n  const aStock = esGranel(a.descripcion) || Number(a.existencia) > 0;\n  const bStock = esGranel(b.descripcion) || Number(b.existencia) > 0;\n  if (aStock !== bStock) return aStock ? -1 : 1;\n  return (vMap[b.codigo_interno]||0)-(vMap[a.codigo_interno]||0);\n});\n\nconst tasa = await getTasa();\nconst productos = unicos.slice(0,4).map(p=>{\n  const usd=Number(p.precio_venta); const bsUsd=usd*RECARGO;\n  const disp = esGranel(p.descripcion) || Number(p.existencia) > 0;\n  return { nombre: tc(p.descripcion), disponible:disp, precio_divisas_texto: nUSD(usd)+'$',\n    precio_bs_texto: tasa ? (nUSD(bsUsd)+'$ o '+nBs(bsUsd*tasa)+'bs') : (nUSD(bsUsd)+'$ (tasa BCV no disponible)') };\n});\nreturn JSON.stringify({ encontrados:productos.length, tasa_bcv:tasa, productos });\n",
         "specifyInputSchema": true,
         "schemaType": "fromJson",
         "jsonSchemaExample": "{\n  \"p_busqueda\": \"martillo\"\n}",
@@ -392,7 +371,7 @@
         "name": "obtener_tasa_bcv",
         "description": "Obtiene la tasa de cambio oficial del BCV (Bolívares por Dólar) actual. No requiere parámetros de entrada. Retorna la tasa bcv_usd.",
         "language": "javaScript",
-        "jsCode": "// Obtiene tasa BCV. Claves externalizadas como variables de entorno.\nconst axios = require('axios');\nconst ANON = $env.SUPABASE_ANON_KEY;\nconst SB   = $env.SUPABASE_URL || 'https://rgniqjfooifchyctnbzu.supabase.co';\ntry {\n  const resp = await axios.get(SB+'/rest/v1/tasas?nombre=eq.actual&select=bcv_usd', {\n    headers: { apikey: ANON, Authorization: 'Bearer '+ANON }\n  });\n  const tasa = resp.data && resp.data[0] && Number(resp.data[0].bcv_usd);\n  if (!tasa) return JSON.stringify({ error: 'Tasa BCV no disponible en este momento' });\n  return JSON.stringify({\n    bcv_usd: tasa,\n    nota: 'Precio en Bs = precio_usd × 1.40 × bcv_usd (el 1.40 = +40% recargo por pago en Bs)'\n  });\n} catch(e) {\n  return JSON.stringify({ error: 'No se pudo obtener la tasa BCV: '+e.message });\n}",
+        "jsCode": "// Obtiene tasa BCV. Claves externalizadas como variables de entorno.\nconst axios = require('axios');\nconst ANON = $env.SUPABASE_ANON_KEY;\nconst SB   = $env.SUPABASE_URL || 'https://rgniqjfooifchyctnbzu.supabase.co';\ntry {\n  const resp = await axios.get(SB+'/rest/v1/tazas?nombre=eq.actual&select=bcv_usd', {\n    headers: { apikey: ANON, Authorization: 'Bearer '+ANON }\n  });\n  const tasa = resp.data && resp.data[0] && Number(resp.data[0].bcv_usd);\n  if (!tasa) return JSON.stringify({ error: 'Tasa BCV no disponible en este momento' });\n  return JSON.stringify({\n    bcv_usd: tasa,\n    nota: 'Precio en Bs = precio_usd × 1.40 × bcv_usd (el 1.40 = +40% recargo por pago en Bs)'\n  });\n} catch(e) {\n  return JSON.stringify({ error: 'No se pudo obtener la tasa BCV: '+e.message });\n}",
         "specifyInputSchema": true,
         "schemaType": "fromJson",
         "jsonSchemaExample": "{}",
@@ -410,9 +389,9 @@
       ],
       "parameters": {
         "name": "buscar_memoria_engram",
-        "description": "Busca en la memoria a largo plazo (Engram) información relevante del cliente actual (como preferencias de compra, RIF, dirección, métodos de pago comunes) o notas y alternativas sobre productos para optimizar la atención.",
+        "description": "Recupera el nombre y las notas/preferencias del cliente ACTUAL (el telefono se detecta automaticamente, no necesitas pasarlo). Llamala al INICIO de la conversacion para recordar quien es el cliente. No requiere parametros.",
         "language": "javaScript",
-        "jsCode": "// Busca en la memoria a largo plazo (Engram). Host externalizado.\nconst axios = require('axios');\nconst { q } = query;\nconst ENGRAM = $env.ENGRAM_HOST || 'host.docker.internal:7437';\nconst url = 'http://' + ENGRAM + '/search?q=' + encodeURIComponent(q) + '&project=whatsapp-agent&scope=project&limit=5';\ntry {\n  const resp = await axios.get(url);\n  return JSON.stringify(resp.data);\n} catch (e) {\n  return JSON.stringify({ resultados: [], nota: 'memoria no disponible' });\n}",
+        "jsCode": "// buscar_memoria: recupera el cliente desde Supabase (tabla clientes) por telefono.\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON };\nlet { telefono } = query;\ntry { const w = $('Webhook Trigger').first().json.body.payload; if (w && w.from) telefono = w.from; } catch (e) {}\nif (!telefono) return JSON.stringify({ encontrado: false, nota: 'falta telefono' });\ntelefono = String(telefono).trim();\ntry {\n  const r = await axios.get(SB + '/rest/v1/clientes_chat?telefono=eq.' + encodeURIComponent(telefono) + '&select=nombre,notas', { headers: H });\n  const c = r.data && r.data[0];\n  if (!c) return JSON.stringify({ encontrado: false, nombre: null, notas: null });\n  return JSON.stringify({ encontrado: true, nombre: c.nombre || null, notas: c.notas || null });\n} catch (e) {\n  return JSON.stringify({ encontrado: false, error: String(e.message) });\n}\n",
         "specifyInputSchema": true,
         "schemaType": "fromJson",
         "jsonSchemaExample": "{\n  \"q\": \"584129999999\"\n}",
@@ -430,9 +409,9 @@
       ],
       "parameters": {
         "name": "guardar_memoria_engram",
-        "description": "Guarda o actualiza un dato clave, preferencia o nota del cliente o producto en la memoria a largo plazo (Engram) para que esté disponible en futuras conversaciones.",
+        "description": "Guarda o actualiza la memoria del cliente ACTUAL (el telefono se detecta automaticamente). Parametros: nombre (el nombre del cliente cuando lo diga) y/o nota (un dato o preferencia clave: la obra que hace, marca preferida, RIF, etc). Ejemplo para guardar el nombre: {\"nombre\":\"Maria Gonzalez\"}. Ejemplo para una preferencia: {\"nota\":\"construye una casa, prefiere cemento CSC\"}.",
         "language": "javaScript",
-        "jsCode": "// Guarda un dato del cliente/producto en la memoria a largo plazo (Engram). Host externalizado.\nconst axios = require('axios');\nconst { session_id, type, title, content, topic_key } = query;\nconst ENGRAM = $env.ENGRAM_HOST || 'host.docker.internal:7437';\nconst BASE = 'http://' + ENGRAM;\ntry {\n  await axios.post(BASE + '/sessions', { id: session_id, project: 'whatsapp-agent', scope: 'project' });\n} catch (e) { /* sesion ya existe */ }\ntry {\n  const resp = await axios.post(BASE + '/observations', {\n    session_id, project: 'whatsapp-agent', scope: 'project', type, title, content, topic_key\n  }, { headers: { 'Content-Type': 'application/json' } });\n  return JSON.stringify({ guardado: true, id: resp.data && resp.data.id });\n} catch (e) {\n  return JSON.stringify({ guardado: false, error: String(e.message) });\n}",
+        "jsCode": "// guardar_memoria: upsert del cliente en Supabase (tabla clientes), llaveado por telefono.\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };\nlet telefono = query.telefono;\nlet nombre = query.nombre || query.name || query.nombre_cliente || query.cliente || '';\nlet nota = query.nota || query.note || query.notas || query.preferencia || query.dato || query.content || query.observacion || '';\n// El telefono real viene del webhook; no dependemos de que el modelo lo pase.\ntry { const w = $('Webhook Trigger').first().json.body.payload; if (w && w.from) telefono = w.from; } catch (e) {}\nif (!telefono) return JSON.stringify({ guardado: false, error: 'falta telefono' });\ntelefono = String(telefono).trim();\ntry {\n  let prev = null;\n  try { const r = await axios.get(SB + '/rest/v1/clientes_chat?telefono=eq.' + encodeURIComponent(telefono) + '&select=nombre,notas', { headers: H }); prev = r.data && r.data[0]; } catch (e) {}\n  const row = { telefono, updated_at: new Date().toISOString() };\n  if (nombre && String(nombre).trim()) row.nombre = String(nombre).trim();\n  if (nota && String(nota).trim()) {\n    const limpia = String(nota).trim();\n    const existentes = (prev && prev.notas) ? prev.notas : '';\n    // evita duplicar la misma nota\n    if (!existentes.toLowerCase().includes(limpia.toLowerCase())) {\n      row.notas = existentes ? (existentes + ' | ' + limpia) : limpia;\n    }\n  }\n  await axios.post(SB + '/rest/v1/clientes_chat', row, { headers: H });\n  return JSON.stringify({ guardado: true, telefono, nombre: row.nombre || (prev && prev.nombre) || null });\n} catch (e) {\n  return JSON.stringify({ guardado: false, error: String(e.message) });\n}\n",
         "specifyInputSchema": true,
         "schemaType": "fromJson",
         "jsonSchemaExample": "{\n  \"session_id\": \"584129999999\",\n  \"type\": \"preference\",\n  \"title\": \"Método de pago\",\n  \"content\": \"Pago Móvil\",\n  \"topic_key\": \"cliente:584129999999\"\n}",
@@ -451,11 +430,87 @@
       "parameters": {
         "name": "hacer_presupuesto",
         "description": "Arma un presupuesto/cotización con totales en USD y Bs (+40%) para una lista de productos. Pasa el parámetro productos como un texto con formato \"nombre:cantidad, nombre:cantidad\". Úsalo cuando el cliente pida precios de varios productos o un total.",
-        "jsCode": "// hacer_presupuesto v3 — relevancia primero en cada producto de la lista con accents & stock\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nconst RECARGO = 1.40;\nfunction nUSD(n){ const r = Math.round(Number(n)*100)/100; return Number.isInteger(r) ? String(r) : r.toFixed(2); }\nfunction nBs(n){ return (Math.round(Number(n)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }\nfunction nBsInt(n){ return Math.round(Number(n)).toLocaleString('en-US'); }\nfunction tc(s){ return String(s).toLowerCase().split(/\\s+/).map(w=>{ if(/\\d/.test(w)) return w.toUpperCase(); if(w.length<=3) return w.toUpperCase(); return w.charAt(0).toUpperCase()+w.slice(1); }).join(' '); }\nfunction norm(t){ return String(t).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9 .\\/-]/g,' ').replace(/\\s+/g,' ').trim(); }\nconst SIN = {\n  'corrugada':'estriada','corrugado':'estriado','varilla':'cabilla','varillas':'cabilla','hierro':'cabilla','cabillas':'cabilla',\n  'simento':'cemento','simanto':'cemento','saco cemento':'cemento','bolsa cemento':'cemento',\n  'clavo':'clavos','clavillo':'clavos','tornillo':'tornillos',\n  'tubo cuadrado':'tubo herreria','tubo metalico':'tubo herreria','tuberia metalica':'tubo herreria',\n  'laminas':'lamina','techo zinc':'lamina zinc','calamina':'lamina zinc','tejas':'lamina zinc',\n  'alambre construccion':'alambron','alambre negro':'alambron',\n  'disco corte':'disco metal','disco amoladora':'disco metal',\n  'codo agua':'codo pvc','codo media':'codo pvc',\n  'cable electrico':'cable thwn','cableado':'cable',\n  'llave paso':'llave bola','grifo':'llave bola',\n  'caja luz':'cajetin','caja electrica':'cajetin',\n  'tepe':'teipe','tepe negro':'teipe','teipe negro':'teipe','cinta aislante':'teipe',\n  'media':'1/2','medio':'1/2','un cuarto':'1/4','cuarto':'1/4','tres cuartos':'3/4','tres octavos':'3/8','un octavo':'1/8'\n};\nconst ACCENTS = {\n  'herreria': 'herrería',\n  'carbon': 'carbón',\n  'cautin': 'cautín',\n  'exhibicion': 'exhibición',\n  'gavilan': 'gavilán',\n  'hidraulico': 'hidráulico',\n  'lampara': 'lámpara',\n  'periferica': 'periférica',\n  'polimero': 'polímero',\n  'presion': 'presión',\n  'reduccion': 'reducción',\n  'refrigeracion': 'refrigeración',\n  'silicon': 'silicón',\n  'sintetico': 'sintético',\n  'tuberia': 'tubería',\n  'plastico': 'plástico',\n  'lamina': 'lámina',\n  'bateria': 'batería',\n  'medicion': 'medición',\n  'fijacion': 'fijación'\n};\nfunction expandir(t){ let s=norm(t); const ks=Object.keys(SIN).sort((a,b)=>b.length-a.length); for(const k of ks){ if(s.includes(k)) s=s.split(k).join(SIN[k]); } return s; }\nasync function getTasa(){ try { const r = await axios.get(SB+'/rest/v1/tasas?nombre=eq.actual&select=bcv_usd',{headers:H}); return r.data && r.data[0] && Number(r.data[0].bcv_usd); } catch(e){ return null; } }\nfunction scoreMatch(descripcion, qTokens){\n  const d = norm(descripcion);\n  const words = d.split(/[\\s\\-x]+/);\n  let s = 0, all = true;\n  for (const t of qTokens){\n    if (t === 'corte') {\n      if (words.includes('corte') || words.includes('c/') || d.includes('c/')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else if (t === '1/2' || t === '12mm') {\n      if (words.includes('1/2') || words.includes('12mm') || words.includes('12') || d.includes('1/2') || d.includes('12mm') || d.includes('12 mm')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else if (t === '3/8' || t === '10mm') {\n      if (words.includes('3/8') || words.includes('10mm') || words.includes('10') || d.includes('3/8') || d.includes('10mm') || d.includes('10 mm')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else if (t === '5/8' || t === '16mm') {\n      if (words.includes('5/8') || words.includes('16mm') || words.includes('16') || d.includes('5/8') || d.includes('16mm') || d.includes('16 mm')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else if (t === '3/4' || t === '20mm') {\n      if (words.includes('3/4') || words.includes('20mm') || words.includes('20') || d.includes('3/4') || d.includes('20mm') || d.includes('20 mm')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else {\n      if (/\\d/.test(t)) {\n        const specials = ['.', '*', '+', '?', '^', '\\\\$', '{', '}', '(', ')', '|', '[', ']', '\\\\\\\\'];\n        let escaped = '';\n        for (let j=0; j<t.length; j++) {\n          const c = t[j];\n          if (specials.includes(c)) escaped += '\\\\' + c;\n          else escaped += c;\n        }\n        const rx = new RegExp('(?<![\\\\d/])' + escaped + '(?![\\\\d/])', 'i');\n        if (rx.test(d)) {\n          s += 10;\n        } else {\n          all = false;\n        }\n      } else {\n        if (words.includes(t)) s += 10;\n        else if (t.length>=3 && d.includes(t)) s += 5;\n        else all = false;\n      }\n    }\n  }\n  if (all && qTokens.length>0) s += 50;\n  s -= words.length * 0.1;\n  return s;\n}\n\nlet raw = query.productos || query.items || query.lista || query.some_input || '';\nif (typeof raw !== 'string') { try { raw = JSON.stringify(raw); } catch(e){ raw=String(raw); } }\nraw = raw.trim();\nif (!raw) return JSON.stringify({ ok:false, mensaje:'Necesito la lista de productos con cantidades.' });\n\nfunction parseItems(str){\n  const partes = str.split(/[,;\\n]+/).map(s=>s.trim()).filter(Boolean);\n  const out = [];\n  for (let p of partes){\n    let nombre=p, cant=1;\n    let m = p.match(/^(.*?)[:=]\\s*(\\d+(?:\\.\\d+)?)\\s*$/);\n    if (!m) m = p.match(/^(.*?)\\s+x\\s*(\\d+(?:\\.\\d+)?)\\s*$/i);\n    if (!m){ const m2=p.match(/^(\\d+(?:\\.\\d+)?)\\s+(.*)$/); if(m2){ cant=Number(m2[1]); nombre=m2[2]; } }\n    if (m){ nombre=m[1].trim(); cant=Number(m[2]); }\n    nombre = nombre.replace(/^(sacos?|unidades?|uds?|piezas?|de)\\s+/i,'').trim();\n    if (nombre) out.push({ nombre, cantidad: cant>0?cant:1 });\n  }\n  return out;\n}\nconst items = parseItems(raw);\nif (items.length===0) return JSON.stringify({ ok:false, mensaje:'No pude interpretar la lista. Formato: nombre:cantidad' });\n\nconst tasa = await getTasa();\n\nasync function buscarUno(nombre){\n  const exp = expandir(nombre);\n  const qTokens = exp.split(' ').filter(w=>w.length>=2);\n  const largas = qTokens.filter(w=>w.length>=3 || /\\d/.test(w));\n  let cand=[];\n  for (let i=Math.min(largas.length,4); i>=1 && cand.length===0; i--){\n    const q = largas.slice(0,i).map(w => {\n      if (w === 'corte') return 'or=(descripcion.ilike.*corte*,descripcion.ilike.*c/*)';\n      if (w === '1/2' || w === '12mm') return 'or=(descripcion.ilike.*1/2*,descripcion.ilike.*12mm*,descripcion.ilike.*12 mm*)';\n      if (w === '3/8' || w === '10mm') return 'or=(descripcion.ilike.*3/8*,descripcion.ilike.*10mm*,descripcion.ilike.*10 mm*)';\n      if (w === '5/8' || w === '16mm') return 'or=(descripcion.ilike.*5/8*,descripcion.ilike.*16mm*,descripcion.ilike.*16 mm*)';\n      if (w === '3/4' || w === '20mm') return 'or=(descripcion.ilike.*3/4*,descripcion.ilike.*20mm*,descripcion.ilike.*20 mm*)';\n      if (ACCENTS[w]) return `or=(descripcion.ilike.*${w}*,descripcion.ilike.*${ACCENTS[w]}*)`;\n      return 'descripcion=ilike.*' + encodeURIComponent(w) + '*';\n    }).join('&');\n    try{ const r=await axios.get(SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+'&limit=30',{headers:H}); cand=r.data||[]; }catch(e){}\n  }\n  if (cand.length===0) return null;\n  // ventas para desempate\n  const codes=cand.map(p=>p.codigo_interno);\n  let vMap={};\n  try{ const cf=codes.map(c=>'\"'+c+'\"').join(','); const vr=await axios.get(SB+'/rest/v1/ventas_detalle?select=codigo_producto,cantidad&codigo_producto=in.('+cf+')&limit=3000',{headers:H}); for(const v of(vr.data||[])) vMap[v.codigo_producto]=(vMap[v.codigo_producto]||0)+Number(v.cantidad); }catch(e){}\n  cand.sort((a,b)=>{\n    const ds=scoreMatch(b.descripcion,qTokens)-scoreMatch(a.descripcion,qTokens);\n    if(Math.abs(ds)>0.5) return ds;\n    const aStock = Number(a.existencia) > 0;\n    const bStock = Number(b.existencia) > 0;\n    if (aStock !== bStock) return aStock ? -1 : 1;\n    return (vMap[b.codigo_interno]||0)-(vMap[a.codigo_interno]||0);\n  });\n  return cand[0];\n}\n\nlet bloque='', totUSD=0, n=0;\nconst noEnc=[];\nlet hasAgotado = false;\nfor (const it of items){\n  const prod=await buscarUno(it.nombre);\n  if(!prod){ noEnc.push(it.nombre); continue; }\n  n++;\n  const usd=Number(prod.precio_venta);\n  const sub=usd*it.cantidad;\n  totUSD+=sub;\n  const isAgotado = Number(prod.existencia) <= 0;\n  if (isAgotado) hasAgotado = true;\n  bloque += n+'. *'+tc(prod.descripcion)+'*' + (isAgotado ? ' _(Agotado)_' : '') + '\\n';\n  bloque += '   '+it.cantidad+' x '+nUSD(usd)+'$ = *'+nUSD(sub)+'$*\\n\\n';\n}\nif (n===0) return JSON.stringify({ ok:false, mensaje:'No encontré esos productos: '+noEnc.join(', ') });\n\nconst totBs = tasa ? totUSD*RECARGO*tasa : null;\nbloque += '━━━━━━━━━━━━━━━\\n';\nbloque += '💵 *Pagando en dólares: '+nUSD(totUSD)+'$*\\n';\nif (tasa) bloque += '🇻🇪 *Pagando en bolívares (+40%): '+nUSD(totUSD*RECARGO)+'$ = Bs '+nBsInt(totBs)+'*';\nelse bloque += '_(tasa BCV no disponible para el monto en Bs)_';\n\nconst notaParts = [];\nif (noEnc.length) notaParts.push('no ubiqué en catálogo: ' + noEnc.join(', '));\nif (hasAgotado) notaParts.push('algunos productos están agotados (marcados con Agotado)');\nconst nota = notaParts.length ? ('Ojo: ' + notaParts.join('; ') + '.') : '';\nreturn JSON.stringify({ ok:true, presupuesto_texto: bloque, nota });",
+        "jsCode": "// hacer_presupuesto v4 — relevancia + medidas robustas + reglas cabilla/cemento + ventas; Bs sin revelar recargo\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nconst RECARGO = 1.40;\nfunction nUSD(n){ const r = Math.round(Number(n)*100)/100; return Number.isInteger(r) ? String(r) : r.toFixed(2); }\nfunction nBs(n){ return (Math.round(Number(n)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }\nfunction nBsInt(n){ return Math.round(Number(n)).toLocaleString('en-US'); }\nfunction tc(s){ return String(s).toLowerCase().split(/\\s+/).map(w=>{ if(/\\d/.test(w)) return w.toUpperCase(); if(w.length<=3) return w.toUpperCase(); return w.charAt(0).toUpperCase()+w.slice(1); }).join(' '); }\nfunction norm(t){ return String(t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 .\\/-]/g,' ').replace(/\\s+/g,' ').trim(); }\nfunction normMedida(s){\n  let t = norm(s);\n  t = t.replace(/(\\d+)\\s*mm/g, '$1mm');\n  t = t.replace(/(\\d+)\\s*[.\\s]\\s*(\\d+\\/\\d+)/g, '$1-$2');\n  t = t.replace(/(\\d[\\d\\/-]*)\\s*[x*]\\s*(?=\\d)/gi, '$1x');\n  return t.replace(/\\s+/g,' ').trim();\n}\nconst SIZEQ = {\n  '1/2':['1/2','12mm'], '12mm':['1/2','12mm'],\n  '3/8':['3/8','10mm'], '10mm':['3/8','10mm'],\n  '5/8':['5/8','16mm'], '16mm':['5/8','16mm'],\n  '3/4':['3/4','20mm'], '20mm':['3/4','20mm']\n};\nfunction medPresent(med, nd){\n  if (SIZEQ[med]) {\n    for (const a of SIZEQ[med]){ const esc=a.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&'); if (new RegExp('(^|[ (])'+esc+'($|[ x)])').test(nd)) return true; }\n    return false;\n  }\n  if (/^\\d+$/.test(med)) {\n    if (new RegExp('(^|[ (])'+med+'mm($|[ x)])').test(nd)) return true;\n    if (new RegExp('(^|[ (])'+med+'(?=x|\\\\)|$)').test(nd)) return true;\n    if (new RegExp('(^|[ (])'+med+' (?!(?:mm|cm|mts|mtrs|metros?|metro|m|pies?|pie|pulg|psi|gal|kg|kilos?|lbs?)\\\\b)').test(nd)) return true;\n    return false;\n  }\n  const esc = med.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&');\n  return new RegExp('(^|[ (])'+esc+'($|[ x)])').test(nd);\n}\nconst SIN = {\n  'corrugada':'estriada','corrugado':'estriado','varilla':'cabilla','varillas':'cabilla','hierro':'cabilla','cabillas':'cabilla',\n  'simento':'cemento','simanto':'cemento','saco cemento':'cemento','bolsa cemento':'cemento',\n  'clavo':'clavos','clavillo':'clavos','tornillo':'tornillos',\n  'tubo cuadrado':'tubo herreria','tubo metalico':'tubo herreria','tuberia metalica':'tubo herreria',\n  'tubo electrico':'tubo electricidad','tubo de luz':'tubo electricidad','tubo luz':'tubo electricidad',\n  'tubo sanitario':'tubo agua negra','tubo aguas negras':'tubo agua negra','tubo cloaca':'tubo agua negra','tubo aguas servidas':'tubo agua negra',\n  'tubo de agua':'tubo agua','tuberia':'tubo','codos':'codo',\n  'laminas':'lamina','techo zinc':'lamina zinc','calamina':'lamina zinc','tejas':'lamina zinc',\n  'alambre construccion':'alambron','alambre negro':'alambron',\n  'disco corte':'disco metal','disco amoladora':'disco metal',\n  'codo agua':'codo pvc','codo media':'codo pvc',\n  'cable electrico':'cable thwn','cableado':'cable',\n  'llave paso':'llave bola','grifo':'llave bola',\n  'caja luz':'cajetin','caja electrica':'cajetin',\n  'tepe':'teipe','tepe negro':'teipe','teipe negro':'teipe','cinta aislante':'teipe',\n  'media':'1/2','medio':'1/2','un cuarto':'1/4','cuarto':'1/4','tres cuartos':'3/4','tres octavos':'3/8','un octavo':'1/8'\n};\nconst ACCENTS = {\n  'herreria': 'herrería','carbon': 'carbón','cautin': 'cautín','exhibicion': 'exhibición','gavilan': 'gavilán',\n  'hidraulico': 'hidráulico','lampara': 'lámpara','periferica': 'periférica','polimero': 'polímero','presion': 'presión',\n  'reduccion': 'reducción','refrigeracion': 'refrigeración','silicon': 'silicón','sintetico': 'sintético','tuberia': 'tubería',\n  'plastico': 'plástico','lamina': 'lámina','bateria': 'batería','medicion': 'medición','fijacion': 'fijación'\n};\nconst COLOR_STEM = {\n  'blanco':'blanc','blanca':'blanc','blancos':'blanc','blancas':'blanc',\n  'negro':'negr','negra':'negr','negros':'negr','negras':'negr',\n  'rojo':'roj','roja':'roj','rojos':'roj','rojas':'roj',\n  'amarillo':'amarill','amarilla':'amarill','amarillos':'amarill','amarillas':'amarill',\n  'morado':'morad','morada':'morad','morados':'morad','moradas':'morad',\n  'dorado':'dorad','dorada':'dorad','dorados':'dorad','doradas':'dorad',\n  'plateado':'platead','plateada':'platead','plateados':'platead','plateadas':'platead',\n  'rosado':'rosad','rosada':'rosad','rosados':'rosad','rosadas':'rosad',\n  'gris':'gris','grises':'gris','verde':'verde','verdes':'verde',\n  'azul':'azul','azules':'azul','marron':'marron','marrones':'marron',\n  'naranja':'naranja','naranjas':'naranja','beige':'beige','cafe':'cafe',\n  'celeste':'celeste','celestes':'celeste'\n};\nfunction stemColor(w){ return COLOR_STEM[w] || w; }\nfunction singular(w){\n  if (w.length < 5) return w;\n  if (/ones$/.test(w)) return w.slice(0,-2);\n  if (/ores$/.test(w)) return w.slice(0,-2);\n  if (/[aeiou]s$/.test(w)) return w.slice(0,-1);\n  if (/[^aeiou]es$/.test(w)) return w.slice(0,-2);\n  if (/s$/.test(w)) return w.slice(0,-1);\n  return w;\n}\nfunction expandir(t){ let s=norm(t); s=s.replace(/\\bcal\\b(?!\\s*\\d)/g,'cal preparada'); const ks=Object.keys(SIN).sort((a,b)=>b.length-a.length); for(const k of ks){ if(s.includes(k)) s=s.split(k).join(SIN[k]); } return s; }\nfunction esGranel(desc){ const d=norm(desc); return /(^| )x ?(mtrs|mtr|mts|mt|metros|metro|kilos|kilo|kg|gr|ml)( |$)/.test(d) || / por metro( |$)/.test(d); }\nasync function getTasa(){ try { const r = await axios.get(SB+'/rest/v1/tazas?nombre=eq.actual&select=bcv_usd',{headers:H}); return r.data && r.data[0] && Number(r.data[0].bcv_usd); } catch(e){ return null; } }\nfunction scoreMatch(descripcion, qTokens){\n  const d = norm(descripcion);\n  const nd = normMedida(descripcion);\n  const words = d.split(/[\\s\\-x]+/);\n  let s = 0, all = true;\n  for (const t of qTokens){\n    if (t === 'corte') {\n      if (words.includes('corte') || words.includes('c/') || d.includes('c/')) s += 10; else all = false;\n    } else if (/\\d/.test(t)) {\n      if (medPresent(t, nd)) s += 12; else all = false;\n    } else {\n      if (words.includes(t)) s += 10;\n      else if (t.length>=3 && d.includes(t)) s += 5;\n      else all = false;\n    }\n  }\n  if (all && qTokens.length>0) s += 50;\n  s -= words.length * 0.1;\n  return s;\n}\n\nlet raw = query.productos || query.items || query.lista || query.some_input || '';\nif (typeof raw !== 'string') { try { raw = JSON.stringify(raw); } catch(e){ raw=String(raw); } }\nraw = raw.trim();\nif (!raw) return JSON.stringify({ ok:false, mensaje:'Necesito la lista de productos con cantidades.' });\n\nfunction parseItems(str){\n  const partes = str.split(/[,;\\n]+/).map(s=>s.trim()).filter(Boolean);\n  const out = [];\n  for (let p of partes){\n    let nombre=p, cant=1;\n    let m = p.match(/^(.*?)[:=]\\s*(\\d+(?:\\.\\d+)?)\\s*$/);\n    if (!m) m = p.match(/^(.*?)\\s+x\\s*(\\d+(?:\\.\\d+)?)\\s*$/i);\n    if (!m){ const m2=p.match(/^(\\d+(?:\\.\\d+)?)\\s+(.*)$/); if(m2){ cant=Number(m2[1]); nombre=m2[2]; } }\n    if (m){ nombre=m[1].trim(); cant=Number(m[2]); }\n    nombre = nombre.replace(/^((sacos?|unidades?|uds?|piezas?|metros?|mts|de|del|la|el|los|las)\\s+)+/i,'').trim();\n    if (nombre) out.push({ nombre, cantidad: cant>0?cant:1 });\n  }\n  return out;\n}\nconst items = parseItems(raw);\nif (items.length===0) return JSON.stringify({ ok:false, mensaje:'No pude interpretar la lista. Formato: nombre:cantidad' });\n\nconst tasa = await getTasa();\n\nconst STOPW = new Set(['de','del','la','el','los','las','un','una','unos','unas','y','o','con','para','por','al','cada','metro','metros','mt','mts','pulgada','pulgadas','pieza','piezas','saco','sacos','unidad','unidades','caja','cajas','galon','galones']);\nasync function buscarUno(nombre){\n  const exp = normMedida(expandir(nombre));\n  const qTokens = exp.split(' ').filter(w=>(w.length>=2 || /\\d/.test(w)) && !STOPW.has(w)).map(w => /\\d/.test(w) ? w : singular(stemColor(w)));\n  const largas = qTokens.filter(w=>w.length>=3 || /\\d/.test(w));\n  const textLargas = largas.filter(w=>!/\\d/.test(w));\n  const medLargas = largas.filter(w=>/\\d/.test(w));\n  const granelIntent = /\\b(por|al|x|cada|el)\\s*(metro|metros|mt|mts)\\b/.test(norm(nombre));\n  const GRANEL_OR = 'or=(descripcion.ilike.*x mt*,descripcion.ilike.*x metro*,descripcion.ilike.*por metro*)';\n  let cand=[];\n  // si hay categoria de texto, trae amplio por categoria y filtra medida en JS\n  if (textLargas.length>0){\n    const q = textLargas.map(w => { if (ACCENTS[w]) return `or=(descripcion.ilike.*${w}*,descripcion.ilike.*${ACCENTS[w]}*)`; return 'descripcion=ilike.*' + encodeURIComponent(w) + '*'; }).join('&');\n    if (granelIntent){ try{ const r=await axios.get(SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+'&'+GRANEL_OR+'&limit=60',{headers:H}); cand=r.data||[]; }catch(e){} }\n    if (cand.length===0){ try{ const r=await axios.get(SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+'&limit=60',{headers:H}); cand=r.data||[]; }catch(e){} }\n  }\n  // fallback: logica anterior por tokens (incluye medidas en el ilike)\n  for (let i=Math.min(largas.length,4); i>=1 && cand.length===0; i--){\n    const q = largas.slice(0,i).map(w => {\n      if (w === 'corte') return 'or=(descripcion.ilike.*corte*,descripcion.ilike.*c/*)';\n      if (w === '1/2' || w === '12mm') return 'or=(descripcion.ilike.*1/2*,descripcion.ilike.*12mm*,descripcion.ilike.*12 mm*)';\n      if (w === '3/8' || w === '10mm') return 'or=(descripcion.ilike.*3/8*,descripcion.ilike.*10mm*,descripcion.ilike.*10 mm*)';\n      if (w === '5/8' || w === '16mm') return 'or=(descripcion.ilike.*5/8*,descripcion.ilike.*16mm*,descripcion.ilike.*16 mm*)';\n      if (w === '3/4' || w === '20mm') return 'or=(descripcion.ilike.*3/4*,descripcion.ilike.*20mm*,descripcion.ilike.*20 mm*)';\n      if (ACCENTS[w]) return `or=(descripcion.ilike.*${w}*,descripcion.ilike.*${ACCENTS[w]}*)`;\n      return 'descripcion=ilike.*' + encodeURIComponent(w) + '*';\n    }).join('&');\n    try{ const r=await axios.get(SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+'&limit=30',{headers:H}); cand=r.data||[]; }catch(e){}\n  }\n  if (cand.length===0) return null;\n\n  // Regla CEMENTO\n  { const nbq = norm(nombre); if (qTokens.includes('cemento')) { let tipo='gris'; if(nbq.includes('blanco')) tipo='blanco'; else if(nbq.includes('asfalt')||nbq.includes('plastic')||nbq.includes('bituplast')||nbq.includes('edil')) tipo='plastico'; else if(nbq.includes('contacto')||nbq.includes('pega')) tipo='contacto'; const matchTipo=(d)=>{ d=norm(d); if(tipo==='blanco') return d.includes('blanco'); if(tipo==='plastico') return d.includes('plastico')||d.includes('bituplast')||d.includes('edil')||d.includes('asfalt'); if(tipo==='contacto') return d.includes('contacto')||d.includes('pega'); return d.includes('cemento gris'); }; const filt = cand.filter(p => matchTipo(p.descripcion)); if (filt.length>0) cand = filt; } }\n\n  // Regla CABILLA\n  { const nbq = norm(nombre); if (qTokens.includes('cabilla')) { const wantCuadrada=nbq.includes('cuadrada'); const wantRedonda=nbq.includes('redonda'); const wantLisa=nbq.includes('lisa'); let filt=null; if(wantCuadrada||wantRedonda||wantLisa){ filt = cand.filter(p => { const d=norm(p.descripcion); if(wantCuadrada) return d.includes('cuadrada'); if(wantRedonda) return d.includes('redonda'); if(wantLisa) return d.includes('lisa'); return true; }); } else { const est = cand.filter(p => norm(p.descripcion).includes('estriada')); if (medLargas.length>0){ const estM = est.filter(p=>{ const nd=normMedida(p.descripcion); return medLargas.every(m=>medPresent(m,nd)); }); filt = (estM.length>0) ? est : null; } else { filt = est; } } if (filt && filt.length>0) cand = filt; } }\n\n  // Si pidio \"por metro\", prioriza productos a granel (X MT)\n  if (granelIntent){\n    const g = cand.filter(p => esGranel(p.descripcion));\n    if (g.length>0) cand = g;\n  }\n\n  // Filtro de MEDIDA\n  if (medLargas.length>0){\n    const filt = cand.filter(p => { const nd=normMedida(p.descripcion); return medLargas.every(m => medPresent(m, nd)); });\n    if (filt.length>0) cand = filt;\n  }\n\n  // ventas para desempate\n  const codes=cand.map(p=>p.codigo_interno);\n  let vMap={};\n  try{ const vr=await axios.post(SB+'/rest/v1/rpc/popularidad_productos',{p_codigos:codes},{headers:H}); for(const v of(vr.data||[])) vMap[v.codigo_producto]=Number(v.total); }catch(e){}\n  cand.sort((a,b)=>{\n    const ds=scoreMatch(b.descripcion,qTokens)-scoreMatch(a.descripcion,qTokens);\n    if(Math.abs(ds)>0.5) return ds;\n    const aStock = esGranel(a.descripcion) || Number(a.existencia) > 0;\n    const bStock = esGranel(b.descripcion) || Number(b.existencia) > 0;\n    if (aStock !== bStock) return aStock ? -1 : 1;\n    return (vMap[b.codigo_interno]||0)-(vMap[a.codigo_interno]||0);\n  });\n  // best = mas vendido; alts = otras opciones DISPONIBLES con precio distinto (max 2)\n  const best = cand[0];\n  const seenP = new Set([Number(best.precio_venta)]);\n  const alts = [];\n  for (const c of cand.slice(1)){\n    const avail = esGranel(c.descripcion) || Number(c.existencia) > 0;\n    const pr = Number(c.precio_venta);\n    if (avail && !seenP.has(pr)){ seenP.add(pr); alts.push(c); }\n    if (alts.length>=2) break;\n  }\n  return { best, alts };\n}\n\nlet bloque='', totUSD=0, n=0;\nconst noEnc=[];\nconst altLines=[];\nlet hasAgotado = false;\nfor (const it of items){\n  const r=await buscarUno(it.nombre);\n  if(!r || !r.best){ noEnc.push(it.nombre); continue; }\n  const prod=r.best;\n  n++;\n  const usd=Number(prod.precio_venta);\n  const sub=usd*it.cantidad;\n  totUSD+=sub;\n  const isAgotado = !esGranel(prod.descripcion) && Number(prod.existencia) <= 0;\n  if (isAgotado) hasAgotado = true;\n  bloque += n+'. *'+tc(prod.descripcion)+'*' + (isAgotado ? ' _(Agotado)_' : '') + '\\n';\n  bloque += '   '+it.cantidad+' x '+nUSD(usd)+'$ = *'+nUSD(sub)+'$*\\n\\n';\n  // otras opciones disponibles para este renglón\n  for (const a of (r.alts||[])){\n    const ausd=Number(a.precio_venta);\n    altLines.push('• En vez de *'+tc(prod.descripcion)+'* también está *'+tc(a.descripcion)+'* a '+nUSD(ausd)+'$ c/u');\n  }\n}\nif (n===0) return JSON.stringify({ ok:false, mensaje:'No encontré esos productos: '+noEnc.join(', ') });\n\nconst totBs = tasa ? totUSD*RECARGO*tasa : null;\nbloque += '━━━━━━━━━━━━━━━\\n';\nbloque += '💵 *Pagando en dólares: '+nUSD(totUSD)+'$*\\n';\nif (tasa) bloque += '🇻🇪 *Pagando en bolívares: '+nUSD(totUSD*RECARGO)+'$ = Bs '+nBsInt(totBs)+'*';\nelse bloque += '_(tasa BCV no disponible para el monto en Bs)_';\n\nconst notaParts = [];\nif (noEnc.length) notaParts.push('no ubiqué en catálogo: ' + noEnc.join(', '));\nif (hasAgotado) notaParts.push('algunos productos están agotados (marcados con Agotado)');\nconst nota = notaParts.length ? ('Ojo: ' + notaParts.join('; ') + '.') : '';\nconst alternativas_texto = altLines.length ? altLines.join('\\n') : '';\nreturn JSON.stringify({ ok:true, presupuesto_texto: bloque, alternativas_texto, nota });\n",
         "specifyInputSchema": true,
         "schemaType": "fromJson",
         "inputSchema": "{\"type\":\"object\",\"properties\":{\"productos\":{\"type\":\"string\",\"description\":\"Lista de productos con cantidad, separados por coma, cada uno como \\\"nombre:cantidad\\\". Ejemplo: \\\"cemento gris:2, cabilla 12mm:4, tubo herreria 1x1:10\\\"\"}},\"required\":[\"productos\"]}"
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Nodo de codigo \"Cliente Memoria\": recall determinista + guardado automatico del nombre.\n// Corre en el flujo principal antes del AI Agent. Nunca rompe el flujo (todo en try/catch).\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };\nlet telefono = null, mensaje = '', nombre = null, notas = null;\ntry { const p = $('Webhook Trigger').first().json.body.payload; telefono = p && p.from; mensaje = (p && p.body) || ''; } catch (e) {}\n// 1) Cargar memoria existente (recall)\ntry {\n  if (telefono) {\n    const r = await axios.get(SB + '/rest/v1/clientes_chat?telefono=eq.' + encodeURIComponent(telefono) + '&select=nombre,notas', { headers: H });\n    if (r.data && r.data[0]) { nombre = r.data[0].nombre || null; notas = r.data[0].notas || null; }\n  }\n} catch (e) {}\n// 2) Detectar y guardar el nombre si aun no lo tenemos\ntry {\n  if (telefono && !nombre && mensaje) {\n    const m = mensaje.match(/(?:me\\s+llamo|mi\\s+nombre\\s+es|me\\s+dicen|habla|le\\s+habla|aqui|soy)\\s+([A-Za-zÀ-ſ]{3,}(?:\\s+[A-Za-zÀ-ſ]{2,})?)/i);\n    if (m) {\n      let cand = m[1].trim().replace(/\\s+/g, ' ');\n      const stop = ['de','del','la','el','un','una','que','muy','bien','aqui','interesado','interesada','cliente','buscando','viendo','para','por','con','tu','su','mi','este','esta','buenas','buenos'];\n      const w0 = cand.split(' ')[0].toLowerCase();\n      // segunda palabra: si es un verbo/relleno comun, quedarse solo con la primera\n      const parts = cand.split(' ');\n      if (parts[1]) { const v=['necesito','quiero','busco','ando','estoy','tengo','voy','y','me','que','por','para','de'].includes(parts[1].toLowerCase()); if (v) cand = parts[0]; }\n      if (!stop.includes(w0) && cand.length >= 3) {\n        nombre = cand.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');\n        try { await axios.post(SB + '/rest/v1/clientes_chat', { telefono, nombre, updated_at: new Date().toISOString() }, { headers: H }); } catch (e) {}\n      }\n    }\n  }\n} catch (e) {}\nreturn [{ json: { cliente_nombre: nombre, cliente_notas: notas, telefono_cliente: telefono } }];\n"
+      },
+      "id": "cliente_memoria_node",
+      "name": "Cliente Memoria",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        620,
+        470
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "id": "descartar_node",
+      "name": "Descartar",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        96,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c_no_status",
+              "leftValue": "={{ $json.body.payload ? $json.body.payload.from : $json.body.from }}",
+              "rightValue": "status@broadcast",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            },
+            {
+              "id": "c_no_group",
+              "leftValue": "={{ $json.body.payload ? $json.body.payload.from : $json.body.from }}",
+              "rightValue": "@g.us",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "c_no_news",
+              "leftValue": "={{ $json.body.payload ? $json.body.payload.from : $json.body.from }}",
+              "rightValue": "@newsletter",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          }
+        },
+        "options": {}
+      },
+      "id": "es_cliente_real_node",
+      "name": "Es Cliente Real?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        96,
+        304
+      ]
     }
   ],
   "connections": {
@@ -463,9 +518,9 @@
       "main": [
         [
           {
-            "index": 0,
-            "node": "Is Text Message?",
-            "type": "main"
+            "node": "Es Cliente Real?",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -474,16 +529,16 @@
       "main": [
         [
           {
-            "index": 0,
-            "node": "Reply Non-Text",
-            "type": "main"
+            "node": "Check Chat Session",
+            "type": "main",
+            "index": 0
           }
         ],
         [
           {
-            "index": 0,
-            "node": "Check Chat Session",
-            "type": "main"
+            "node": "Reply Non-Text",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -528,9 +583,9 @@
         ],
         [
           {
-            "index": 0,
-            "node": "AI Agent",
-            "type": "main"
+            "node": "Cliente Memoria",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -651,730 +706,39 @@
           }
         ]
       ]
+    },
+    "Cliente Memoria": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Es Cliente Real?": {
+      "main": [
+        [
+          {
+            "node": "Is Text Message?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Descartar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
-  },
-  "staticData": null,
-  "meta": {},
-  "nodeGroups": [],
-  "pinData": {},
-  "versionId": "4f5ae056-6ef0-434a-a707-6a12ebb15049",
-  "activeVersionId": "4f5ae056-6ef0-434a-a707-6a12ebb15049",
-  "versionCounter": 70,
-  "triggerCount": 1,
-  "shared": [
-    {
-      "updatedAt": "2026-06-05T19:23:04.349Z",
-      "createdAt": "2026-06-05T19:23:04.349Z",
-      "role": "workflow:owner",
-      "workflowId": "ugHOTQv3Vb6cuTct",
-      "projectId": "o4UwjyJJrlfHWiFr",
-      "project": {
-        "updatedAt": "2026-06-05T19:38:07.046Z",
-        "createdAt": "2026-06-05T19:18:56.994Z",
-        "id": "o4UwjyJJrlfHWiFr",
-        "name": "Admin Serrucho <admin@serrucho.local>",
-        "type": "personal",
-        "icon": null,
-        "description": null,
-        "creatorId": "a9174cb6-6525-426b-9005-30bde1cb175c"
-      }
-    }
-  ],
-  "tags": [],
-  "activeVersion": {
-    "updatedAt": "2026-06-06T12:59:13.380Z",
-    "createdAt": "2026-06-06T12:59:13.380Z",
-    "versionId": "4f5ae056-6ef0-434a-a707-6a12ebb15049",
-    "workflowId": "ugHOTQv3Vb6cuTct",
-    "nodes": [
-      {
-        "parameters": {
-          "httpMethod": "POST",
-          "path": "whatsapp/inbound",
-          "options": {}
-        },
-        "id": "webhook_node",
-        "name": "Webhook Trigger",
-        "position": [
-          112,
-          304
-        ],
-        "type": "n8n-nodes-base.webhook",
-        "typeVersion": 2.1,
-        "webhookId": "89a113d5-2af5-490e-9cf9-89f9a44601c5"
-      },
-      {
-        "parameters": {
-          "conditions": {
-            "combinator": "and",
-            "conditions": [
-              {
-                "id": "cond_has_text",
-                "leftValue": "={{ $json.body.payload ? $json.body.payload.body : $json.body.body }}",
-                "operator": {
-                  "operation": "isNotEmpty",
-                  "type": "string"
-                },
-                "rightValue": ""
-              }
-            ],
-            "options": {
-              "caseSensitive": true,
-              "leftValue": "",
-              "typeValidation": "loose",
-              "version": 2
-            }
-          },
-          "options": {}
-        },
-        "id": "filter_text_node",
-        "name": "Is Text Message?",
-        "position": [
-          272,
-          304
-        ],
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2.3
-      },
-      {
-        "parameters": {
-          "method": "POST",
-          "url": "http://waha_serrucho:3000/api/sendText",
-          "sendHeaders": true,
-          "headerParameters": {
-            "parameters": [
-              {
-                "name": "X-API-Key",
-                "value": "={{ $env.WAHA_API_KEY }}"
-              }
-            ]
-          },
-          "sendBody": true,
-          "specifyBody": "json",
-          "jsonBody": "={{ JSON.stringify({ session: 'default', chatId: $json.body.payload ? $json.body.payload.from : $json.body.from, text: '👨🏻‍🔧 ¡Hola! Soy *Perucho*, el bot de Ferretería El Serrucho 🪚. Por ahora solo puedo leer mensajes de texto. ¿Podrías escribirme tu consulta? 📝' }) }}",
-          "options": {}
-        },
-        "onError": "continueRegularOutput",
-        "id": "reply_non_text_node",
-        "name": "Reply Non-Text",
-        "position": [
-          272,
-          128
-        ],
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4
-      },
-      {
-        "parameters": {
-          "operation": "executeQuery",
-          "query": "=INSERT INTO public.chat_sessions (telefono, estado, msg_count, window_start) VALUES ('{{ $json.body.payload ? $json.body.payload.from : $json.body.from }}', 'automatico', 1, NOW()) ON CONFLICT (telefono) DO UPDATE SET updated_at = NOW(), msg_count = CASE WHEN NOW() - chat_sessions.window_start > INTERVAL '60 seconds' THEN 1 ELSE chat_sessions.msg_count + 1 END, window_start = CASE WHEN NOW() - chat_sessions.window_start > INTERVAL '60 seconds' THEN NOW() ELSE chat_sessions.window_start END RETURNING estado, msg_count, telefono;",
-          "additionalFields": {}
-        },
-        "id": "postgres_session_node",
-        "name": "Check Chat Session",
-        "position": [
-          432,
-          304
-        ],
-        "type": "n8n-nodes-base.postgres",
-        "typeVersion": 2.6,
-        "credentials": {
-          "postgres": {
-            "id": "1dtm0jLulZEFrKtB",
-            "name": "Supabase Readonly"
-          }
-        },
-        "onError": "continueRegularOutput"
-      },
-      {
-        "parameters": {
-          "conditions": {
-            "combinator": "and",
-            "conditions": [
-              {
-                "id": "cond_rate_limit",
-                "leftValue": "={{ $json.msg_count }}",
-                "operator": {
-                  "operation": "gt",
-                  "type": "number"
-                },
-                "rightValue": 10
-              }
-            ],
-            "options": {
-              "caseSensitive": true,
-              "leftValue": "",
-              "typeValidation": "loose",
-              "version": 2
-            }
-          },
-          "options": {}
-        },
-        "id": "rate_limit_node",
-        "name": "Rate Limited?",
-        "position": [
-          592,
-          304
-        ],
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2.3
-      },
-      {
-        "parameters": {},
-        "id": "rate_limit_noop",
-        "name": "Rate Limit Drop",
-        "position": [
-          592,
-          128
-        ],
-        "type": "n8n-nodes-base.noOp",
-        "typeVersion": 1
-      },
-      {
-        "parameters": {
-          "conditions": {
-            "combinator": "and",
-            "conditions": [
-              {
-                "id": "cond_manual",
-                "leftValue": "={{ $json.estado }}",
-                "operator": {
-                  "operation": "equals",
-                  "type": "string"
-                },
-                "rightValue": "manual"
-              }
-            ],
-            "options": {
-              "caseSensitive": true,
-              "leftValue": "",
-              "typeValidation": "strict",
-              "version": 3
-            }
-          },
-          "options": {}
-        },
-        "id": "if_manual_node",
-        "name": "Is Manual Handover?",
-        "position": [
-          752,
-          304
-        ],
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2.3
-      },
-      {
-        "parameters": {
-          "promptType": "define",
-          "text": "={{ $('Webhook Trigger').first().json.body.payload.body }}",
-          "options": {
-            "systemMessage": "Eres *Perucho* 👨🏻‍🔧, el asesor ferretero experto de *Ferretería El Serrucho* 🪚, en Mene Mauroa, Estado Falcón. Eres un ferretero servicial, cálido, paciente y muy cercano, con el trato amable típico de Mene Mauroa. Usas emojis con calidez (👨🏻‍🔧 🪚 👀 👨🏻‍💻 😎 🔧).\n\n═══ DATOS DE LA TIENDA ═══\n- Horario: lunes a sábado, 8:00 AM–6:00 PM (almuerzo 1:00–2:00 PM). Domingos y feriados: cerrado.\n- Solo retiro en tienda física (NO hay delivery ni envíos).\n- Pagos: Pago Móvil (BCV), Efectivo (USD o Bs), Transferencia, Zelle (compras > $20 USD).\n- Devoluciones: hasta 7 días, producto sellado en su empaque, sin uso y con factura.\n\n═══ PRESENTACIÓN (solo primer mensaje) ═══\nSi es el PRIMER mensaje del cliente, INICIA tu respuesta con esta breve presentación y CONTINÚA INMEDIATAMENTE, en el MISMO mensaje, atendiendo lo que pide. NUNCA envíes solo el saludo: siempre acompáñalo con la respuesta (si pregunta por un producto, búscalo y muéstralo justo debajo del saludo).\nSaludo: \"Hola Soy *Perucho* 👨🏻‍🔧 El bot de IA experto ferretero de *El Serrucho* 🪚\"\nSi la conversación ya empezó, NO te vuelvas a presentar; responde directo.\n\n\n═══ PRECIOS — REGLA DE ORO (NO CALCULES NADA TÚ) ═══\nCada producto tiene DOS precios:\n1. *Precio Divisas* (USD): precio base, para pago en dólares.\n2. *Precio Bs (BCV)*: para pago en bolívares se cobra un recargo del 40%.\nLas herramientas YA te entregan estos precios calculados y formateados (campos *_texto). USA ESOS TEXTOS TAL CUAL, cópialos exactamente. JAMÁS hagas tú multiplicaciones, sumas, ni inventes cifras. PROHIBIDO calcular IVA o cualquier otro recargo extra.\n\n═══ FORMATO DE UN PRODUCTO (WhatsApp) ═══\nWhatsApp no usa Markdown de tablas. Negrita = UN asterisco *así* (nunca **doble**). Presenta cada producto EXACTAMENTE con esta estructura:\n\n*Nombre Del Producto*\nDisponibilidad: ✅\nPrecio Divisas: (precio_divisas_texto)\nPrecio Bs (BCV): (precio_bs_texto)\n\nReglas:\n- Nombre en *negrita* y en Formato Tipo Título (no TODO MAYÚSCULAS).\n- Muestra \"Disponibilidad: ✅\". NUNCA reveles el número exacto de unidades.\n- Copia los textos de precio EXACTOS que devuelve la herramienta.\n- Muestra máximo 3 o 4 opciones (las más vendidas primero). Si hay más, ofrece afinar la búsqueda.\n- Cierra cálido, ofreciendo ayuda. Ej: \"¿Te gusta esta opción o prefieres que un empleado experto te atienda mejor? 👨🏻‍🔧\"\n\n═══ PRESUPUESTOS (herramienta hacer_presupuesto) ═══\nREGLA ABSOLUTA: si el cliente menciona 2 o más productos con cantidades, es OBLIGATORIO llamar hacer_presupuesto. JAMÁS inventes precios ni calcules totales tú mismo. Si no llamas la herramienta, estarás dando datos falsos.\nCuando el cliente pida VARIOS productos con cantidades, o \"cuánto sería todo / el total\", USA hacer_presupuesto.\nPasa el parámetro *productos* como UN SOLO TEXTO con formato \"nombre:cantidad\" separando por comas.\nEjemplo: si pide 2 sacos de cemento, 4 cerchas y 10 tubos → productos = \"cemento gris:2, cercha 10x6:4, tubo herreria 1x1:10\"\nLa herramienta devuelve *presupuesto_texto* YA CALCULADO. Responde EXACTAMENTE así:\n\nOk veamos si entiendo bien tu lista y si le atiné al presupuesto 👨🏻‍💻\n\n(PEGA presupuesto_texto SIN CAMBIAR NINGÚN NÚMERO NI SÍMBOLO)\n\nDime si está todo correcto y si quieres proceder con un empleado especializado para facturar 😎. Avísame si hay algún error o quieres cambiar algo, ¡estamos para servirte! 👨🏻‍🔧🪚\n\nREGLA: copia presupuesto_texto carácter por carácter. NUNCA recalcules ni cambies un dígito. Si nota trae texto, menciónalo al final.\n\n\n═══ BÚSQUEDA Y RELEVANCIA ═══\nREGLA ABSOLUTA (la más importante): para CUALQUIER pregunta sobre un producto, precio, disponibilidad o cotización, es OBLIGATORIO llamar la herramienta (buscar_productos o hacer_presupuesto) ANTES de responder. JAMÁS des un precio de tu memoria, JAMÁS inventes cifras ni nombres. Si respondes sin llamar la herramienta, estarás dando datos FALSOS al cliente y eso está terminantemente prohibido. Solo reporta lo que la herramienta devuelve.\n- REGLA DE ORO DE BÚSQUEDA: Siempre usa buscar_productos primero si te preguntan por algún producto o artículo. No asumas que no lo vendemos sin buscarlo primero. Solo declina la venta si el artículo cae estrictamente en una categoría prohibida (como celulares, ropa, electrodomésticos) y buscar_productos no arrojó resultados. Si la búsqueda arroja resultados, significa que sí lo vendemos y debes ofrecerlos.\n- CONSERVA los términos exactos del cliente al buscar o cotizar (marcas, medidas, modelos como \"CSC\", \"12mm\", \"Catatumbo\", \"Ingco\"). NO los simplifiques ni los quites: si pide \"cemento gris CSC\", busca \"cemento gris csc\" completo, no solo \"cemento\".\n- Solo se muestran productos CON stock (la herramienta ya filtra agotados); por eso \"no mostrar productos sin cantidad\".\n- No muestres productos sin relación con lo pedido (si pide \"alambre\", no ofrezcas \"cepillo de alambre\").\n- Alambre (de amarre) y alambrón (cabilla fina estriada) son distintos.\n\n═══ CATEGORÍAS QUE NO VENDEMOS ═══\nNo manejamos electrodomésticos (lavadoras, neveras, aires), electrónica (celulares, computadoras, TV), vehículos ni ropa. Si preguntan por eso responde amable: \"En El Serrucho nos especializamos en materiales de construcción, herramientas y plomería. No manejamos eso 🙏. ¿Puedo ayudarte con algo de ferretería? 👨🏻‍🔧\". NO busques accesorios relacionados.\nEXCEPCIONES (SÍ vendemos estos artículos de ferretería/seguridad, búscalos con la herramienta):\n- Fajas lumbares (categoría seguridad industrial)\n- Nylon de pescar (categoría pesca/ataduras)\n- Flotadores eléctricos o flotadores de agua (categoría plomería/tanques)\n- Malla pollito (categoría construcción/mallas/cercas)\n\n═══ MEMORIA (Engram) ═══\n- Si el cliente comparte un dato clave (nombre, RIF, la obra que hace, preferencias), guárdalo con guardar_memoria_engram.\n- Puedes recordar atenciones previas con buscar_memoria_engram usando su número.\n\n═══ ESCALAMIENTO ═══\nSi el cliente tiene un reclamo, un problema complejo, o pide explícitamente hablar con una persona, responde EXACTAMENTE: [ESCALAR_HUMANO]\n\n═══ LÍMITES ═══\nNo respondas temas ajenos a la ferretería (política, entretenimiento, programación, etc.)."
-          }
-        },
-        "id": "ai_agent_node",
-        "name": "AI Agent",
-        "position": [
-          1008,
-          400
-        ],
-        "type": "@n8n/n8n-nodes-langchain.agent",
-        "typeVersion": 3.1
-      },
-      {
-        "parameters": {
-          "model": "openai/gpt-4o-mini",
-          "options": {
-            "temperature": 0.3
-          }
-        },
-        "id": "openrouter_model_node",
-        "name": "OpenRouter Chat Model",
-        "position": [
-          928,
-          592
-        ],
-        "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
-        "typeVersion": 1,
-        "credentials": {
-          "openRouterApi": {
-            "id": "4tgq95GQzWAS8kMd",
-            "name": "OpenRouter (free)"
-          }
-        }
-      },
-      {
-        "id": "postgres_memory_node",
-        "name": "Simple Memory",
-        "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
-        "typeVersion": 1.3,
-        "position": [
-          1072,
-          592
-        ],
-        "parameters": {
-          "sessionIdType": "customKey",
-          "sessionKey": "={{ $('Webhook Trigger').first().json.body.payload.from }}",
-          "contextWindowLength": 10
-        }
-      },
-      {
-        "parameters": {
-          "conditions": {
-            "combinator": "and",
-            "conditions": [
-              {
-                "id": "cond_escalar",
-                "leftValue": "={{ $json.output }}",
-                "operator": {
-                  "operation": "contains",
-                  "type": "string"
-                },
-                "rightValue": "[ESCALAR_HUMANO]"
-              }
-            ],
-            "options": {
-              "caseSensitive": true,
-              "leftValue": "",
-              "typeValidation": "strict",
-              "version": 2
-            }
-          },
-          "options": {}
-        },
-        "id": "if_escalar_node",
-        "name": "Check Escalation",
-        "position": [
-          1408,
-          400
-        ],
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2.3
-      },
-      {
-        "parameters": {
-          "operation": "executeQuery",
-          "query": "=UPDATE public.chat_sessions SET estado = 'manual', updated_at = NOW() WHERE telefono = '{{ $('Webhook Trigger').first().json.body.payload.from }}';",
-          "additionalFields": {}
-        },
-        "id": "postgres_set_manual_node",
-        "name": "Set Chat Manual",
-        "position": [
-          1600,
-          256
-        ],
-        "type": "n8n-nodes-base.postgres",
-        "typeVersion": 2.6,
-        "credentials": {
-          "postgres": {
-            "id": "1dtm0jLulZEFrKtB",
-            "name": "Supabase Readonly"
-          }
-        },
-        "onError": "continueRegularOutput"
-      },
-      {
-        "parameters": {
-          "method": "POST",
-          "url": "http://waha_serrucho:3000/api/sendText",
-          "sendHeaders": true,
-          "headerParameters": {
-            "parameters": [
-              {
-                "name": "X-API-Key",
-                "value": "={{ $env.WAHA_API_KEY }}"
-              }
-            ]
-          },
-          "sendBody": true,
-          "specifyBody": "json",
-          "jsonBody": "={{ JSON.stringify({ session: 'default', chatId: $('Webhook Trigger').first().json.body.payload.from, text: 'En un momento uno de nuestros asesores comerciales continuará atendiéndote de forma personalizada. ¡Muchas gracias por tu paciencia!' }) }}",
-          "options": {}
-        },
-        "onError": "continueRegularOutput",
-        "id": "waha_handover_node",
-        "name": "Send Handover Message",
-        "position": [
-          1808,
-          256
-        ],
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4
-      },
-      {
-        "parameters": {
-          "method": "POST",
-          "url": "http://waha_serrucho:3000/api/sendText",
-          "sendHeaders": true,
-          "headerParameters": {
-            "parameters": [
-              {
-                "name": "X-API-Key",
-                "value": "={{ $env.WAHA_API_KEY }}"
-              }
-            ]
-          },
-          "sendBody": true,
-          "specifyBody": "json",
-          "jsonBody": "={{ JSON.stringify({ session: 'default', chatId: $('Webhook Trigger').first().json.body.payload.from, text: ($json.output || '').replace(/\\*\\*/g, '*').trim() }) }}",
-          "options": {}
-        },
-        "id": "waha_agent_node",
-        "name": "Send Agent Response",
-        "position": [
-          1600,
-          464
-        ],
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4,
-        "onError": "continueRegularOutput"
-      },
-      {
-        "parameters": {},
-        "id": "manual_handover_noop",
-        "name": "Manual Handover Active",
-        "position": [
-          1008,
-          208
-        ],
-        "type": "n8n-nodes-base.noOp",
-        "typeVersion": 1
-      },
-      {
-        "id": "http_tool_node",
-        "name": "buscar_productos_tool",
-        "type": "@n8n/n8n-nodes-langchain.toolCode",
-        "typeVersion": 1.3,
-        "position": [
-          1216,
-          592
-        ],
-        "parameters": {
-          "name": "buscar_productos",
-          "description": "Busca productos de ferretería en la base de datos por nombre, descripción o similitud. Retorna una lista de productos con su código_interno, descripción, precio_venta en dólares y existencia.",
-          "language": "javaScript",
-          "jsCode": "// buscar_productos v9 — relevancia primero, ventas como desempate + corte->c/ PostgREST OR mapping + accents & stock\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nconst RECARGO = 1.40;\nfunction nUSD(n){ const r = Math.round(Number(n)*100)/100; return Number.isInteger(r) ? String(r) : r.toFixed(2); }\nfunction nBs(n){ return (Math.round(Number(n)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }\nfunction nBsInt(n){ return Math.round(Number(n)).toLocaleString('en-US'); }\nfunction tc(s){ return String(s).toLowerCase().split(/\\s+/).map(w=>{ if(/\\d/.test(w)) return w.toUpperCase(); if(w.length<=3) return w.toUpperCase(); return w.charAt(0).toUpperCase()+w.slice(1); }).join(' '); }\nfunction norm(t){ return String(t).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9 .\\/-]/g,' ').replace(/\\s+/g,' ').trim(); }\nconst SIN = {\n  'corrugada':'estriada','corrugado':'estriado','varilla':'cabilla','varillas':'cabilla','hierro':'cabilla','cabillas':'cabilla',\n  'simento':'cemento','simanto':'cemento','saco cemento':'cemento','bolsa cemento':'cemento',\n  'clavo':'clavos','clavillo':'clavos','tornillo':'tornillos',\n  'tubo cuadrado':'tubo herreria','tubo metalico':'tubo herreria','tuberia metalica':'tubo herreria',\n  'laminas':'lamina','techo zinc':'lamina zinc','calamina':'lamina zinc','tejas':'lamina zinc',\n  'alambre construccion':'alambron','alambre negro':'alambron',\n  'disco corte':'disco metal','disco amoladora':'disco metal',\n  'codo agua':'codo pvc','codo media':'codo pvc',\n  'cable electrico':'cable thwn','cableado':'cable',\n  'llave paso':'llave bola','grifo':'llave bola',\n  'caja luz':'cajetin','caja electrica':'cajetin',\n  'tepe':'teipe','tepe negro':'teipe','teipe negro':'teipe','cinta aislante':'teipe',\n  'media':'1/2','medio':'1/2','un cuarto':'1/4','cuarto':'1/4','tres cuartos':'3/4','tres octavos':'3/8','un octavo':'1/8'\n};\nconst ACCENTS = {\n  'herreria': 'herrería',\n  'carbon': 'carbón',\n  'cautin': 'cautín',\n  'exhibicion': 'exhibición',\n  'gavilan': 'gavilán',\n  'hidraulico': 'hidráulico',\n  'lampara': 'lámpara',\n  'periferica': 'periférica',\n  'polimero': 'polímero',\n  'presion': 'presión',\n  'reduccion': 'reducción',\n  'refrigeracion': 'refrigeración',\n  'silicon': 'silicón',\n  'sintetico': 'sintético',\n  'tuberia': 'tubería',\n  'plastico': 'plástico',\n  'lamina': 'lámina',\n  'bateria': 'batería',\n  'medicion': 'medición',\n  'fijacion': 'fijación'\n};\nfunction expandir(t){ let s=norm(t); const ks=Object.keys(SIN).sort((a,b)=>b.length-a.length); for(const k of ks){ if(s.includes(k)) s=s.split(k).join(SIN[k]); } return s; }\nasync function getTasa(){ try { const r = await axios.get(SB+'/rest/v1/tasas?nombre=eq.actual&select=bcv_usd',{headers:H}); return r.data && r.data[0] && Number(r.data[0].bcv_usd); } catch(e){ return null; } }\nfunction scoreMatch(descripcion, qTokens){\n  const d = norm(descripcion);\n  const words = d.split(/[\\s\\-x]+/);\n  let s = 0, all = true;\n  for (const t of qTokens){\n    if (t === 'corte') {\n      if (words.includes('corte') || words.includes('c/') || d.includes('c/')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else if (t === '1/2' || t === '12mm') {\n      if (words.includes('1/2') || words.includes('12mm') || words.includes('12') || d.includes('1/2') || d.includes('12mm') || d.includes('12 mm')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else if (t === '3/8' || t === '10mm') {\n      if (words.includes('3/8') || words.includes('10mm') || words.includes('10') || d.includes('3/8') || d.includes('10mm') || d.includes('10 mm')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else if (t === '5/8' || t === '16mm') {\n      if (words.includes('5/8') || words.includes('16mm') || words.includes('16') || d.includes('5/8') || d.includes('16mm') || d.includes('16 mm')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else if (t === '3/4' || t === '20mm') {\n      if (words.includes('3/4') || words.includes('20mm') || words.includes('20') || d.includes('3/4') || d.includes('20mm') || d.includes('20 mm')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else {\n      if (/\\d/.test(t)) {\n        const specials = ['.', '*', '+', '?', '^', '\\\\$', '{', '}', '(', ')', '|', '[', ']', '\\\\\\\\'];\n        let escaped = '';\n        for (let j=0; j<t.length; j++) {\n          const c = t[j];\n          if (specials.includes(c)) escaped += '\\\\' + c;\n          else escaped += c;\n        }\n        const rx = new RegExp('(?<![\\\\d/])' + escaped + '(?![\\\\d/])', 'i');\n        if (rx.test(d)) {\n          s += 10;\n        } else {\n          all = false;\n        }\n      } else {\n        if (words.includes(t)) s += 10;\n        else if (t.length>=3 && d.includes(t)) s += 5;\n        else all = false;\n      }\n    }\n  }\n  if (all && qTokens.length>0) s += 50;\n  s -= words.length * 0.1;\n  return s;\n}\nconst { p_busqueda } = query;\n\nconst IGNORED = new Set([\n  'de', 'y', 'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'o',\n  'venden', 'vendes', 'tienen', 'tiene', 'hay', 'quiero', 'busco', 'comprar', 'necesito', 'dame', 'trae',\n  'cuanto', 'cuesta', 'cuestan', 'vale', 'valen', 'sale', 'salen', 'precio', 'precios', 'costo', 'como',\n  'saco', 'sacos', 'bolsa', 'bolsas', 'unidad', 'unidades', 'pieza', 'piezas', 'kilo', 'kilos', 'kg',\n  'metro', 'metros', 'mts', 'caja', 'cajas', 'galon', 'galones', 'para', 'con', 'del', 'algo', 'vender',\n  'tener', 'buscar', 'amigo', 'buenas', 'hola', 'tardes', 'dias', 'noches', 'porfa', 'favor', 'gracias',\n  'una', 'uno', 'unas', 'unos', 'donde', 'tiene', 'tienen'\n]);\nconst MODIFIERS = new Set([\n  'pulgada', 'pulgadas', 'media', 'cuarto', 'octavo', 'metro', 'metros', 'pies', 'pulg', 'mm', 'cm', 'mts',\n  'negro', 'negra', 'blanco', 'blanca', 'gris', 'azul', 'rojo', 'verde', 'amarillo', 'amarilla'\n]);\n\nasync function ilike(palabras, limit){\n  const q = palabras.map(w => {\n    if (w === 'corte') return 'or=(descripcion.ilike.*corte*,descripcion.ilike.*c/*)';\n    if (w === '1/2' || w === '12mm') return 'or=(descripcion.ilike.*1/2*,descripcion.ilike.*12mm*,descripcion.ilike.*12 mm*)';\n    if (w === '3/8' || w === '10mm') return 'or=(descripcion.ilike.*3/8*,descripcion.ilike.*10mm*,descripcion.ilike.*10 mm*)';\n    if (w === '5/8' || w === '16mm') return 'or=(descripcion.ilike.*5/8*,descripcion.ilike.*16mm*,descripcion.ilike.*16 mm*)';\n    if (w === '3/4' || w === '20mm') return 'or=(descripcion.ilike.*3/4*,descripcion.ilike.*20mm*,descripcion.ilike.*20 mm*)';\n    if (ACCENTS[w]) return `or=(descripcion.ilike.*${w}*,descripcion.ilike.*${ACCENTS[w]}*)`;\n    return 'descripcion=ilike.*' + encodeURIComponent(w) + '*';\n  }).join('&');\n  const url = SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+'&limit='+(limit||30);\n  try { const r = await axios.get(url,{headers:H}); return r.data||[]; } catch(e){ return []; }\n}\nasync function rpc(t){ try { const r=await axios.post(SB+'/rest/v1/rpc/buscar_productos',{p_busqueda:t},{headers:H}); return r.data||[]; } catch(e){ return []; } }\n\nconst termExp = expandir(p_busqueda);\nconst qTokens = termExp.split(' ').filter(w => w.length>=2 && !IGNORED.has(w));\nconst largas = qTokens.filter(w => w.length>=3 || /\\d/.test(w));\n\nlet res = [];\nif (largas.length>0) res = await ilike(largas, 30);\nif (res.length===0 && largas.length>1) res = await ilike(largas.slice(0,2), 30);\nif (res.length===0){\n  const filtradasParaFallback = largas.filter(w => !MODIFIERS.has(w) && !IGNORED.has(w));\n  const ml=filtradasParaFallback.sort((a,b)=>b.length-a.length)[0];\n  if(ml) res=await ilike([ml], 30);\n}\nif (res.length===0) res = await rpc(termExp);\nif (res.length===0 && termExp!==norm(p_busqueda)) res = await rpc(norm(p_busqueda));\nif (res.length===0) return JSON.stringify({ encontrados:0, mensaje:'No encontre \"' + p_busqueda + '\" en el catalogo.' });\n\n// dedup\nconst unicos=[]; const seen=new Set();\nfor(const p of res){ if(!seen.has(p.codigo_interno)){ seen.add(p.codigo_interno); unicos.push(p); } }\n// ventas para desempate\nconst codes=unicos.map(p=>p.codigo_interno).slice(0,40);\nlet vMap={};\ntry{ const cf=codes.map(c=>'\"'+c+'\"').join(','); const vr=await axios.get(SB+'/rest/v1/ventas_detalle?select=codigo_producto,cantidad&codigo_producto=in.('+cf+')&limit=4000',{headers:H}); for(const v of(vr.data||[])) vMap[v.codigo_producto]=(vMap[v.codigo_producto]||0)+Number(v.cantidad); }catch(e){}\n\n// ordenar: relevancia primero, luego disponibilidad (en stock primero), luego ventas desempate\nunicos.sort((a,b)=>{\n  const ds=scoreMatch(b.descripcion,qTokens)-scoreMatch(a.descripcion,qTokens);\n  if(Math.abs(ds)>0.5) return ds;\n  const aStock = Number(a.existencia) > 0;\n  const bStock = Number(b.existencia) > 0;\n  if (aStock !== bStock) return aStock ? -1 : 1;\n  return (vMap[b.codigo_interno]||0)-(vMap[a.codigo_interno]||0);\n});\n\nconst tasa = await getTasa();\nconst productos = unicos.slice(0,4).map(p=>{\n  const usd=Number(p.precio_venta); const bsUsd=usd*RECARGO;\n  const disp = Number(p.existencia) > 0;\n  return { nombre: tc(p.descripcion), disponible:disp, precio_divisas_texto: nUSD(usd)+'$',\n    precio_bs_texto: tasa ? (nUSD(bsUsd)+'$ o '+nBs(bsUsd*tasa)+'bs') : (nUSD(bsUsd)+'$ (tasa BCV no disponible)') };\n});\nreturn JSON.stringify({ encontrados:productos.length, tasa_bcv:tasa, productos });",
-          "specifyInputSchema": true,
-          "schemaType": "fromJson",
-          "jsonSchemaExample": "{\n  \"p_busqueda\": \"martillo\"\n}",
-          "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"p_busqueda\": {\n      \"type\": \"string\",\n      \"description\": \"Nombre o descripción del producto a buscar\"\n    }\n  },\n  \"required\": [\n    \"p_busqueda\"\n  ]\n}"
-        }
-      },
-      {
-        "id": "tasa_tool_node",
-        "name": "obtener_tasa_bcv_tool",
-        "type": "@n8n/n8n-nodes-langchain.toolCode",
-        "typeVersion": 1.3,
-        "position": [
-          1216,
-          704
-        ],
-        "parameters": {
-          "name": "obtener_tasa_bcv",
-          "description": "Obtiene la tasa de cambio oficial del BCV (Bolívares por Dólar) actual. No requiere parámetros de entrada. Retorna la tasa bcv_usd.",
-          "language": "javaScript",
-          "jsCode": "// Obtiene tasa BCV. Claves externalizadas como variables de entorno.\nconst axios = require('axios');\nconst ANON = $env.SUPABASE_ANON_KEY;\nconst SB   = $env.SUPABASE_URL || 'https://rgniqjfooifchyctnbzu.supabase.co';\ntry {\n  const resp = await axios.get(SB+'/rest/v1/tasas?nombre=eq.actual&select=bcv_usd', {\n    headers: { apikey: ANON, Authorization: 'Bearer '+ANON }\n  });\n  const tasa = resp.data && resp.data[0] && Number(resp.data[0].bcv_usd);\n  if (!tasa) return JSON.stringify({ error: 'Tasa BCV no disponible en este momento' });\n  return JSON.stringify({\n    bcv_usd: tasa,\n    nota: 'Precio en Bs = precio_usd × 1.40 × bcv_usd (el 1.40 = +40% recargo por pago en Bs)'\n  });\n} catch(e) {\n  return JSON.stringify({ error: 'No se pudo obtener la tasa BCV: '+e.message });\n}",
-          "specifyInputSchema": true,
-          "schemaType": "fromJson",
-          "jsonSchemaExample": "{}",
-          "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {}\n}"
-        }
-      },
-      {
-        "id": "buscar_memoria_engram_tool",
-        "name": "buscar_memoria_engram_tool",
-        "type": "@n8n/n8n-nodes-langchain.toolCode",
-        "typeVersion": 1.3,
-        "position": [
-          1216,
-          832
-        ],
-        "parameters": {
-          "name": "buscar_memoria_engram",
-          "description": "Busca en la memoria a largo plazo (Engram) información relevante del cliente actual (como preferencias de compra, RIF, dirección, métodos de pago comunes) o notas y alternativas sobre productos para optimizar la atención.",
-          "language": "javaScript",
-          "jsCode": "// Busca en la memoria a largo plazo (Engram). Host externalizado.\nconst axios = require('axios');\nconst { q } = query;\nconst ENGRAM = $env.ENGRAM_HOST || 'host.docker.internal:7437';\nconst url = 'http://' + ENGRAM + '/search?q=' + encodeURIComponent(q) + '&project=whatsapp-agent&scope=project&limit=5';\ntry {\n  const resp = await axios.get(url);\n  return JSON.stringify(resp.data);\n} catch (e) {\n  return JSON.stringify({ resultados: [], nota: 'memoria no disponible' });\n}",
-          "specifyInputSchema": true,
-          "schemaType": "fromJson",
-          "jsonSchemaExample": "{\n  \"q\": \"584129999999\"\n}",
-          "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"q\": {\n      \"type\": \"string\",\n      \"description\": \"Término de búsqueda (número de teléfono del cliente, nombre de producto, etc.)\"\n    }\n  },\n  \"required\": [\n    \"q\"\n  ]\n}"
-        }
-      },
-      {
-        "id": "guardar_memoria_engram_tool",
-        "name": "guardar_memoria_engram_tool",
-        "type": "@n8n/n8n-nodes-langchain.toolCode",
-        "typeVersion": 1.3,
-        "position": [
-          1216,
-          944
-        ],
-        "parameters": {
-          "name": "guardar_memoria_engram",
-          "description": "Guarda o actualiza un dato clave, preferencia o nota del cliente o producto en la memoria a largo plazo (Engram) para que esté disponible en futuras conversaciones.",
-          "language": "javaScript",
-          "jsCode": "// Guarda un dato del cliente/producto en la memoria a largo plazo (Engram). Host externalizado.\nconst axios = require('axios');\nconst { session_id, type, title, content, topic_key } = query;\nconst ENGRAM = $env.ENGRAM_HOST || 'host.docker.internal:7437';\nconst BASE = 'http://' + ENGRAM;\ntry {\n  await axios.post(BASE + '/sessions', { id: session_id, project: 'whatsapp-agent', scope: 'project' });\n} catch (e) { /* sesion ya existe */ }\ntry {\n  const resp = await axios.post(BASE + '/observations', {\n    session_id, project: 'whatsapp-agent', scope: 'project', type, title, content, topic_key\n  }, { headers: { 'Content-Type': 'application/json' } });\n  return JSON.stringify({ guardado: true, id: resp.data && resp.data.id });\n} catch (e) {\n  return JSON.stringify({ guardado: false, error: String(e.message) });\n}",
-          "specifyInputSchema": true,
-          "schemaType": "fromJson",
-          "jsonSchemaExample": "{\n  \"session_id\": \"584129999999\",\n  \"type\": \"preference\",\n  \"title\": \"Método de pago\",\n  \"content\": \"Pago Móvil\",\n  \"topic_key\": \"cliente:584129999999\"\n}",
-          "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"session_id\": {\n      \"type\": \"string\",\n      \"description\": \"Identificador único de la sesión (número de teléfono del cliente)\"\n    },\n    \"type\": {\n      \"type\": \"string\",\n      \"description\": \"Tipo de memoria (preference, decision, bugfix, architecture, learning, etc.)\"\n    },\n    \"title\": {\n      \"type\": \"string\",\n      \"description\": \"Título corto y descriptivo de la memoria\"\n    },\n    \"content\": {\n      \"type\": \"string\",\n      \"description\": \"Contenido detallado de la memoria (preferencias, notas, datos del cliente)\"\n    },\n    \"topic_key\": {\n      \"type\": \"string\",\n      \"description\": \"Clave temática para agrupar memorias relacionadas (ej. cliente:584129999999, producto:martillo)\"\n    }\n  },\n  \"required\": [\n    \"session_id\",\n    \"type\",\n    \"title\",\n    \"content\",\n    \"topic_key\"\n  ]\n}"
-        }
-      },
-      {
-        "id": "hacer_presupuesto_node",
-        "name": "hacer_presupuesto_tool",
-        "type": "@n8n/n8n-nodes-langchain.toolCode",
-        "typeVersion": 1.3,
-        "position": [
-          1072,
-          800
-        ],
-        "parameters": {
-          "name": "hacer_presupuesto",
-          "description": "Arma un presupuesto/cotización con totales en USD y Bs (+40%) para una lista de productos. Pasa el parámetro productos como un texto con formato \"nombre:cantidad, nombre:cantidad\". Úsalo cuando el cliente pida precios de varios productos o un total.",
-          "jsCode": "// hacer_presupuesto v3 — relevancia primero en cada producto de la lista con accents & stock\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nconst RECARGO = 1.40;\nfunction nUSD(n){ const r = Math.round(Number(n)*100)/100; return Number.isInteger(r) ? String(r) : r.toFixed(2); }\nfunction nBs(n){ return (Math.round(Number(n)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }\nfunction nBsInt(n){ return Math.round(Number(n)).toLocaleString('en-US'); }\nfunction tc(s){ return String(s).toLowerCase().split(/\\s+/).map(w=>{ if(/\\d/.test(w)) return w.toUpperCase(); if(w.length<=3) return w.toUpperCase(); return w.charAt(0).toUpperCase()+w.slice(1); }).join(' '); }\nfunction norm(t){ return String(t).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9 .\\/-]/g,' ').replace(/\\s+/g,' ').trim(); }\nconst SIN = {\n  'corrugada':'estriada','corrugado':'estriado','varilla':'cabilla','varillas':'cabilla','hierro':'cabilla','cabillas':'cabilla',\n  'simento':'cemento','simanto':'cemento','saco cemento':'cemento','bolsa cemento':'cemento',\n  'clavo':'clavos','clavillo':'clavos','tornillo':'tornillos',\n  'tubo cuadrado':'tubo herreria','tubo metalico':'tubo herreria','tuberia metalica':'tubo herreria',\n  'laminas':'lamina','techo zinc':'lamina zinc','calamina':'lamina zinc','tejas':'lamina zinc',\n  'alambre construccion':'alambron','alambre negro':'alambron',\n  'disco corte':'disco metal','disco amoladora':'disco metal',\n  'codo agua':'codo pvc','codo media':'codo pvc',\n  'cable electrico':'cable thwn','cableado':'cable',\n  'llave paso':'llave bola','grifo':'llave bola',\n  'caja luz':'cajetin','caja electrica':'cajetin',\n  'tepe':'teipe','tepe negro':'teipe','teipe negro':'teipe','cinta aislante':'teipe',\n  'media':'1/2','medio':'1/2','un cuarto':'1/4','cuarto':'1/4','tres cuartos':'3/4','tres octavos':'3/8','un octavo':'1/8'\n};\nconst ACCENTS = {\n  'herreria': 'herrería',\n  'carbon': 'carbón',\n  'cautin': 'cautín',\n  'exhibicion': 'exhibición',\n  'gavilan': 'gavilán',\n  'hidraulico': 'hidráulico',\n  'lampara': 'lámpara',\n  'periferica': 'periférica',\n  'polimero': 'polímero',\n  'presion': 'presión',\n  'reduccion': 'reducción',\n  'refrigeracion': 'refrigeración',\n  'silicon': 'silicón',\n  'sintetico': 'sintético',\n  'tuberia': 'tubería',\n  'plastico': 'plástico',\n  'lamina': 'lámina',\n  'bateria': 'batería',\n  'medicion': 'medición',\n  'fijacion': 'fijación'\n};\nfunction expandir(t){ let s=norm(t); const ks=Object.keys(SIN).sort((a,b)=>b.length-a.length); for(const k of ks){ if(s.includes(k)) s=s.split(k).join(SIN[k]); } return s; }\nasync function getTasa(){ try { const r = await axios.get(SB+'/rest/v1/tasas?nombre=eq.actual&select=bcv_usd',{headers:H}); return r.data && r.data[0] && Number(r.data[0].bcv_usd); } catch(e){ return null; } }\nfunction scoreMatch(descripcion, qTokens){\n  const d = norm(descripcion);\n  const words = d.split(/[\\s\\-x]+/);\n  let s = 0, all = true;\n  for (const t of qTokens){\n    if (t === 'corte') {\n      if (words.includes('corte') || words.includes('c/') || d.includes('c/')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else if (t === '1/2' || t === '12mm') {\n      if (words.includes('1/2') || words.includes('12mm') || words.includes('12') || d.includes('1/2') || d.includes('12mm') || d.includes('12 mm')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else if (t === '3/8' || t === '10mm') {\n      if (words.includes('3/8') || words.includes('10mm') || words.includes('10') || d.includes('3/8') || d.includes('10mm') || d.includes('10 mm')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else if (t === '5/8' || t === '16mm') {\n      if (words.includes('5/8') || words.includes('16mm') || words.includes('16') || d.includes('5/8') || d.includes('16mm') || d.includes('16 mm')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else if (t === '3/4' || t === '20mm') {\n      if (words.includes('3/4') || words.includes('20mm') || words.includes('20') || d.includes('3/4') || d.includes('20mm') || d.includes('20 mm')) {\n        s += 10;\n      } else {\n        all = false;\n      }\n    } else {\n      if (/\\d/.test(t)) {\n        const specials = ['.', '*', '+', '?', '^', '\\\\$', '{', '}', '(', ')', '|', '[', ']', '\\\\\\\\'];\n        let escaped = '';\n        for (let j=0; j<t.length; j++) {\n          const c = t[j];\n          if (specials.includes(c)) escaped += '\\\\' + c;\n          else escaped += c;\n        }\n        const rx = new RegExp('(?<![\\\\d/])' + escaped + '(?![\\\\d/])', 'i');\n        if (rx.test(d)) {\n          s += 10;\n        } else {\n          all = false;\n        }\n      } else {\n        if (words.includes(t)) s += 10;\n        else if (t.length>=3 && d.includes(t)) s += 5;\n        else all = false;\n      }\n    }\n  }\n  if (all && qTokens.length>0) s += 50;\n  s -= words.length * 0.1;\n  return s;\n}\n\nlet raw = query.productos || query.items || query.lista || query.some_input || '';\nif (typeof raw !== 'string') { try { raw = JSON.stringify(raw); } catch(e){ raw=String(raw); } }\nraw = raw.trim();\nif (!raw) return JSON.stringify({ ok:false, mensaje:'Necesito la lista de productos con cantidades.' });\n\nfunction parseItems(str){\n  const partes = str.split(/[,;\\n]+/).map(s=>s.trim()).filter(Boolean);\n  const out = [];\n  for (let p of partes){\n    let nombre=p, cant=1;\n    let m = p.match(/^(.*?)[:=]\\s*(\\d+(?:\\.\\d+)?)\\s*$/);\n    if (!m) m = p.match(/^(.*?)\\s+x\\s*(\\d+(?:\\.\\d+)?)\\s*$/i);\n    if (!m){ const m2=p.match(/^(\\d+(?:\\.\\d+)?)\\s+(.*)$/); if(m2){ cant=Number(m2[1]); nombre=m2[2]; } }\n    if (m){ nombre=m[1].trim(); cant=Number(m[2]); }\n    nombre = nombre.replace(/^(sacos?|unidades?|uds?|piezas?|de)\\s+/i,'').trim();\n    if (nombre) out.push({ nombre, cantidad: cant>0?cant:1 });\n  }\n  return out;\n}\nconst items = parseItems(raw);\nif (items.length===0) return JSON.stringify({ ok:false, mensaje:'No pude interpretar la lista. Formato: nombre:cantidad' });\n\nconst tasa = await getTasa();\n\nasync function buscarUno(nombre){\n  const exp = expandir(nombre);\n  const qTokens = exp.split(' ').filter(w=>w.length>=2);\n  const largas = qTokens.filter(w=>w.length>=3 || /\\d/.test(w));\n  let cand=[];\n  for (let i=Math.min(largas.length,4); i>=1 && cand.length===0; i--){\n    const q = largas.slice(0,i).map(w => {\n      if (w === 'corte') return 'or=(descripcion.ilike.*corte*,descripcion.ilike.*c/*)';\n      if (w === '1/2' || w === '12mm') return 'or=(descripcion.ilike.*1/2*,descripcion.ilike.*12mm*,descripcion.ilike.*12 mm*)';\n      if (w === '3/8' || w === '10mm') return 'or=(descripcion.ilike.*3/8*,descripcion.ilike.*10mm*,descripcion.ilike.*10 mm*)';\n      if (w === '5/8' || w === '16mm') return 'or=(descripcion.ilike.*5/8*,descripcion.ilike.*16mm*,descripcion.ilike.*16 mm*)';\n      if (w === '3/4' || w === '20mm') return 'or=(descripcion.ilike.*3/4*,descripcion.ilike.*20mm*,descripcion.ilike.*20 mm*)';\n      if (ACCENTS[w]) return `or=(descripcion.ilike.*${w}*,descripcion.ilike.*${ACCENTS[w]}*)`;\n      return 'descripcion=ilike.*' + encodeURIComponent(w) + '*';\n    }).join('&');\n    try{ const r=await axios.get(SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+'&limit=30',{headers:H}); cand=r.data||[]; }catch(e){}\n  }\n  if (cand.length===0) return null;\n  // ventas para desempate\n  const codes=cand.map(p=>p.codigo_interno);\n  let vMap={};\n  try{ const cf=codes.map(c=>'\"'+c+'\"').join(','); const vr=await axios.get(SB+'/rest/v1/ventas_detalle?select=codigo_producto,cantidad&codigo_producto=in.('+cf+')&limit=3000',{headers:H}); for(const v of(vr.data||[])) vMap[v.codigo_producto]=(vMap[v.codigo_producto]||0)+Number(v.cantidad); }catch(e){}\n  cand.sort((a,b)=>{\n    const ds=scoreMatch(b.descripcion,qTokens)-scoreMatch(a.descripcion,qTokens);\n    if(Math.abs(ds)>0.5) return ds;\n    const aStock = Number(a.existencia) > 0;\n    const bStock = Number(b.existencia) > 0;\n    if (aStock !== bStock) return aStock ? -1 : 1;\n    return (vMap[b.codigo_interno]||0)-(vMap[a.codigo_interno]||0);\n  });\n  return cand[0];\n}\n\nlet bloque='', totUSD=0, n=0;\nconst noEnc=[];\nlet hasAgotado = false;\nfor (const it of items){\n  const prod=await buscarUno(it.nombre);\n  if(!prod){ noEnc.push(it.nombre); continue; }\n  n++;\n  const usd=Number(prod.precio_venta);\n  const sub=usd*it.cantidad;\n  totUSD+=sub;\n  const isAgotado = Number(prod.existencia) <= 0;\n  if (isAgotado) hasAgotado = true;\n  bloque += n+'. *'+tc(prod.descripcion)+'*' + (isAgotado ? ' _(Agotado)_' : '') + '\\n';\n  bloque += '   '+it.cantidad+' x '+nUSD(usd)+'$ = *'+nUSD(sub)+'$*\\n\\n';\n}\nif (n===0) return JSON.stringify({ ok:false, mensaje:'No encontré esos productos: '+noEnc.join(', ') });\n\nconst totBs = tasa ? totUSD*RECARGO*tasa : null;\nbloque += '━━━━━━━━━━━━━━━\\n';\nbloque += '💵 *Pagando en dólares: '+nUSD(totUSD)+'$*\\n';\nif (tasa) bloque += '🇻🇪 *Pagando en bolívares (+40%): '+nUSD(totUSD*RECARGO)+'$ = Bs '+nBsInt(totBs)+'*';\nelse bloque += '_(tasa BCV no disponible para el monto en Bs)_';\n\nconst notaParts = [];\nif (noEnc.length) notaParts.push('no ubiqué en catálogo: ' + noEnc.join(', '));\nif (hasAgotado) notaParts.push('algunos productos están agotados (marcados con Agotado)');\nconst nota = notaParts.length ? ('Ojo: ' + notaParts.join('; ') + '.') : '';\nreturn JSON.stringify({ ok:true, presupuesto_texto: bloque, nota });",
-          "specifyInputSchema": true,
-          "schemaType": "fromJson",
-          "inputSchema": "{\"type\":\"object\",\"properties\":{\"productos\":{\"type\":\"string\",\"description\":\"Lista de productos con cantidad, separados por coma, cada uno como \\\"nombre:cantidad\\\". Ejemplo: \\\"cemento gris:2, cabilla 12mm:4, tubo herreria 1x1:10\\\"\"}},\"required\":[\"productos\"]}"
-        }
-      }
-    ],
-    "connections": {
-      "Webhook Trigger": {
-        "main": [
-          [
-            {
-              "index": 0,
-              "node": "Is Text Message?",
-              "type": "main"
-            }
-          ]
-        ]
-      },
-      "Is Text Message?": {
-        "main": [
-          [
-            {
-              "index": 0,
-              "node": "Reply Non-Text",
-              "type": "main"
-            }
-          ],
-          [
-            {
-              "index": 0,
-              "node": "Check Chat Session",
-              "type": "main"
-            }
-          ]
-        ]
-      },
-      "Check Chat Session": {
-        "main": [
-          [
-            {
-              "index": 0,
-              "node": "Rate Limited?",
-              "type": "main"
-            }
-          ]
-        ]
-      },
-      "Rate Limited?": {
-        "main": [
-          [
-            {
-              "index": 0,
-              "node": "Rate Limit Drop",
-              "type": "main"
-            }
-          ],
-          [
-            {
-              "index": 0,
-              "node": "Is Manual Handover?",
-              "type": "main"
-            }
-          ]
-        ]
-      },
-      "Is Manual Handover?": {
-        "main": [
-          [
-            {
-              "index": 0,
-              "node": "Manual Handover Active",
-              "type": "main"
-            }
-          ],
-          [
-            {
-              "index": 0,
-              "node": "AI Agent",
-              "type": "main"
-            }
-          ]
-        ]
-      },
-      "AI Agent": {
-        "main": [
-          [
-            {
-              "index": 0,
-              "node": "Check Escalation",
-              "type": "main"
-            }
-          ]
-        ]
-      },
-      "Check Escalation": {
-        "main": [
-          [
-            {
-              "index": 0,
-              "node": "Set Chat Manual",
-              "type": "main"
-            }
-          ],
-          [
-            {
-              "index": 0,
-              "node": "Send Agent Response",
-              "type": "main"
-            }
-          ]
-        ]
-      },
-      "Set Chat Manual": {
-        "main": [
-          [
-            {
-              "index": 0,
-              "node": "Send Handover Message",
-              "type": "main"
-            }
-          ]
-        ]
-      },
-      "OpenRouter Chat Model": {
-        "ai_languageModel": [
-          [
-            {
-              "index": 0,
-              "node": "AI Agent",
-              "type": "ai_languageModel"
-            }
-          ]
-        ]
-      },
-      "Simple Memory": {
-        "ai_memory": [
-          [
-            {
-              "index": 0,
-              "node": "AI Agent",
-              "type": "ai_memory"
-            }
-          ]
-        ]
-      },
-      "buscar_productos_tool": {
-        "ai_tool": [
-          [
-            {
-              "index": 0,
-              "node": "AI Agent",
-              "type": "ai_tool"
-            }
-          ]
-        ]
-      },
-      "obtener_tasa_bcv_tool": {
-        "ai_tool": [
-          [
-            {
-              "index": 0,
-              "node": "AI Agent",
-              "type": "ai_tool"
-            }
-          ]
-        ]
-      },
-      "buscar_memoria_engram_tool": {
-        "ai_tool": [
-          [
-            {
-              "index": 0,
-              "node": "AI Agent",
-              "type": "ai_tool"
-            }
-          ]
-        ]
-      },
-      "guardar_memoria_engram_tool": {
-        "ai_tool": [
-          [
-            {
-              "index": 0,
-              "node": "AI Agent",
-              "type": "ai_tool"
-            }
-          ]
-        ]
-      },
-      "hacer_presupuesto_tool": {
-        "ai_tool": [
-          [
-            {
-              "index": 0,
-              "node": "AI Agent",
-              "type": "ai_tool"
-            }
-          ]
-        ]
-      }
-    },
-    "nodeGroups": [],
-    "authors": "Admin Serrucho",
-    "name": null,
-    "description": null,
-    "autosaved": false,
-    "workflowPublishHistory": [
-      {
-        "createdAt": "2026-06-06T12:59:13.550Z",
-        "id": 119,
-        "workflowId": "ugHOTQv3Vb6cuTct",
-        "versionId": "4f5ae056-6ef0-434a-a707-6a12ebb15049",
-        "event": "activated",
-        "userId": "a9174cb6-6525-426b-9005-30bde1cb175c"
-      },
-      {
-        "createdAt": "2026-06-06T12:59:13.953Z",
-        "id": 121,
-        "workflowId": "ugHOTQv3Vb6cuTct",
-        "versionId": "4f5ae056-6ef0-434a-a707-6a12ebb15049",
-        "event": "activated",
-        "userId": "a9174cb6-6525-426b-9005-30bde1cb175c"
-      },
-      {
-        "createdAt": "2026-06-06T12:59:13.507Z",
-        "id": 118,
-        "workflowId": "ugHOTQv3Vb6cuTct",
-        "versionId": "4f5ae056-6ef0-434a-a707-6a12ebb15049",
-        "event": "deactivated",
-        "userId": "a9174cb6-6525-426b-9005-30bde1cb175c"
-      },
-      {
-        "createdAt": "2026-06-06T12:59:13.687Z",
-        "id": 120,
-        "workflowId": "ugHOTQv3Vb6cuTct",
-        "versionId": "4f5ae056-6ef0-434a-a707-6a12ebb15049",
-        "event": "deactivated",
-        "userId": "a9174cb6-6525-426b-9005-30bde1cb175c"
-      }
-    ]
   }
 }

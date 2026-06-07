@@ -60,6 +60,21 @@ const ACCENTS = {
   'reduccion': 'reducción','refrigeracion': 'refrigeración','silicon': 'silicón','sintetico': 'sintético','tuberia': 'tubería',
   'plastico': 'plástico','lamina': 'lámina','bateria': 'batería','medicion': 'medición','fijacion': 'fijación'
 };
+const COLOR_STEM = {
+  'blanco':'blanc','blanca':'blanc','blancos':'blanc','blancas':'blanc',
+  'negro':'negr','negra':'negr','negros':'negr','negras':'negr',
+  'rojo':'roj','roja':'roj','rojos':'roj','rojas':'roj',
+  'amarillo':'amarill','amarilla':'amarill','amarillos':'amarill','amarillas':'amarill',
+  'morado':'morad','morada':'morad','morados':'morad','moradas':'morad',
+  'dorado':'dorad','dorada':'dorad','dorados':'dorad','doradas':'dorad',
+  'plateado':'platead','plateada':'platead','plateados':'platead','plateadas':'platead',
+  'rosado':'rosad','rosada':'rosad','rosados':'rosad','rosadas':'rosad',
+  'gris':'gris','grises':'gris','verde':'verde','verdes':'verde',
+  'azul':'azul','azules':'azul','marron':'marron','marrones':'marron',
+  'naranja':'naranja','naranjas':'naranja','beige':'beige','cafe':'cafe',
+  'celeste':'celeste','celestes':'celeste'
+};
+function stemColor(w){ return COLOR_STEM[w] || w; }
 function singular(w){
   if (w.length < 5) return w;
   if (/ones$/.test(w)) return w.slice(0,-2);
@@ -117,18 +132,21 @@ if (items.length===0) return JSON.stringify({ ok:false, mensaje:'No pude interpr
 
 const tasa = await getTasa();
 
-const STOPW = new Set(['de','del','la','el','los','las','un','una','unos','unas','y','o','con','para','por']);
+const STOPW = new Set(['de','del','la','el','los','las','un','una','unos','unas','y','o','con','para','por','al','cada','metro','metros','mt','mts','pulgada','pulgadas','pieza','piezas','saco','sacos','unidad','unidades','caja','cajas','galon','galones']);
 async function buscarUno(nombre){
   const exp = normMedida(expandir(nombre));
-  const qTokens = exp.split(' ').filter(w=>(w.length>=2 || /\d/.test(w)) && !STOPW.has(w)).map(w => /\d/.test(w) ? w : singular(w));
+  const qTokens = exp.split(' ').filter(w=>(w.length>=2 || /\d/.test(w)) && !STOPW.has(w)).map(w => /\d/.test(w) ? w : singular(stemColor(w)));
   const largas = qTokens.filter(w=>w.length>=3 || /\d/.test(w));
   const textLargas = largas.filter(w=>!/\d/.test(w));
   const medLargas = largas.filter(w=>/\d/.test(w));
+  const granelIntent = /\b(por|al|x|cada|el)\s*(metro|metros|mt|mts)\b/.test(norm(nombre));
+  const GRANEL_OR = 'or=(descripcion.ilike.*x mt*,descripcion.ilike.*x metro*,descripcion.ilike.*por metro*)';
   let cand=[];
   // si hay categoria de texto, trae amplio por categoria y filtra medida en JS
   if (textLargas.length>0){
     const q = textLargas.map(w => { if (ACCENTS[w]) return `or=(descripcion.ilike.*${w}*,descripcion.ilike.*${ACCENTS[w]}*)`; return 'descripcion=ilike.*' + encodeURIComponent(w) + '*'; }).join('&');
-    try{ const r=await axios.get(SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+'&limit=60',{headers:H}); cand=r.data||[]; }catch(e){}
+    if (granelIntent){ try{ const r=await axios.get(SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+'&'+GRANEL_OR+'&limit=60',{headers:H}); cand=r.data||[]; }catch(e){} }
+    if (cand.length===0){ try{ const r=await axios.get(SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+'&limit=60',{headers:H}); cand=r.data||[]; }catch(e){} }
   }
   // fallback: logica anterior por tokens (incluye medidas en el ilike)
   for (let i=Math.min(largas.length,4); i>=1 && cand.length===0; i--){
@@ -149,7 +167,13 @@ async function buscarUno(nombre){
   { const nbq = norm(nombre); if (qTokens.includes('cemento')) { let tipo='gris'; if(nbq.includes('blanco')) tipo='blanco'; else if(nbq.includes('asfalt')||nbq.includes('plastic')||nbq.includes('bituplast')||nbq.includes('edil')) tipo='plastico'; else if(nbq.includes('contacto')||nbq.includes('pega')) tipo='contacto'; const matchTipo=(d)=>{ d=norm(d); if(tipo==='blanco') return d.includes('blanco'); if(tipo==='plastico') return d.includes('plastico')||d.includes('bituplast')||d.includes('edil')||d.includes('asfalt'); if(tipo==='contacto') return d.includes('contacto')||d.includes('pega'); return d.includes('cemento gris'); }; const filt = cand.filter(p => matchTipo(p.descripcion)); if (filt.length>0) cand = filt; } }
 
   // Regla CABILLA
-  { const nbq = norm(nombre); if (qTokens.includes('cabilla')) { const wantCuadrada=nbq.includes('cuadrada'); const wantRedonda=nbq.includes('redonda'); const wantLisa=nbq.includes('lisa'); let filt; if(!wantCuadrada && !wantRedonda && !wantLisa){ filt = cand.filter(p => norm(p.descripcion).includes('estriada')); } else { filt = cand.filter(p => { const d=norm(p.descripcion); if(wantCuadrada) return d.includes('cuadrada'); if(wantRedonda) return d.includes('redonda'); if(wantLisa) return d.includes('lisa'); return true; }); } if (filt.length>0) cand = filt; } }
+  { const nbq = norm(nombre); if (qTokens.includes('cabilla')) { const wantCuadrada=nbq.includes('cuadrada'); const wantRedonda=nbq.includes('redonda'); const wantLisa=nbq.includes('lisa'); let filt=null; if(wantCuadrada||wantRedonda||wantLisa){ filt = cand.filter(p => { const d=norm(p.descripcion); if(wantCuadrada) return d.includes('cuadrada'); if(wantRedonda) return d.includes('redonda'); if(wantLisa) return d.includes('lisa'); return true; }); } else { const est = cand.filter(p => norm(p.descripcion).includes('estriada')); if (medLargas.length>0){ const estM = est.filter(p=>{ const nd=normMedida(p.descripcion); return medLargas.every(m=>medPresent(m,nd)); }); filt = (estM.length>0) ? est : null; } else { filt = est; } } if (filt && filt.length>0) cand = filt; } }
+
+  // Si pidio "por metro", prioriza productos a granel (X MT)
+  if (granelIntent){
+    const g = cand.filter(p => esGranel(p.descripcion));
+    if (g.length>0) cand = g;
+  }
 
   // Filtro de MEDIDA
   if (medLargas.length>0){

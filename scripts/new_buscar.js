@@ -65,6 +65,23 @@ const ACCENTS = {
   'reduccion': 'reducción','refrigeracion': 'refrigeración','silicon': 'silicón','sintetico': 'sintético','tuberia': 'tubería',
   'plastico': 'plástico','lamina': 'lámina','bateria': 'batería','medicion': 'medición','fijacion': 'fijación'
 };
+// colores: neutraliza genero/numero a una raiz (blanco/blanca/blancos/blancas -> blanc)
+// asi "pintura blanca" coincide con "PINTURA ... BLANCO" en la BD.
+const COLOR_STEM = {
+  'blanco':'blanc','blanca':'blanc','blancos':'blanc','blancas':'blanc',
+  'negro':'negr','negra':'negr','negros':'negr','negras':'negr',
+  'rojo':'roj','roja':'roj','rojos':'roj','rojas':'roj',
+  'amarillo':'amarill','amarilla':'amarill','amarillos':'amarill','amarillas':'amarill',
+  'morado':'morad','morada':'morad','morados':'morad','moradas':'morad',
+  'dorado':'dorad','dorada':'dorad','dorados':'dorad','doradas':'dorad',
+  'plateado':'platead','plateada':'platead','plateados':'platead','plateadas':'platead',
+  'rosado':'rosad','rosada':'rosad','rosados':'rosad','rosadas':'rosad',
+  'gris':'gris','grises':'gris','verde':'verde','verdes':'verde',
+  'azul':'azul','azules':'azul','marron':'marron','marrones':'marron',
+  'naranja':'naranja','naranjas':'naranja','beige':'beige','cafe':'cafe',
+  'celeste':'celeste','celestes':'celeste'
+};
+function stemColor(w){ return COLOR_STEM[w] || w; }
 // plural -> singular (español, suficiente para el catalogo)
 function singular(w){
   if (w.length < 5) return w;                     // gris, csc, tres...
@@ -106,7 +123,7 @@ const IGNORED = new Set([
   'venden', 'vendes', 'tienen', 'tiene', 'hay', 'quiero', 'busco', 'comprar', 'necesito', 'dame', 'trae',
   'cuanto', 'cuesta', 'cuestan', 'vale', 'valen', 'sale', 'salen', 'precio', 'precios', 'costo', 'como',
   'saco', 'sacos', 'bolsa', 'bolsas', 'unidad', 'unidades', 'pieza', 'piezas', 'kilo', 'kilos', 'kg',
-  'metro', 'metros', 'mts', 'caja', 'cajas', 'galon', 'galones', 'para', 'con', 'del', 'algo', 'vender',
+  'metro', 'metros', 'mts', 'caja', 'cajas', 'galon', 'galones', 'para', 'con', 'del', 'algo', 'vender', 'por', 'al', 'cada',
   'tener', 'buscar', 'amigo', 'buenas', 'hola', 'tardes', 'dias', 'noches', 'porfa', 'favor', 'gracias',
   'una', 'uno', 'unas', 'unos', 'donde', 'tiene', 'tienen'
 ]);
@@ -115,7 +132,8 @@ const MODIFIERS = new Set([
   'negro', 'negra', 'blanco', 'blanca', 'gris', 'azul', 'rojo', 'verde', 'amarillo', 'amarilla'
 ]);
 
-async function ilike(palabras, limit){
+const GRANEL_OR = 'or=(descripcion.ilike.*x mt*,descripcion.ilike.*x metro*,descripcion.ilike.*por metro*)';
+async function ilike(palabras, limit, extra){
   const q = palabras.map(w => {
     if (w === 'corte') return 'or=(descripcion.ilike.*corte*,descripcion.ilike.*c/*)';
     if (w === '1/2' || w === '12mm') return 'or=(descripcion.ilike.*1/2*,descripcion.ilike.*12mm*,descripcion.ilike.*12 mm*)';
@@ -125,21 +143,25 @@ async function ilike(palabras, limit){
     if (ACCENTS[w]) return `or=(descripcion.ilike.*${w}*,descripcion.ilike.*${ACCENTS[w]}*)`;
     return 'descripcion=ilike.*' + encodeURIComponent(w) + '*';
   }).join('&');
-  const url = SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+'&limit='+(limit||30);
+  const url = SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+(extra?('&'+extra):'')+'&limit='+(limit||30);
   try { const r = await axios.get(url,{headers:H}); return r.data||[]; } catch(e){ return []; }
 }
 async function rpc(t){ try { const r=await axios.post(SB+'/rest/v1/rpc/buscar_productos',{p_busqueda:t},{headers:H}); return r.data||[]; } catch(e){ return []; } }
 
 const termExp = normMedida(expandir(p_busqueda));
-const qTokens = termExp.split(' ').filter(w => (w.length>=2 || /\d/.test(w)) && !IGNORED.has(w)).map(w => /\d/.test(w) ? w : singular(w));
+const qTokens = termExp.split(' ').filter(w => (w.length>=2 || /\d/.test(w)) && !IGNORED.has(w)).map(w => /\d/.test(w) ? w : singular(stemColor(w)));
 const largas = qTokens.filter(w => w.length>=3 || /\d/.test(w));
 const textLargas = largas.filter(w => !/\d/.test(w));
 const medLargas = largas.filter(w => /\d/.test(w));
 
+// ¿el cliente lo pidio "por metro / al metro / x metro"? -> preferir el producto a granel (X MT)
+const granelIntent = /\b(por|al|x|cada|el)\s*(metro|metros|mt|mts)\b/.test(norm(p_busqueda));
+
 // Fetch: si hay palabras de texto (categoria), trae amplio por categoria y filtra la medida en JS
 // (las descripciones guardan las medidas con formatos inconsistentes, por eso no las metemos al ilike).
 let res = [];
-if (textLargas.length>0) res = await ilike(textLargas, 60);
+if (granelIntent && textLargas.length>0) res = await ilike(textLargas, 60, GRANEL_OR);
+if (res.length===0 && textLargas.length>0) res = await ilike(textLargas, 60);
 if (res.length===0 && largas.length>0) res = await ilike(largas, 30);
 if (res.length===0 && largas.length>1) res = await ilike(largas.slice(0,2), 30);
 if (res.length===0){
@@ -159,7 +181,13 @@ for(const p of res){ if(!seen.has(p.codigo_interno)){ seen.add(p.codigo_interno)
 { const nbq = norm(p_busqueda); if (qTokens.includes('cemento')) { let tipo='gris'; if(nbq.includes('blanco')) tipo='blanco'; else if(nbq.includes('asfalt')||nbq.includes('plastic')||nbq.includes('bituplast')||nbq.includes('edil')) tipo='plastico'; else if(nbq.includes('contacto')||nbq.includes('pega')) tipo='contacto'; const matchTipo=(d)=>{ d=norm(d); if(tipo==='blanco') return d.includes('blanco'); if(tipo==='plastico') return d.includes('plastico')||d.includes('bituplast')||d.includes('edil')||d.includes('asfalt'); if(tipo==='contacto') return d.includes('contacto')||d.includes('pega'); return d.includes('cemento gris'); }; const filt = unicos.filter(p => matchTipo(p.descripcion)); if (filt.length>0){ unicos.length=0; for(const x of filt) unicos.push(x); } } }
 
 // Regla negocio CABILLA: generico = solo ESTRIADA (12mm=1/2, 10mm=3/8 son las principales). Redonda/Cuadrada/Lisa solo si las piden.
-{ const nbq = norm(p_busqueda); if (qTokens.includes('cabilla')) { const wantCuadrada=nbq.includes('cuadrada'); const wantRedonda=nbq.includes('redonda'); const wantLisa=nbq.includes('lisa'); let filt; if(!wantCuadrada && !wantRedonda && !wantLisa){ filt = unicos.filter(p => norm(p.descripcion).includes('estriada')); } else { filt = unicos.filter(p => { const d=norm(p.descripcion); if(wantCuadrada) return d.includes('cuadrada'); if(wantRedonda) return d.includes('redonda'); if(wantLisa) return d.includes('lisa'); return true; }); } if (filt.length>0){ unicos.length=0; for(const x of filt) unicos.push(x); } } }
+{ const nbq = norm(p_busqueda); if (qTokens.includes('cabilla')) { const wantCuadrada=nbq.includes('cuadrada'); const wantRedonda=nbq.includes('redonda'); const wantLisa=nbq.includes('lisa'); let filt=null; if(wantCuadrada||wantRedonda||wantLisa){ filt = unicos.filter(p => { const d=norm(p.descripcion); if(wantCuadrada) return d.includes('cuadrada'); if(wantRedonda) return d.includes('redonda'); if(wantLisa) return d.includes('lisa'); return true; }); } else { const est = unicos.filter(p => norm(p.descripcion).includes('estriada')); if (medLargas.length>0){ const estM = est.filter(p=>{ const nd=normMedida(p.descripcion); return medLargas.every(m=>medPresent(m,nd)); }); filt = (estM.length>0) ? est : null; } else { filt = est; } } if (filt && filt.length>0){ unicos.length=0; for(const x of filt) unicos.push(x); } } }
+
+// Si pidio "por metro", prioriza los productos a granel (X MT)
+if (granelIntent){
+  const g = unicos.filter(p => esGranel(p.descripcion));
+  if (g.length>0){ unicos.length=0; for(const x of g) unicos.push(x); }
+}
 
 // Filtro de MEDIDA: si el cliente dio medidas, deja solo los que las cumplen TODAS
 if (medLargas.length>0){
