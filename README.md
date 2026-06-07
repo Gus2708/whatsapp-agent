@@ -68,7 +68,7 @@ Hemos creado un instalador automatizado en Javascript (`setup.js`) que verifica 
    👉 [supabase_schema.sql](file:///g:/Projects/whatsapp-agent/supabase_schema.sql)
 3. Esto configurará:
    *   La tabla `productos` con soporte de búsqueda difusa e indexación trigram (`pg_trgm`).
-   *   La tabla de `clientes` y de `tazas` de cambio oficiales.
+   *   La tabla de `clientes` y de `tasas` de cambio oficiales.
    *   Las funciones de búsqueda difusa relacional e historial de movimientos (`get_resumen_movimientos`).
 
 ### 2. Conexión de WhatsApp (WAHA)
@@ -110,15 +110,18 @@ npm start
 
 ## 📁 Estructura del Proyecto
 
-*   [setup.js](file:///g:/Projects/whatsapp-agent/setup.js): Script de instalación automatizada de dependencias y variables de entorno.
-*   [seed_memory.js](file:///g:/Projects/whatsapp-agent/seed_memory.js): Script de siembra e inicialización de memorias base (idempotente) en Engram.
-*   [start_agent.ps1](file:///g:/Projects/whatsapp-agent/start_agent.ps1): Script PowerShell para encendido coordinado del sistema.
-*   [docker-compose.yml](file:///g:/Projects/whatsapp-agent/docker-compose.yml) & [Dockerfile](file:///g:/Projects/whatsapp-agent/Dockerfile): Archivos de empaquetamiento de n8n con soporte nativo de docker-cli y WAHA.
-*   [n8n_workflow.json](file:///g:/Projects/whatsapp-agent/n8n_workflow.json): Flujo de trabajo y lógica del bot de n8n.
-*   [supabase_schema.sql](file:///g:/Projects/whatsapp-agent/supabase_schema.sql): Esquema DDL, índices y store procedures de Supabase.
-*   [Diseño_Arquitectónico_Ferretería_El_Serrucho.md](file:///g:/Projects/whatsapp-agent/Diseño_Arquitectónico_Ferretería_El_Serrucho.md): Documento técnico de diseño, justificación y matriz de estados del sistema.
-*   [.agents/](file:///g:/Projects/whatsapp-agent/.agents/): Reglas cognitivas del agente (`AGENTS.md`) y habilidades específicas (`skills/advisor-serrucho/SKILL.md`).
-*   [.gitignore](file:///g:/Projects/whatsapp-agent/.gitignore) & [package.json](file:///g:/Projects/whatsapp-agent/package.json): Gestión de archivos de repositorio y scripts npm.
+*   **setup.js**: Script de instalación automatizada de dependencias y variables de entorno.
+*   **seed_memory.js**: Script de siembra e inicialización de memorias base (idempotente) en Engram.
+*   **start_agent.ps1**: Script PowerShell para encendido coordinado del sistema.
+*   **waha_watchdog.ps1**: Watchdog que mantiene viva la sesión de WhatsApp (cada 3 min vía Task Scheduler).
+*   **docker-compose.yml** & **Dockerfile**: Empaquetamiento de n8n con docker-cli y WAHA.
+*   **n8n_workflow.json**: Flujo de trabajo del bot (20 nodos: filtro multimedia, rate limiting, AI agent, escalación).
+*   **supabase_schema.sql**: Esquema DDL con 7 tablas, índices GIN/trigram y funciones RPC.
+*   **.env.example**: Plantilla de variables de entorno (credenciales, URLs, claves).
+*   **mcp_config.json**: Configuración MCP para Postgres readonly y Engram.
+*   **scripts/**: Scripts de desarrollo, testing y patches (movidos desde la raíz para organización).
+*   **data/**: Archivos de contexto del comercio.
+*   **.agents/**: Reglas cognitivas del agente y habilidades específicas (`skills/advisor-serrucho/`).
 
 ---
 
@@ -128,3 +131,5 @@ npm start
 *   **Retiro en Tienda**: Se informa de forma categórica que no hay envíos a domicilio; todo se retira en la tienda en **Mene Mauroa, Falcón**.
 *   **Seguridad RLS**: La conexión a la base de datos se realiza con un rol exclusivo de lectura, bloqueando cualquier intento de inyección de instrucciones para alterar el stock o los precios.
 *   **Memoria Engram**: Perucho reconoce a clientes habituales por su teléfono y recuerda sus métodos de pago predilectos, facturación RIF y cotizaciones pasadas.
+*   **Rate Limiting**: Protección anti-flood de 10 mensajes por minuto por teléfono.
+*   **Filtro Multimedia**: Solo se procesan mensajes de texto; imágenes, audios y stickers reciben respuesta amable.

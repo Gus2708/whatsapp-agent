@@ -51,8 +51,9 @@ El esquema Entidad-Relación (ER) que fundamenta a la Ferretería El Serrucho de
 | Nombre de la Tabla | Columnas Críticas y Tipos de Datos | Propósito en el Flujo del Asistente |
 | :--- | :--- | :--- |
 | **productos** | `codigo_interno` (TEXT, PK), `descripcion` (TEXT), `unidad` (TEXT), `codigo_barras` (TEXT), `costo` (NUMERIC), `precio_venta` (NUMERIC), `existencia` (NUMERIC), `referencia` (TEXT), `actualizado_en` (TIMESTAMPTZ) | Fuente única de verdad para la información de precios (en USD) y existencias. El agente consulta directamente esta tabla. |
-| **tazas** | `id` (BIGINT, PK), `nombre` (TEXT), `bcv_usd` (NUMERIC), `bcv_eur` (NUMERIC), `binance_p2p` (NUMERIC), `tasa_promedio` (NUMERIC), `created_at` (TIMESTAMPTZ) | Registra la tasa de cambio oficial de referencia del BCV y promedio para cobros en moneda nacional (Pago Móvil). |
+| **tasas** | `id` (BIGINT, PK), `nombre` (TEXT), `bcv_usd` (NUMERIC), `bcv_eur` (NUMERIC), `binance_p2p` (NUMERIC), `tasa_promedio` (NUMERIC), `created_at` (TIMESTAMPTZ) | Registra la tasa de cambio oficial de referencia del BCV y promedio para cobros en moneda nacional (Pago Móvil). |
 | **clientes** | `id` (UUID, PK), `telefono` (TEXT), `nombre` (TEXT), `preferencias` (JSONB) | Almacena perfiles de clientes habituales para personalización del trato e histórico. |
+| **chat_sessions** | `telefono` (TEXT, PK), `estado` (TEXT), `msg_count` (INT), `window_start` (TIMESTAMPTZ), `updated_at` (TIMESTAMPTZ) | Control de estado conversacional (automatico/manual) y rate limiting anti-flood. |
 
 El diseño de este esquema va inherentemente acoplado a la implementación de Seguridad a Nivel de Fila (Row Level Security - RLS) de PostgreSQL. En el contexto de un agente de inteligencia artificial operando de manera autónoma, otorgar permisos irrestrictos a la base de datos constituye una vulnerabilidad crítica. Mediante RLS, se definen políticas granulares que evalúan el contexto del usuario ejecutor en cada consulta.
 

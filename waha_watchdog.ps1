@@ -36,7 +36,26 @@ try {
     # Todo bien; no ensuciar el log en cada corrida.
     exit 0
   }
-  Write-Log "Sesión en estado '$($s.status)'. Intentando reiniciar..."
+  # No tocar si está esperando escaneo de QR (requiere acción humana).
+  if ($s.status -eq "SCAN_QR_CODE") {
+    Write-Log "Sesión esperando escaneo de QR — no se interviene (escanea en http://localhost:3000)."
+    exit 0
+  }
+  # FAILED: la autenticación quedó corrupta. Hay que limpiar (logout+stop) y
+  # rearrancar; esto deja la sesión en SCAN_QR_CODE para re-escanear el QR.
+  if ($s.status -eq "FAILED") {
+    Write-Log "Sesión FAILED. Limpiando (logout/stop) para poder re-escanear..."
+    foreach ($act in @("logout","stop")) {
+      try { Invoke-RestMethod -Uri "$Base/api/sessions/$Session/$act" -Method POST -Headers $headers -Body "{}" -TimeoutSec 20 | Out-Null } catch {}
+      Start-Sleep -Seconds 2
+    }
+    try { Invoke-RestMethod -Uri "$Base/api/sessions/$Session/start" -Method POST -Headers $headers -Body "{}" -TimeoutSec 30 | Out-Null } catch {}
+    Write-Log "Rearranque hecho. Revisa http://localhost:3000 para escanear el QR si pide."
+    exit 0
+  }
+  # STOPPED u otros: /start revive la sesión guardada SIN re-escanear (la auth persiste).
+  # (Nunca usar /restart: ese sí borra la autenticación.)
+  Write-Log "Sesión en estado '$($s.status)'. Intentando iniciar (start)..."
   try {
     Invoke-RestMethod -Uri "$Base/api/sessions/$Session/start" -Method POST -Headers $headers -Body "{}" -TimeoutSec 30 | Out-Null
   } catch {

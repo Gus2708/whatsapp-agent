@@ -14,8 +14,12 @@ function req(opts, body) {
   });
 }
 
-// Payload estilo WAHA. Usamos un chatId de PRUEBA que no enviará a nadie real
-// (si sendText falla por número inexistente, no importa: queremos ver la salida del AI Agent).
+// Payload estilo WAHA. chatId de PRUEBA.
+// Por defecto usa un número ALEATORIO por corrida → memoria de conversación limpia
+// (evita que el bot imite respuestas viejas). Pasa un 2º arg para fijar el número
+// (útil para probar continuidad de conversación: misma memoria entre mensajes).
+const FIXED_FROM = process.argv[3];
+const RANDOM_FROM = FIXED_FROM || ('5849' + Math.floor(Math.random()*1e8).toString().padStart(8,'0') + '@c.us');
 function makePayload(text) {
   return JSON.stringify({
     id: 'evt_test_' + Date.now(),
@@ -26,7 +30,7 @@ function makePayload(text) {
     payload: {
       id: 'test_' + Date.now(),
       timestamp: Math.floor(Date.now()/1000),
-      from: '999999999999@c.us',
+      from: RANDOM_FROM,
       fromMe: false,
       source: 'app',
       body: text,

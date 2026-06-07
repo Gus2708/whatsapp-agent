@@ -12,7 +12,7 @@
         "PG_HOST": "aws-0-us-east-1.pooler.supabase.com",
         "PG_PORT": "5432",
         "PG_USER": "serrucho_agent_readonly.rgniqjfooifchyctnbzu",
-        "PG_PASSWORD": "SerruchoSecureAgent2026_Access",
+        "PG_PASSWORD": "${PG_PASSWORD}",
         "PG_DATABASE": "postgres",
         "PG_LOCK_CONNECTION": "true"
       }

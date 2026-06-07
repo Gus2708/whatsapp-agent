@@ -1,0 +1,177 @@
+[
+  {
+    "codigo": "CEMCSC",
+    "desc": "CEMENTO GRIS CSC 42.5KG",
+    "precio": 11,
+    "stock": 555,
+    "vendido": 6329
+  },
+  {
+    "codigo": "01112",
+    "desc": "CEMENTO GRIS CATATUMBO SELLADO TIPO II IDEAL",
+    "precio": 12,
+    "stock": 25,
+    "vendido": 4834
+  },
+  {
+    "codigo": "00767",
+    "desc": "CABILLA ESTRIADA 10 MM X 12MTS",
+    "precio": 12,
+    "stock": 300,
+    "vendido": 1549
+  },
+  {
+    "codigo": "05156",
+    "desc": "TUBO HERRERÍA 2X1X0.80X6MTS",
+    "precio": 10,
+    "stock": 305,
+    "vendido": 1470
+  },
+  {
+    "codigo": "00768",
+    "desc": "CABILLA ESTRIADA 12MMX12MTS",
+    "precio": 17.5,
+    "stock": 360,
+    "vendido": 1461
+  },
+  {
+    "codigo": "01174",
+    "desc": "CERCHA DE 10X6MTS",
+    "precio": 11,
+    "stock": 57,
+    "vendido": 1237
+  },
+  {
+    "codigo": "01404",
+    "desc": "CLAVOS",
+    "precio": 2,
+    "stock": 737,
+    "vendido": 1216
+  },
+  {
+    "codigo": "01729",
+    "desc": "DISCO C/METAL  FINO 4-1/2X3.2 COVO",
+    "precio": 1,
+    "stock": 211,
+    "vendido": 911
+  },
+  {
+    "codigo": "02554",
+    "desc": "LAMINA DE ZINC 0.20 X 0.80 12 PIES X3.66 MTS IMPORT",
+    "precio": 8.5,
+    "stock": 154,
+    "vendido": 833
+  },
+  {
+    "codigo": "02580",
+    "desc": "LAMINA ZINC ONDULADO AZUL 0.25X810X3.66MTS",
+    "precio": 10.5,
+    "stock": 280,
+    "vendido": 796
+  },
+  {
+    "codigo": "101006",
+    "desc": "ALAMBRE GH 700GR",
+    "precio": 2.5,
+    "stock": 168,
+    "vendido": 675
+  },
+  {
+    "codigo": "00192",
+    "desc": "ALAMBRON ESTRIADO 5MM X 6MTS",
+    "precio": 2,
+    "stock": 284,
+    "vendido": 661
+  },
+  {
+    "codigo": "01420",
+    "desc": "CODO 1/2 90 SCHEDULE",
+    "precio": 0.5,
+    "stock": 74,
+    "vendido": 564
+  },
+  {
+    "codigo": "01567",
+    "desc": "CURVA 90GR PVC CONDUIT 3/4",
+    "precio": 0.6,
+    "stock": 120,
+    "vendido": 526
+  },
+  {
+    "codigo": "02584",
+    "desc": "LAMINA ZINC ONDULADO ROJO 12 PIES 0.25",
+    "precio": 10.5,
+    "stock": 89,
+    "vendido": 505
+  },
+  {
+    "codigo": "02579",
+    "desc": ".",
+    "precio": 10,
+    "stock": 300,
+    "vendido": 497
+  },
+  {
+    "codigo": "05166",
+    "desc": "TUBO LIVIANO P/ELECTRICIDAD 3/4",
+    "precio": 3,
+    "stock": 44,
+    "vendido": 451
+  },
+  {
+    "codigo": "00873",
+    "desc": "CAJETIN OCTAGONAL COMB PLASTICO BLANCO",
+    "precio": 0.75,
+    "stock": 26,
+    "vendido": 431
+  },
+  {
+    "codigo": "02188",
+    "desc": "GANCHO PARA TECHO 2X1 CORTO GH",
+    "precio": 14,
+    "stock": 74,
+    "vendido": 395
+  },
+  {
+    "codigo": "05154",
+    "desc": "TUBO HERRERIA 1X1X0.90X6MTS",
+    "precio": 7.5,
+    "stock": 64,
+    "vendido": 388
+  },
+  {
+    "codigo": "CAJ-PVC-4X2",
+    "desc": "CAJETIN PLASTICO 4X2 NORTE",
+    "precio": 0.5,
+    "stock": 434,
+    "vendido": 349
+  },
+  {
+    "codigo": "05160",
+    "desc": "TUBO HERRERIA 3 X 1 X 0.90MM X 6 MTS",
+    "precio": 14.5,
+    "stock": 84,
+    "vendido": 348
+  },
+  {
+    "codigo": "02573",
+    "desc": "LAMINA TECHO IMP 1.10 X 6 MTS ( ROJO )",
+    "precio": 28,
+    "stock": 60,
+    "vendido": 330
+  },
+  {
+    "codigo": "IMP211",
+    "desc": "TUBO HERRERIA 2X1 1.0MM X 6MTS IMP",
+    "precio": 13.5,
+    "stock": 17,
+    "vendido": 316
+  },
+  {
+    "codigo": "04737",
+    "desc": "TEE PVC PEGAR 1/2",
+    "precio": 0.5,
+    "stock": 13,
+    "vendido": 305
+  }
+]

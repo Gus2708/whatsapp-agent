@@ -1,5 +1,3 @@
-version: '3.8'
-
 networks:
   serrucho_net:
     driver: bridge
@@ -66,7 +64,11 @@ services:
       - NODE_FUNCTION_ALLOW_BUILTIN=*
       - NODE_FUNCTION_ALLOW_EXTERNAL=*
       - WAHA_API_KEY=${WAHA_API_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - ENGRAM_HOST=${ENGRAM_HOST:-host.docker.internal:7437}
+      - N8N_DEFAULT_PRODUCTION_WORKFLOW_ACTIVE=true
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
     volumes:
       - n8n_data:/home/node/.n8n
       - /var/run/docker.sock:/var/run/docker.sock
