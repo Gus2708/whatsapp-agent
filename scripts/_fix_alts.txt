@@ -1,0 +1,18 @@
+  // best = mas vendido de la medida pedida. Si el EXACTO esta AGOTADO, ofrece sustitutos
+  // DISPONIBLES de la MISMA familia (estructural/herreria/...) en vez de callar o saltar a otro producto.
+  const best = cand[0];
+  const bestAgotado = !esGranel(best.descripcion) && Number(best.existencia) <= 0;
+  const famDe = (s)=>{ const d=norm(s); for (const f of ['estructural','herreria','ventilacion','agua negra','agua caliente','agua fria','conduit','presion','electricidad']) if (d.includes(f)) return f; return null; };
+  const fam = famDe(best.descripcion);
+  const pool = bestAgotado
+    ? (typeof candPre!=='undefined'?candPre:cand).filter(c => c.codigo_interno!==best.codigo_interno && (esGranel(c.descripcion) || Number(c.existencia)>0) && (!fam || norm(c.descripcion).includes(fam))).sort((a,b)=>(vMap[b.codigo_interno]||0)-(vMap[a.codigo_interno]||0))
+    : cand.slice(1);
+  const seenP = new Set([Number(best.precio_venta)]);
+  const alts = [];
+  for (const c of pool){
+    const avail = esGranel(c.descripcion) || Number(c.existencia) > 0;
+    const pr = Number(c.precio_venta);
+    if (avail && !seenP.has(pr)){ seenP.add(pr); alts.push(c); }
+    if (alts.length>=2) break;
+  }
+  return { best, alts };

@@ -26,15 +26,22 @@ const SIZEQ = {
 };
 // ¿la medida `med` aparece en la descripcion ya normalizada `nd`, con limites de palabra?
 function medPresent(med, nd){
+  // Par de dimensiones AxB de perfiles (tubo/angulo/lamina): aceptar en CUALQUIER orden (40x100 == 100x40)
+  const _pm = /^(\d[\d.\/-]*)x(\d[\d.\/-]*)$/.exec(med);
+  if (_pm) {
+    const _e = s => s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const _a = _e(_pm[1]), _b = _e(_pm[2]);
+    return new RegExp('(^|[ (x])'+_a+'x'+_b+'($|[ x)])').test(nd)
+        || new RegExp('(^|[ (x])'+_b+'x'+_a+'($|[ x)])').test(nd);
+  }
   if (SIZEQ[med]) {
     for (const a of SIZEQ[med]){ const esc=a.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); if (new RegExp('(^|[ (])'+esc+'($|[ x)])').test(nd)) return true; }
     return false;
   }
   if (/^\d+$/.test(med)) {
-    // entero "pelado": calibre Nmm, nominal (N)/NxM, o diametro "N <palabra>" (ej "4 agua negra");
-    // pero NO la longitud (ej "6 metros", "3 mts").
     if (new RegExp('(^|[ (])'+med+'mm($|[ x)])').test(nd)) return true;
     if (new RegExp('(^|[ (])'+med+'(?=x|\\)|$)').test(nd)) return true;
+    if (new RegExp('(?<=x)'+med+'(?=x|\\)|$| )').test(nd)) return true;
     if (new RegExp('(^|[ (])'+med+' (?!(?:mm|cm|mts|mtrs|metros?|metro|m|pies?|pie|pulg|psi|gal|kg|kilos?|lbs?)\\b)').test(nd)) return true;
     return false;
   }

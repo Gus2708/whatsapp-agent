@@ -23,6 +23,14 @@ const SIZEQ = {
   '3/4':['3/4','20mm'], '20mm':['3/4','20mm']
 };
 function medPresent(med, nd){
+  // Par de dimensiones AxB de perfiles (tubo/angulo/lamina): aceptar en CUALQUIER orden (40x100 == 100x40)
+  const _pm = /^(\d[\d.\/-]*)x(\d[\d.\/-]*)$/.exec(med);
+  if (_pm) {
+    const _e = s => s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const _a = _e(_pm[1]), _b = _e(_pm[2]);
+    return new RegExp('(^|[ (x])'+_a+'x'+_b+'($|[ x)])').test(nd)
+        || new RegExp('(^|[ (x])'+_b+'x'+_a+'($|[ x)])').test(nd);
+  }
   if (SIZEQ[med]) {
     for (const a of SIZEQ[med]){ const esc=a.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); if (new RegExp('(^|[ (])'+esc+'($|[ x)])').test(nd)) return true; }
     return false;
@@ -30,6 +38,7 @@ function medPresent(med, nd){
   if (/^\d+$/.test(med)) {
     if (new RegExp('(^|[ (])'+med+'mm($|[ x)])').test(nd)) return true;
     if (new RegExp('(^|[ (])'+med+'(?=x|\\)|$)').test(nd)) return true;
+    if (new RegExp('(?<=x)'+med+'(?=x|\\)|$| )').test(nd)) return true;
     if (new RegExp('(^|[ (])'+med+' (?!(?:mm|cm|mts|mtrs|metros?|metro|m|pies?|pie|pulg|psi|gal|kg|kilos?|lbs?)\\b)').test(nd)) return true;
     return false;
   }
@@ -176,6 +185,7 @@ async function buscarUno(nombre){
     if (g.length>0) cand = g;
   }
 
+  const candPre = cand.slice();
   // Filtro de MEDIDA
   if (medLargas.length>0){
     const filt = cand.filter(p => { const nd=normMedida(p.descripcion); return medLargas.every(m => medPresent(m, nd)); });
@@ -194,11 +204,18 @@ async function buscarUno(nombre){
     if (aStock !== bStock) return aStock ? -1 : 1;
     return (vMap[b.codigo_interno]||0)-(vMap[a.codigo_interno]||0);
   });
-  // best = mas vendido; alts = otras opciones DISPONIBLES con precio distinto (max 2)
+  // best = mas vendido de la medida pedida. Si el EXACTO esta AGOTADO, ofrece sustitutos
+  // DISPONIBLES de la MISMA familia (estructural/herreria/...) en vez de callar o saltar a otro producto.
   const best = cand[0];
+  const bestAgotado = !esGranel(best.descripcion) && Number(best.existencia) <= 0;
+  const famDe = (s)=>{ const d=norm(s); for (const f of ['estructural','herreria','ventilacion','agua negra','agua caliente','agua fria','conduit','presion','electricidad']) if (d.includes(f)) return f; return null; };
+  const fam = famDe(best.descripcion);
+  const pool = bestAgotado
+    ? (typeof candPre!=='undefined'?candPre:cand).filter(c => c.codigo_interno!==best.codigo_interno && (esGranel(c.descripcion) || Number(c.existencia)>0) && (!fam || norm(c.descripcion).includes(fam))).sort((a,b)=>(vMap[b.codigo_interno]||0)-(vMap[a.codigo_interno]||0))
+    : cand.slice(1);
   const seenP = new Set([Number(best.precio_venta)]);
   const alts = [];
-  for (const c of cand.slice(1)){
+  for (const c of pool){
     const avail = esGranel(c.descripcion) || Number(c.existencia) > 0;
     const pr = Number(c.precio_venta);
     if (avail && !seenP.has(pr)){ seenP.add(pr); alts.push(c); }
