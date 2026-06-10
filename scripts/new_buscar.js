@@ -8,7 +8,7 @@ function nUSD(n){ const r = Math.round(Number(n)*100)/100; return Number.isInteg
 function nBs(n){ return (Math.round(Number(n)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function nBsInt(n){ return Math.round(Number(n)).toLocaleString('en-US'); }
 function tc(s){ return String(s).toLowerCase().split(/\s+/).map(w=>{ if(/\d/.test(w)) return w.toUpperCase(); if(w.length<=3) return w.toUpperCase(); return w.charAt(0).toUpperCase()+w.slice(1); }).join(' '); }
-function norm(t){ return String(t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 .\/-]/g,' ').replace(/\s+/g,' ').trim(); }
+function norm(t){ return String(t).toLowerCase().replace(/[\u00d7\u2715\u2716]/g,'x').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 .\/-]/g,' ').replace(/\s+/g,' ').trim(); }
 // Normaliza medidas compuestas: "3 x 1-1/2", "3x1.1/2", "1 1/2 x 1 1/2" -> "3x1-1/2", "1-1/2x1-1/2"
 function normMedida(s){
   let t = norm(s);
@@ -42,7 +42,8 @@ function medPresent(med, nd){
   return new RegExp('(^|[ (])'+esc+'($|[ x)])').test(nd);
 }
 const SIN = {
-  'corrugada':'estriada','corrugado':'estriado','varilla':'cabilla','varillas':'cabilla','hierro':'cabilla','cabillas':'cabilla',
+  'rieles':'tubo herreria','riel':'tubo herreria',
+  'lavaplatos':'fregadero','lavaplato':'fregadero','lava platos':'fregadero','lava plato':'fregadero','elegante':'lujo','corrugada':'estriada','corrugado':'estriado','varilla':'cabilla','varillas':'cabilla','hierro':'cabilla','cabillas':'cabilla',
   'simento':'cemento','simanto':'cemento','saco cemento':'cemento','bolsa cemento':'cemento',
   'clavo':'clavos','clavillo':'clavos','tornillo':'tornillos',
   'tubo cuadrado':'tubo herreria','tubo metalico':'tubo herreria','tuberia metalica':'tubo herreria',
@@ -60,7 +61,7 @@ const SIN = {
   'media':'1/2','medio':'1/2','un cuarto':'1/4','cuarto':'1/4','tres cuartos':'3/4','tres octavos':'3/8','un octavo':'1/8'
 };
 const ACCENTS = {
-  'herreria': 'herrería','carbon': 'carbón','cautin': 'cautín','exhibicion': 'exhibición','gavilan': 'gavilán',
+  'fregadero': 'lavaplato','herreria': 'herrería','carbon': 'carbón','cautin': 'cautín','exhibicion': 'exhibición','gavilan': 'gavilán',
   'hidraulico': 'hidráulico','lampara': 'lámpara','periferica': 'periférica','polimero': 'polímero','presion': 'presión',
   'reduccion': 'reducción','refrigeracion': 'refrigeración','silicon': 'silicón','sintetico': 'sintético','tuberia': 'tubería',
   'plastico': 'plástico','lamina': 'lámina','bateria': 'batería','medicion': 'medición','fijacion': 'fijación'
@@ -128,7 +129,7 @@ const IGNORED = new Set([
   'una', 'uno', 'unas', 'unos', 'donde', 'tiene', 'tienen'
 ]);
 const MODIFIERS = new Set([
-  'pulgada', 'pulgadas', 'media', 'cuarto', 'octavo', 'metro', 'metros', 'pies', 'pulg', 'mm', 'cm', 'mts',
+  'multifuncional', 'pulgada', 'pulgadas', 'media', 'cuarto', 'octavo', 'metro', 'metros', 'pies', 'pulg', 'mm', 'cm', 'mts',
   'negro', 'negra', 'blanco', 'blanca', 'gris', 'azul', 'rojo', 'verde', 'amarillo', 'amarilla'
 ]);
 
