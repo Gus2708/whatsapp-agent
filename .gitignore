@@ -23,6 +23,8 @@ n8n_local_storage/
 
 # Logs
 waha_watchdog.log
+boot_serrucho.log
+catchup_serrucho.log
 
 # QR / imágenes temporales
 qr_whatsapp.png
