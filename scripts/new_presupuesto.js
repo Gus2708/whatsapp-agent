@@ -142,7 +142,7 @@ if (items.length===0) return JSON.stringify({ ok:false, mensaje:'No pude interpr
 
 const tasa = await getTasa();
 
-const STOPW = new Set(['de','del','la','el','los','las','un','una','unos','unas','y','o','con','para','por','al','cada','metro','metros','mt','mts','pulgada','pulgadas','pieza','piezas','saco','sacos','unidad','unidades','caja','cajas','galon','galones']);
+const STOPW = new Set(['de','del','la','el','los','las','un','una','unos','unas','y','o','con','para','por','al','cada','metro','metros','mt','mts','pulgada','pulgadas','pieza','piezas','rollo','rollos','saco','sacos','unidad','unidades','caja','cajas','galon','galones']);
 async function buscarUno(nombre){
   const exp = normMedida(expandir(nombre));
   const qTokens = exp.split(' ').filter(w=>(w.length>=2 || /\d/.test(w)) && !STOPW.has(w)).map(w => /\d/.test(w) ? w : singular(stemColor(w)));
@@ -150,6 +150,7 @@ async function buscarUno(nombre){
   const textLargas = largas.filter(w=>!/\d/.test(w));
   const medLargas = largas.filter(w=>/\d/.test(w));
   const granelIntent = /\b(por|al|x|cada|el)\s*(metro|metros|mt|mts)\b/.test(norm(nombre));
+  const rolloIntent = /\b(rollos?)\b/.test(norm(nombre)); // "rollo de cable" -> rollo completo, no por metro
   const GRANEL_OR = 'or=(descripcion.ilike.*x mt*,descripcion.ilike.*x metro*,descripcion.ilike.*por metro*)';
   let cand=[];
   // si hay categoria de texto, trae amplio por categoria y filtra medida en JS
@@ -184,12 +185,18 @@ async function buscarUno(nombre){
     const g = cand.filter(p => esGranel(p.descripcion));
     if (g.length>0) cand = g;
   }
+  // Si pidio "rollo", prioriza el rollo COMPLETO (no las versiones por metro "X MT")
+  if (rolloIntent && !granelIntent){
+    const r = cand.filter(p => !esGranel(p.descripcion));
+    if (r.length>0) cand = r;
+  }
 
   const candPre = cand.slice();
   // Filtro de MEDIDA
   if (medLargas.length>0){
     const filt = cand.filter(p => { const nd=normMedida(p.descripcion); return medLargas.every(m => medPresent(m, nd)); });
     if (filt.length>0) cand = filt;
+    else return null; // pidio una medida que ningun producto tiene -> no sustituir; va a "no encontrados"
   }
 
   // ventas para desempate
@@ -204,6 +211,12 @@ async function buscarUno(nombre){
     if (aStock !== bStock) return aStock ? -1 : 1;
     return (vMap[b.codigo_interno]||0)-(vMap[a.codigo_interno]||0);
   });
+  // Si el mejor resultado no comparte NINGUNA palabra de categoría con lo pedido, es OTRO producto
+  // (coincidió por subcadena/número) -> no lo sustituyas; va a "no encontrados".
+  if (textLargas.length>0 && cand.length>0){
+    const w0 = norm(cand[0].descripcion).split(/[\s\-x]+/);
+    if (!textLargas.some(t => w0.includes(t))) return null;
+  }
   // best = mas vendido de la medida pedida. Si el EXACTO esta AGOTADO, ofrece sustitutos
   // DISPONIBLES de la MISMA familia (estructural/herreria/...) en vez de callar o saltar a otro producto.
   const best = cand[0];
@@ -246,7 +259,7 @@ for (const it of items){
     altLines.push('• En vez de *'+tc(prod.descripcion)+'* también está *'+tc(a.descripcion)+'* a '+nUSD(ausd)+'$ c/u');
   }
 }
-if (n===0) return JSON.stringify({ ok:false, mensaje:'No encontré esos productos: '+noEnc.join(', ') });
+if (n===0) return JSON.stringify({ ok:false, instruccion:'NO encontre estos productos. Tu UNICA respuesta valida ahora es el token [PEDIR_AYUDA] (escribelo solo, exactamente asi). PROHIBIDO sugerir alternativas o decir que no los tenemos: un empleado los elegira.', mensaje:'No encontré esos productos: '+noEnc.join(', ') });
 
 const totBs = tasa ? totUSD*RECARGO*tasa : null;
 bloque += '━━━━━━━━━━━━━━━\n';

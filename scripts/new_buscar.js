@@ -130,7 +130,7 @@ const IGNORED = new Set([
   'de', 'y', 'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'o',
   'venden', 'vendes', 'tienen', 'tiene', 'hay', 'quiero', 'busco', 'comprar', 'necesito', 'dame', 'trae',
   'cuanto', 'cuesta', 'cuestan', 'vale', 'valen', 'sale', 'salen', 'precio', 'precios', 'costo', 'como',
-  'saco', 'sacos', 'bolsa', 'bolsas', 'unidad', 'unidades', 'pieza', 'piezas', 'kilo', 'kilos', 'kg',
+  'rollo', 'rollos', 'saco', 'sacos', 'bolsa', 'bolsas', 'unidad', 'unidades', 'pieza', 'piezas', 'kilo', 'kilos', 'kg',
   'metro', 'metros', 'mts', 'caja', 'cajas', 'galon', 'galones', 'para', 'con', 'del', 'algo', 'vender', 'por', 'al', 'cada',
   'tener', 'buscar', 'amigo', 'buenas', 'hola', 'tardes', 'dias', 'noches', 'porfa', 'favor', 'gracias',
   'una', 'uno', 'unas', 'unos', 'donde', 'tiene', 'tienen'
@@ -164,6 +164,7 @@ const medLargas = largas.filter(w => /\d/.test(w));
 
 // ¿el cliente lo pidio "por metro / al metro / x metro"? -> preferir el producto a granel (X MT)
 const granelIntent = /\b(por|al|x|cada|el)\s*(metro|metros|mt|mts)\b/.test(norm(p_busqueda));
+const rolloIntent = /\b(rollos?)\b/.test(norm(p_busqueda)); // "rollo de cable" -> rollo completo, no por metro
 
 // Fetch: si hay palabras de texto (categoria), trae amplio por categoria y filtra la medida en JS
 // (las descripciones guardan las medidas con formatos inconsistentes, por eso no las metemos al ilike).
@@ -179,7 +180,7 @@ if (res.length===0){
 }
 if (res.length===0) res = await rpc(termExp);
 if (res.length===0 && termExp!==norm(p_busqueda)) res = await rpc(norm(p_busqueda));
-if (res.length===0) return JSON.stringify({ encontrados:0, mensaje:'No encontre "' + p_busqueda + '" en el catalogo.' });
+if (res.length===0) return JSON.stringify({ encontrados:0, instruccion:'NO encontre este producto. Tu UNICA respuesta valida ahora es el token [PEDIR_AYUDA] (escribelo solo, exactamente asi, sin saludo ni nada mas). PROHIBIDO sugerir alternativas, pedir que reformule o decir que no lo tenemos: un empleado lo elegira y se lo enviara al cliente.', mensaje:'No encontre "' + p_busqueda + '" en el catalogo.' });
 
 // dedup
 const unicos=[]; const seen=new Set();
@@ -196,11 +197,18 @@ if (granelIntent){
   const g = unicos.filter(p => esGranel(p.descripcion));
   if (g.length>0){ unicos.length=0; for(const x of g) unicos.push(x); }
 }
+// Si pidio "rollo", prioriza el rollo COMPLETO (no las versiones por metro "X MT")
+if (rolloIntent && !granelIntent){
+  const r = unicos.filter(p => !esGranel(p.descripcion));
+  if (r.length>0){ unicos.length=0; for(const x of r) unicos.push(x); }
+}
 
 // Filtro de MEDIDA: si el cliente dio medidas, deja solo los que las cumplen TODAS
+let medMismatch = false;
 if (medLargas.length>0){
   const filt = unicos.filter(p => { const nd=normMedida(p.descripcion); return medLargas.every(m => medPresent(m, nd)); });
   if (filt.length>0){ unicos.length=0; for(const x of filt) unicos.push(x); }
+  else medMismatch = true; // pidio una medida/calibre que NINGUN producto tiene -> no sustituir
 }
 
 // ventas para desempate
@@ -225,4 +233,12 @@ const productos = unicos.slice(0,4).map(p=>{
   return { nombre: tc(p.descripcion), disponible:disp, precio_divisas_texto: nUSD(usd)+'$',
     precio_bs_texto: tasa ? (nUSD(bsUsd)+'$ o '+nBs(bsUsd*tasa)+'bs') : (nUSD(bsUsd)+'$ (tasa BCV no disponible)') };
 });
-return JSON.stringify({ encontrados:productos.length, tasa_bcv:tasa, productos });
+const _out = { encontrados:productos.length, tasa_bcv:tasa, productos };
+// ¿el mejor resultado es DÉBIL? -> medida pedida ausente, o no comparte NINGUNA palabra de categoría
+let _debil = medMismatch;
+if (!_debil && textLargas.length>0 && unicos.length>0){
+  const _w = norm(unicos[0].descripcion).split(/[\s\-x]+/);
+  if (!textLargas.some(t => _w.includes(t))) _debil = true; // el "match" es solo por subcadena/numero -> otra cosa
+}
+if (_debil) _out.instruccion = 'Lo que encontré NO coincide con lo que pidió el cliente (es de OTRA categoría o medida; coincidió de casualidad). NO lo ofrezcas como si fuera lo que pidió ni sugieras otra cosa: responde SOLO con el token [PEDIR_AYUDA].';
+return JSON.stringify(_out);
