@@ -5,7 +5,8 @@
   "main": "setup.js",
   "scripts": {
     "setup": "node setup.js",
-    "start": "powershell -ExecutionPolicy Bypass -File ./start_agent.ps1"
+    "start": "powershell -ExecutionPolicy Bypass -File ./start_agent.ps1",
+    "test": "node --test"
   },
   "keywords": [
     "whatsapp",
