@@ -6,7 +6,7 @@
   "scripts": {
     "setup": "node setup.js",
     "start": "powershell -ExecutionPolicy Bypass -File ./start_agent.ps1",
-    "test": "node --test"
+    "test": "node --test && node scripts/check_sources_sync.js"
   },
   "keywords": [
     "whatsapp",
