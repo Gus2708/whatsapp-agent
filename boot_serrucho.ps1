@@ -53,9 +53,16 @@ try {
 }
 
 # ---------------------------------------------------------------------------
-# 2) Contenedores n8n + WAHA
+# 2) Contenedores WAHA + n8n  (se levantan POR SEPARADO, a proposito)
 #    (red de seguridad: con restart:unless-stopped Docker ya los recupera,
 #     pero esto cubre el caso de que hayan quedado detenidos a mano)
+#
+#    Por que separados y NO un solo `docker compose up -d`:
+#    ese comando levanta WAHA y COMPILA n8n de forma atomica; si el build de
+#    n8n falla (exit 1), Compose aborta TODO y WAHA cae junto con n8n (paso el
+#    2026-06-11). WAHA solo baja una imagen y nunca compila, asi que lo
+#    arrancamos primero e independiente: la sesion de WhatsApp debe vivir
+#    SIEMPRE, pase lo que pase con el build de n8n.
 # ---------------------------------------------------------------------------
 try {
     Set-Location $ProjectDir
@@ -64,9 +71,25 @@ try {
         Log "Creando volumen externo n8n_data..."
         docker volume create n8n_data | Out-Null
     }
-    Log "docker compose up -d ..."
-    docker compose up -d 2>$null
-    if ($LASTEXITCODE -eq 0) { Log "compose: OK" } else { Log "compose: fallo (exit $LASTEXITCODE)" }
+
+    # 2a) WAHA primero (sin build) -> WhatsApp arriba cueste lo que cueste.
+    Log "docker compose up -d waha ..."
+    docker compose up -d waha 2>$null
+    if ($LASTEXITCODE -eq 0) { Log "WAHA: OK" } else { Log "WAHA: fallo (exit $LASTEXITCODE)" }
+
+    # 2b) n8n despues (aqui SI se compila). Si el build falla, WAHA ya quedo
+    #     arriba; ademas intentamos arrancar la ultima imagen buena con
+    #     --no-build para no quedarnos sin agente por un build roto.
+    Log "docker compose up -d n8n ..."
+    docker compose up -d n8n 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Log "n8n: build fallo (exit $LASTEXITCODE). Intentando ultima imagen buena (--no-build)..."
+        docker compose up -d --no-build n8n 2>$null
+        if ($LASTEXITCODE -eq 0) { Log "n8n: OK (imagen previa, sin recompilar)" }
+        else { Log "n8n: no se pudo arrancar (exit $LASTEXITCODE) -- WAHA sigue arriba" }
+    } else {
+        Log "n8n: OK"
+    }
 } catch {
     Log "ERROR en docker compose: $($_.Exception.Message)"
 }
@@ -113,6 +136,19 @@ try {
     }
 } catch {
     Log "ERROR lanzando la recuperacion: $($_.Exception.Message)"
+}
+
+# ---------------------------------------------------------------------------
+# 4.5) Ejecutar Watchdog de WAHA para iniciar la sesión de inmediato
+# ---------------------------------------------------------------------------
+try {
+    $watchdogScript = Join-Path $ProjectDir "waha_watchdog.ps1"
+    if (Test-Path $watchdogScript) {
+        Log "Ejecutando watchdog para iniciar sesion de WhatsApp de inmediato..."
+        & $watchdogScript
+    }
+} catch {
+    Log "ERROR ejecutando watchdog al arrancar: $($_.Exception.Message)"
 }
 
 # ---------------------------------------------------------------------------

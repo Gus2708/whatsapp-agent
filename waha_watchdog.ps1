@@ -1,13 +1,13 @@
-# ── Watchdog de la sesión WhatsApp (WAHA) ──────────────────────────────────
-# Verifica cada ejecución que la sesión "default" esté en WORKING. Si está
-# STOPPED/FAILED, la reinicia. La autenticación persiste en el volumen Docker,
-# así que NUNCA hace falta re-escanear el QR. Pensado para correr cada 2-3 min
+# -- Watchdog de la sesion WhatsApp (WAHA) ----------------------------------
+# Verifica cada ejecucion que la sesion "default" este en WORKING. Si esta
+# STOPPED/FAILED, la reinicia. La autenticacion persiste en el volumen Docker,
+# asi que NUNCA hace falta re-escanear el QR. Pensado para correr cada 2-3 min
 # mediante el Programador de tareas de Windows.
 #
 # Registrar la tarea (una sola vez, en PowerShell como administrador):
 #   $a = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"C:\Proyect\whatsapp-agent\waha_watchdog.ps1`""
 #   $t = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 3)
-#   Register-ScheduledTask -TaskName "WAHA Watchdog Serrucho" -Action $a -Trigger $t -RunLevel Highest -Description "Mantiene viva la sesión de WhatsApp del bot Perucho"
+#   Register-ScheduledTask -TaskName "WAHA Watchdog Serrucho" -Action $a -Trigger $t -RunLevel Highest -Description "Mantiene viva la sesion de WhatsApp del bot Perucho"
 
 # Cargar variables del archivo .env del proyecto
 $envFile = "C:\Proyect\whatsapp-agent\.env"
@@ -69,15 +69,15 @@ try {
     # WORKING y sin rechazos de envio -> todo bien; no ensuciar el log en cada corrida.
     exit 0
   }
-  # No tocar si está esperando escaneo de QR (requiere acción humana).
+  # No tocar si esta esperando escaneo de QR (requiere accion humana).
   if ($s.status -eq "SCAN_QR_CODE") {
-    Write-Log "Sesión esperando escaneo de QR — no se interviene (escanea en http://localhost:3000)."
+    Write-Log "Sesion esperando escaneo de QR -- no se interviene (escanea en http://localhost:3000)."
     exit 0
   }
-  # FAILED: la autenticación quedó corrupta. Hay que limpiar (logout+stop) y
-  # rearrancar; esto deja la sesión en SCAN_QR_CODE para re-escanear el QR.
+  # FAILED: la autenticacion quedo corrupta. Hay que limpiar (logout+stop) y
+  # rearrancar; esto deja la sesion en SCAN_QR_CODE para re-escanear el QR.
   if ($s.status -eq "FAILED") {
-    Write-Log "Sesión FAILED. Limpiando (logout/stop) para poder re-escanear..."
+    Write-Log "Sesion FAILED. Limpiando (logout/stop) para poder re-escanear..."
     foreach ($act in @("logout","stop")) {
       try { Invoke-RestMethod -Uri "$Base/api/sessions/$Session/$act" -Method POST -Headers $headers -Body "{}" -TimeoutSec 20 | Out-Null } catch {}
       Start-Sleep -Seconds 2
@@ -86,17 +86,17 @@ try {
     Write-Log "Rearranque hecho. Revisa http://localhost:3000 para escanear el QR si pide."
     exit 0
   }
-  # STOPPED u otros: /start revive la sesión guardada SIN re-escanear (la auth persiste).
-  # (Nunca usar /restart: ese sí borra la autenticación.)
-  Write-Log "Sesión en estado '$($s.status)'. Intentando iniciar (start)..."
+  # STOPPED u otros: /start revive la sesion guardada SIN re-escanear (la auth persiste).
+  # (Nunca usar /restart: ese si borra la autenticacion.)
+  Write-Log "Sesion en estado '$($s.status)'. Intentando iniciar (start)..."
   try {
     Invoke-RestMethod -Uri "$Base/api/sessions/$Session/start" -Method POST -Headers $headers -Body "{}" -TimeoutSec 30 | Out-Null
   } catch {
-    Write-Log "start devolvió: $($_.Exception.Message)"
+    Write-Log "start devolvio: $($_.Exception.Message)"
   }
   Start-Sleep -Seconds 6
   $s2 = Invoke-RestMethod -Uri "$Base/api/sessions/$Session" -Headers $headers -TimeoutSec 15
   Write-Log "Estado tras reinicio: $($s2.status)"
 } catch {
-  Write-Log "ERROR consultando WAHA (¿contenedor caído?): $($_.Exception.Message)"
+  Write-Log "ERROR consultando WAHA (contenedor caido?): $($_.Exception.Message)"
 }
