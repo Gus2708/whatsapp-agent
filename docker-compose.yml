@@ -59,7 +59,7 @@ services:
       - N8N_PORT=5678
       - N8N_PROTOCOL=http
       - WEBHOOK_URL=http://localhost:5678/
-      - N8N_LOG_LEVEL=debug
+      - N8N_LOG_LEVEL=warn
       - NODE_FUNCTION_ALLOW_BUILTIN=*
       - NODE_FUNCTION_ALLOW_EXTERNAL=*
       - WAHA_API_KEY=${WAHA_API_KEY}

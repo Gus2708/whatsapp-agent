@@ -26,12 +26,12 @@ const sharedFns = ['nUSD', 'nBs', 'nBsInt', 'tc', 'norm', 'normMedida',
   'medPresent', 'stemColor', 'singular', 'expandir', 'esGranel', 'scoreMatch'];
 for (const name of sharedFns) {
   assert.ok(
-    buscar.includes(L[name].toString()),
+    buscar.includes(L[name].toString().replace(/\r\n/g, '\n')),
     `lib.${name} source not found verbatim in scratch_live/live_buscar.js (lib drifted)`
   );
 }
 assert.ok(
-  presupuesto.includes(L.parseItems.toString()),
+  presupuesto.includes(L.parseItems.toString().replace(/\r\n/g, '\n')),
   'lib.parseItems source not found verbatim in scratch_live/live_presupuesto.js'
 );
 
