@@ -59,7 +59,6 @@ services:
       - N8N_PORT=5678
       - N8N_PROTOCOL=http
       - WEBHOOK_URL=http://localhost:5678/
-      - NODE_TLS_REJECT_UNAUTHORIZED=0
       - N8N_LOG_LEVEL=debug
       - NODE_FUNCTION_ALLOW_BUILTIN=*
       - NODE_FUNCTION_ALLOW_EXTERNAL=*
