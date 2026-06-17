@@ -186,10 +186,26 @@ CREATE TABLE IF NOT EXISTS public.atenciones_pendientes (
     status       text NOT NULL DEFAULT 'pendiente',     -- 'pendiente' | 'atendido'
     creado_en    timestamp with time zone NOT NULL DEFAULT now(),
     atendido_en  timestamp with time zone,
-    atendido_por uuid REFERENCES public.profiles(id) ON DELETE SET NULL
+    atendido_por uuid
 );
 COMMENT ON TABLE public.atenciones_pendientes IS
   'Cola de clientes en espera de atención de un empleado (escalación del bot). La app de empleados se suscribe por Realtime.';
+
+-- Clave foránea a profiles (tabla del employee-app). Se aplica solo si ya existe.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'profiles'
+  ) THEN
+    BEGIN
+      ALTER TABLE public.atenciones_pendientes
+        ADD CONSTRAINT fk_atenciones_atendido_por
+        FOREIGN KEY (atendido_por) REFERENCES public.profiles(id) ON DELETE SET NULL;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+  END IF;
+END $$;
 
 -- A lo sumo UNA atención pendiente por teléfono (evita duplicados si el cliente reescala).
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_atenciones_tel_pendiente
@@ -207,14 +223,25 @@ DROP POLICY IF EXISTS "n8n - insert atenciones" ON public.atenciones_pendientes;
 CREATE POLICY "n8n - insert atenciones" ON public.atenciones_pendientes
   FOR INSERT TO anon WITH CHECK (true);
 
--- empleados activos (app): leer la cola + marcar atendido
-DROP POLICY IF EXISTS "Empleados - leer atenciones" ON public.atenciones_pendientes;
-CREATE POLICY "Empleados - leer atenciones" ON public.atenciones_pendientes
-  FOR SELECT TO authenticated USING (is_active_employee());
-DROP POLICY IF EXISTS "Empleados - actualizar atenciones" ON public.atenciones_pendientes;
-CREATE POLICY "Empleados - actualizar atenciones" ON public.atenciones_pendientes
-  FOR UPDATE TO authenticated USING (is_active_employee() AND validate_session())
-  WITH CHECK (is_active_employee() AND validate_session());
+-- Políticas para empleados: solo si is_active_employee() y validate_session() existen.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid
+             WHERE n.nspname = 'public' AND p.proname = 'is_active_employee')
+  AND EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid
+              WHERE n.nspname = 'public' AND p.proname = 'validate_session')
+  THEN
+    DROP POLICY IF EXISTS "Empleados - leer atenciones" ON public.atenciones_pendientes;
+    CREATE POLICY "Empleados - leer atenciones" ON public.atenciones_pendientes
+      FOR SELECT TO authenticated USING (is_active_employee());
+    DROP POLICY IF EXISTS "Empleados - actualizar atenciones" ON public.atenciones_pendientes;
+    CREATE POLICY "Empleados - actualizar atenciones" ON public.atenciones_pendientes
+      FOR UPDATE TO authenticated USING (is_active_employee() AND validate_session())
+      WITH CHECK (is_active_employee() AND validate_session());
+  ELSE
+    RAISE NOTICE 'Saltando políticas de empleados para atenciones_pendientes: is_active_employee() o validate_session() no existen todavía.';
+  END IF;
+END $$;
 
 -- Realtime: la app recibe el aviso al instante.
 ALTER TABLE public.atenciones_pendientes REPLICA IDENTITY FULL;
@@ -241,11 +268,28 @@ CREATE TABLE IF NOT EXISTS public.solicitudes_ayuda (
     status       text NOT NULL DEFAULT 'pendiente',     -- 'pendiente' | 'resuelto' | 'enviado' | 'descartado'
     creado_en    timestamp with time zone NOT NULL DEFAULT now(),
     resuelto_en  timestamp with time zone,
-    resuelto_por uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+    resuelto_por uuid,
     enviado_en   timestamp with time zone
 );
 COMMENT ON TABLE public.solicitudes_ayuda IS
   'Solicitudes de ayuda del bot (no encontró / cliente refutó). La app elige productos y n8n reenvía al cliente.';
+
+-- Clave foránea a profiles (tabla del employee-app). Se aplica solo si ya existe.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'profiles'
+  ) THEN
+    BEGIN
+      ALTER TABLE public.solicitudes_ayuda
+        ADD CONSTRAINT fk_solicitudes_resuelto_por
+        FOREIGN KEY (resuelto_por) REFERENCES public.profiles(id) ON DELETE SET NULL;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+  END IF;
+END $$;
+
 -- Bandera "no hay stock": la app la marca (botón "no disponible") al resolver SIN productos;
 -- el workflow "Reenviar Ayuda" la lee y le avisa al cliente que no hay disponibilidad.
 ALTER TABLE public.solicitudes_ayuda ADD COLUMN IF NOT EXISTS no_disponible boolean NOT NULL DEFAULT false;
@@ -276,21 +320,32 @@ CREATE POLICY "n8n - update solicitudes" ON public.solicitudes_ayuda FOR UPDATE 
 DROP POLICY IF EXISTS "n8n - select solicitudes_items" ON public.solicitudes_ayuda_items;
 CREATE POLICY "n8n - select solicitudes_items" ON public.solicitudes_ayuda_items FOR SELECT TO anon USING (true);
 
--- empleados activos (app): leer la cola + resolver; leer/escribir los items elegidos
-DROP POLICY IF EXISTS "Empleados - leer solicitudes" ON public.solicitudes_ayuda;
-CREATE POLICY "Empleados - leer solicitudes" ON public.solicitudes_ayuda
-  FOR SELECT TO authenticated USING (is_active_employee());
-DROP POLICY IF EXISTS "Empleados - resolver solicitudes" ON public.solicitudes_ayuda;
-CREATE POLICY "Empleados - resolver solicitudes" ON public.solicitudes_ayuda
-  FOR UPDATE TO authenticated USING (is_active_employee() AND validate_session())
-  WITH CHECK (is_active_employee() AND validate_session());
-DROP POLICY IF EXISTS "Empleados - leer items" ON public.solicitudes_ayuda_items;
-CREATE POLICY "Empleados - leer items" ON public.solicitudes_ayuda_items
-  FOR SELECT TO authenticated USING (is_active_employee());
-DROP POLICY IF EXISTS "Empleados - escribir items" ON public.solicitudes_ayuda_items;
-CREATE POLICY "Empleados - escribir items" ON public.solicitudes_ayuda_items
-  FOR ALL TO authenticated USING (is_active_employee() AND validate_session())
-  WITH CHECK (is_active_employee() AND validate_session());
+-- Políticas para empleados: solo si is_active_employee() y validate_session() existen.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid
+             WHERE n.nspname = 'public' AND p.proname = 'is_active_employee')
+  AND EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid
+              WHERE n.nspname = 'public' AND p.proname = 'validate_session')
+  THEN
+    DROP POLICY IF EXISTS "Empleados - leer solicitudes" ON public.solicitudes_ayuda;
+    CREATE POLICY "Empleados - leer solicitudes" ON public.solicitudes_ayuda
+      FOR SELECT TO authenticated USING (is_active_employee());
+    DROP POLICY IF EXISTS "Empleados - resolver solicitudes" ON public.solicitudes_ayuda;
+    CREATE POLICY "Empleados - resolver solicitudes" ON public.solicitudes_ayuda
+      FOR UPDATE TO authenticated USING (is_active_employee() AND validate_session())
+      WITH CHECK (is_active_employee() AND validate_session());
+    DROP POLICY IF EXISTS "Empleados - leer items" ON public.solicitudes_ayuda_items;
+    CREATE POLICY "Empleados - leer items" ON public.solicitudes_ayuda_items
+      FOR SELECT TO authenticated USING (is_active_employee());
+    DROP POLICY IF EXISTS "Empleados - escribir items" ON public.solicitudes_ayuda_items;
+    CREATE POLICY "Empleados - escribir items" ON public.solicitudes_ayuda_items
+      FOR ALL TO authenticated USING (is_active_employee() AND validate_session())
+      WITH CHECK (is_active_employee() AND validate_session());
+  ELSE
+    RAISE NOTICE 'Saltando políticas de empleados para solicitudes_ayuda: is_active_employee() o validate_session() no existen todavía.';
+  END IF;
+END $$;
 
 -- Realtime para la cola
 ALTER TABLE public.solicitudes_ayuda REPLICA IDENTITY FULL;
@@ -310,13 +365,40 @@ END $$;
 --     privada y el secreto del trigger viven dentro de la función (NO en este repo público).
 CREATE TABLE IF NOT EXISTS public.push_subscriptions (
     id           bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-    empleado_id  uuid REFERENCES public.profiles(id) ON DELETE CASCADE,
+    empleado_id  uuid,
     endpoint     text NOT NULL UNIQUE,
     subscription jsonb NOT NULL,            -- objeto PushSubscription completo (endpoint + keys)
     user_agent   text,
     creado_en    timestamp with time zone NOT NULL DEFAULT now()
 );
 ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Empleados - gestionar push" ON public.push_subscriptions;
-CREATE POLICY "Empleados - gestionar push" ON public.push_subscriptions
-  FOR ALL TO authenticated USING (is_active_employee()) WITH CHECK (is_active_employee());
+
+-- Clave foránea a profiles (tabla del employee-app). Se aplica solo si ya existe.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'profiles'
+  ) THEN
+    BEGIN
+      ALTER TABLE public.push_subscriptions
+        ADD CONSTRAINT fk_push_empleado_id
+        FOREIGN KEY (empleado_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+  END IF;
+END $$;
+
+-- Política para empleados: solo si is_active_employee() existe.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid
+             WHERE n.nspname = 'public' AND p.proname = 'is_active_employee')
+  THEN
+    DROP POLICY IF EXISTS "Empleados - gestionar push" ON public.push_subscriptions;
+    CREATE POLICY "Empleados - gestionar push" ON public.push_subscriptions
+      FOR ALL TO authenticated USING (is_active_employee()) WITH CHECK (is_active_employee());
+  ELSE
+    RAISE NOTICE 'Saltando política de empleados para push_subscriptions: is_active_employee() no existe todavía.';
+  END IF;
+END $$;
