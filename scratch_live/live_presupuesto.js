@@ -241,8 +241,12 @@ let bloque='', totUSD=0, n=0;
 const noEnc=[];
 const altLines=[];
 let hasAgotado = false;
-for (const it of items){
-  const r=await buscarUno(it.nombre);
+
+// Fetch all items in parallel instead of sequentially.
+const resultados = await Promise.all(items.map(it => buscarUno(it.nombre)));
+
+for (const [idx, it] of items.entries()) {
+  const r = resultados[idx];
   if(!r || !r.best){ noEnc.push(it.nombre); continue; }
   const prod=r.best;
   n++;
