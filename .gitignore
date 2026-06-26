@@ -1,43 +1,43 @@
-# ── Entorno y Secretos ──
+# ── Entorno y secretos ──
 .env
 .env.local
 .env.*.local
 
-# ── Dependencias de Node ──
+# ── Dependencias ──
 node_modules/
+package-lock.json
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
 
-# ── Logs ──
+# ── Logs (boot, catchup, watchdog, sync, etc.) ──
 *.log
 logs/
-waha_watchdog.log
-boot_serrucho.log
-catchup_serrucho.log
 
-# ── Docker ──
+# ── Docker / volúmenes locales ──
 .docker/
 waha_session_storage/
 n8n_local_storage/
 
-# ── Caché y artefactos auto-generados ──
-.atl/
-.agents/skills/*/.skill-registry.cache.json
-skills-lock.json
-
-# ── Directorios de trabajo local ──
-scratch/
-scratch_live/
-
 # ── QR / imágenes temporales ──
 qr_whatsapp.png
 
-# ── MCP config local ──
+# ── Config local de herramientas de desarrollo ──
 .mcp.json
+.claude/
+.atl/
+.agents/skills/*/.skill-registry.cache.json
 
-# ── Sistema Operativo ──
+# ── Scratch local desechable ──
+#   OJO: 'scratch/' es desechable y se ignora; 'scratch_live/' SÍ se versiona
+#   (son los dumps canónicos que verifican los guards de npm test). No ignorar.
+scratch/
+
+# ── Backups temporales de los patches (scripts/patch_*.js crean *.bak.js) ──
+*.bak.js
+*.bak
+
+# ── Archivos del sistema operativo ──
 Thumbs.db
 Desktop.ini
 .DS_Store

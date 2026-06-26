@@ -1,0 +1,18 @@
+const fs = require('fs');
+const path = require('path');
+const body = fs.readFileSync(path.join(__dirname,'..','scratch_live','live_buscar.js'),'utf8');
+const cut = body.indexOf('const termExp = normMedida(expandir(p_busqueda));');
+const defs = body.slice(0, cut);
+const fn = new Function('require', 'query', defs + '\nreturn { norm, normMedida, medPresent, expandir, singular, stemColor, IGNORED };');
+const M = fn((n) => n === 'axios' ? {} : require(n), { p_busqueda: '' });
+const desc = 'LAMINA TECHO ARQUITECTONICA 1.10 X 6MTS CAL.30 (AZUL)';
+const nd = M.normMedida(desc);
+console.log('normMedida:', JSON.stringify(nd));
+for (const med of ['0.30','6','1.10','30','0.30mm']) console.log(`  medPresent(${JSON.stringify(med)}) =`, M.medPresent(med, nd));
+const q = 'laminas arquitectonica calibre 0.30 de 6 metros de largo x 1.10 de ancho';
+const termExp = M.normMedida(M.expandir(q));
+console.log('\nexpandir+normMedida:', JSON.stringify(termExp));
+const qTokens = termExp.split(' ').filter(w => (w.length>=2 || /\d/.test(w)) && !M.IGNORED.has(w)).map(w => /\d/.test(w) ? w : M.singular(M.stemColor(w)));
+console.log('qTokens:', JSON.stringify(qTokens));
+console.log('medLargas:', JSON.stringify(qTokens.filter(w=>/\d/.test(w))));
+console.log('textLargas:', JSON.stringify(qTokens.filter(w=>(w.length>=3)&&!/\d/.test(w))));

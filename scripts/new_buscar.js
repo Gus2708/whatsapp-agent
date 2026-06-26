@@ -8,7 +8,7 @@ function nUSD(n){ const r = Math.round(Number(n)*100)/100; return Number.isInteg
 function nBs(n){ return (Math.round(Number(n)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function nBsInt(n){ return Math.round(Number(n)).toLocaleString('en-US'); }
 function tc(s){ return String(s).toLowerCase().split(/\s+/).map(w=>{ if(/\d/.test(w)) return w.toUpperCase(); if(w.length<=3) return w.toUpperCase(); return w.charAt(0).toUpperCase()+w.slice(1); }).join(' '); }
-function norm(t){ return String(t).toLowerCase().replace(/[\u00d7\u2715\u2716]/g,'x').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 .\/-]/g,' ').replace(/\s+/g,' ').trim(); }
+function norm(t){ return String(t).toLowerCase().replace(/(\d)\s*,\s*(\d)/g,'$1.$2').replace(/[\u00d7\u2715\u2716]/g,'x').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 .\/-]/g,' ').replace(/\s+/g,' ').trim(); }
 // Normaliza medidas compuestas: "3 x 1-1/2", "3x1.1/2", "1 1/2 x 1 1/2" -> "3x1-1/2", "1-1/2x1-1/2"
 function normMedida(s){
   let t = norm(s);
@@ -31,8 +31,9 @@ function medPresent(med, nd){
   if (_pm) {
     const _e = s => s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
     const _a = _e(_pm[1]), _b = _e(_pm[2]);
-    return new RegExp('(^|[ (x])'+_a+'x'+_b+'($|[ x)])').test(nd)
-        || new RegExp('(^|[ (x])'+_b+'x'+_a+'($|[ x)])').test(nd);
+    const _tl = '($|[ x)]|mm|mts|mtrs|metros?|pies?)'; // tolera sufijo de unidad: "1.10X6MTS"
+    return new RegExp('(^|[ (x])'+_a+'x'+_b+_tl).test(nd)
+        || new RegExp('(^|[ (x])'+_b+'x'+_a+_tl).test(nd);
   }
   if (SIZEQ[med]) {
     for (const a of SIZEQ[med]){ const esc=a.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); if (new RegExp('(^|[ (])'+esc+'($|[ x)])').test(nd)) return true; }
@@ -43,12 +44,27 @@ function medPresent(med, nd){
     if (new RegExp('(^|[ (])'+med+'(?=x|\\)|$)').test(nd)) return true;
     if (new RegExp('(?<=x)'+med+'(?=x|\\)|$| )').test(nd)) return true;
     if (new RegExp('(^|[ (])'+med+' (?!(?:mm|cm|mts|mtrs|metros?|metro|m|pies?|pie|pulg|psi|gal|kg|kilos?|lbs?)\\b)').test(nd)) return true;
+    // largo en metros: el cliente dice "6 metros" y el catalogo escribe "6MTS"/"X6MTS"/"6 MTS"
+    if (new RegExp('(^|[ (x])'+med+'\\s?(?:mts|mtrs|mt|metros?|pies?)\\b').test(nd)) return true;
+    // calibre de 2 digitos: "30" matchea "CAL.30"/"CAL 30" y la forma decimal "0.30" (cal 30 = 0.30mm)
+    if (med.length===2){
+      if (new RegExp('cal\\.?\\s?'+med+'($|[ x)]|mm)').test(nd)) return true;
+      if (new RegExp('(^|[ (.])0\\.'+med+'($|[ x)]|mm)').test(nd)) return true;
+    }
     return false;
   }
   const esc = med.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  return new RegExp('(^|[ (])'+esc+'($|[ x)])').test(nd);
+  // decimal: tolera prefijo cal./espacio/x y sufijo de unidad mm (p.ej. "CAL.0.20", "0.20MM", "0.20 X")
+  if (new RegExp('(^|[ (x]|cal\\.?\\s?)'+esc+'(mm)?($|[ x)])').test(nd)) return true;
+  // cero final: el cliente escribe "1.1"/"0.2" y el catalogo "1.10"/"0.20"
+  if (/^\d+\.\d$/.test(med) && new RegExp('(^|[ (x]|cal\\.?\\s?)'+esc+'0(mm)?($|[ x)])').test(nd)) return true;
+  // calibre decimal "0.30" tambien matchea el entero "CAL.30" (0.30 == cal 30)
+  const _ent = /^0\.(\d{2})$/.exec(med);
+  if (_ent && new RegExp('cal\\.?\\s?'+_ent[1]+'($|[ x)]|mm)').test(nd)) return true;
+  return false;
 }
 const SIN = {
+  'calibre':'cal','cal.':'cal',
   'rieles':'tubo herreria','riel':'tubo herreria',
   'lavaplatos':'fregadero','lavaplato':'fregadero','lava platos':'fregadero','lava plato':'fregadero','elegante':'lujo','corrugada':'estriada','corrugado':'estriado','varilla':'cabilla','varillas':'cabilla','hierro':'cabilla','cabillas':'cabilla',
   'simento':'cemento','simanto':'cemento','saco cemento':'cemento','bolsa cemento':'cemento',
@@ -57,7 +73,7 @@ const SIN = {
   'tubo electrico':'tubo electricidad','tubo de luz':'tubo electricidad','tubo luz':'tubo electricidad',
   'tubo sanitario':'tubo agua negra','tubo aguas negras':'tubo agua negra','tubo cloaca':'tubo agua negra','tubo aguas servidas':'tubo agua negra',
   'tubo de agua':'tubo agua','tuberia':'tubo','codos':'codo',
-  'laminas':'lamina','techo zinc':'lamina zinc','calamina':'lamina zinc','tejas':'lamina zinc',
+  'laminas':'lamina','techo zinc':'lamina zinc','calamina':'lamina zinc','tejas':'lamina zinc','zinc':'lamina zinc','sinz':'lamina zinc','zing':'lamina zinc','planchas zinc':'lamina zinc','plancha zinc':'lamina zinc',
   'alambre construccion':'alambron','alambre negro':'alambron',
   'disco corte':'disco metal','disco amoladora':'disco metal',
   'codo agua':'codo pvc','codo media':'codo pvc',
@@ -130,6 +146,7 @@ const IGNORED = new Set([
   'de', 'y', 'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'o',
   'venden', 'vendes', 'tienen', 'tiene', 'hay', 'quiero', 'busco', 'comprar', 'necesito', 'dame', 'trae',
   'cuanto', 'cuesta', 'cuestan', 'vale', 'valen', 'sale', 'salen', 'precio', 'precios', 'costo', 'como',
+  'color',
   'rollo', 'rollos', 'saco', 'sacos', 'bolsa', 'bolsas', 'unidad', 'unidades', 'pieza', 'piezas', 'kilo', 'kilos', 'kg',
   'metro', 'metros', 'mts', 'caja', 'cajas', 'galon', 'galones', 'para', 'con', 'del', 'algo', 'vender', 'por', 'al', 'cada',
   'tener', 'buscar', 'amigo', 'buenas', 'hola', 'tardes', 'dias', 'noches', 'porfa', 'favor', 'gracias',
@@ -151,7 +168,7 @@ async function ilike(palabras, limit, extra){
     if (ACCENTS[w]) return `or=(descripcion.ilike.*${w}*,descripcion.ilike.*${ACCENTS[w]}*)`;
     return 'descripcion=ilike.*' + encodeURIComponent(w) + '*';
   }).join('&');
-  const url = SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+(extra?('&'+extra):'')+'&limit='+(limit||30);
+  const url = SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+(extra?('&'+extra):'')+'&order=existencia.desc.nullslast&limit=1000';
   try { const r = await axios.get(url,{headers:H}); return r.data||[]; } catch(e){ return []; }
 }
 async function rpc(t){ try { const r=await axios.post(SB+'/rest/v1/rpc/buscar_productos',{p_busqueda:t},{headers:H}); return r.data||[]; } catch(e){ return []; } }
@@ -163,6 +180,9 @@ const textLargas = largas.filter(w => !/\d/.test(w));
 const medLargas = largas.filter(w => /\d/.test(w));
 
 // ¿el cliente lo pidio "por metro / al metro / x metro"? -> preferir el producto a granel (X MT)
+// APRENDIZAJE: boost de productos corregidos por empleados
+const qSet=new Set(qTokens);let aprBoost=[];try{const _aprR=await axios.get(SB+'/rest/v1/busqueda_aprendizaje?select=termino_tokens,codigo_producto&order=usos.desc&limit=500',{headers:H});const _aprCodes=[];for(const _r of(_aprR.data||[])){const _rT=_r.termino_tokens.split(' ').filter(Boolean);if(_rT.length>=2&&_rT.every(t=>qSet.has(t)))_aprCodes.push(_r.codigo_producto);}if(_aprCodes.length>0){const _cf=_aprCodes.slice(0,10).map(c=>encodeURIComponent(c)).join(',');const _pr=await axios.get(SB+'/rest/v1/productos?codigo_interno=in.('+_cf+')&select=codigo_interno,descripcion,precio_venta,existencia',{headers:H});aprBoost=(_pr.data||[]).map(p=>({...p,_aprendido:true}));}  }catch(e){}
+
 const granelIntent = /\b(por|al|x|cada|el)\s*(metro|metros|mt|mts)\b/.test(norm(p_busqueda));
 const rolloIntent = /\b(rollos?)\b/.test(norm(p_busqueda)); // "rollo de cable" -> rollo completo, no por metro
 
@@ -180,6 +200,7 @@ if (res.length===0){
 }
 if (res.length===0) res = await rpc(termExp);
 if (res.length===0 && termExp!==norm(p_busqueda)) res = await rpc(norm(p_busqueda));
+if (aprBoost.length>0) res=[...aprBoost,...res];
 if (res.length===0) return JSON.stringify({ encontrados:0, instruccion:'NO encontre este producto. Tu UNICA respuesta valida ahora es el token [PEDIR_AYUDA] (escribelo solo, exactamente asi, sin saludo ni nada mas). PROHIBIDO sugerir alternativas, pedir que reformule o decir que no lo tenemos: un empleado lo elegira y se lo enviara al cliente.', mensaje:'No encontre "' + p_busqueda + '" en el catalogo.' });
 
 // dedup
@@ -219,7 +240,7 @@ try{ const vr=await axios.post(SB+'/rest/v1/rpc/popularidad_productos',{p_codigo
 // ordenar: relevancia primero, luego disponibilidad (en stock primero), luego mas vendido
 unicos.sort((a,b)=>{
   const ds=scoreMatch(b.descripcion,qTokens)-scoreMatch(a.descripcion,qTokens);
-  if(Math.abs(ds)>0.5) return ds;
+  if(Math.abs(ds)>2) return ds; // dif. pequeña = solo ruido de conteo de palabras -> desempata disponibilidad
   const aStock = esGranel(a.descripcion) || Number(a.existencia) > 0;
   const bStock = esGranel(b.descripcion) || Number(b.existencia) > 0;
   if (aStock !== bStock) return aStock ? -1 : 1;
@@ -236,7 +257,7 @@ const productos = unicos.slice(0,4).map(p=>{
 const _out = { encontrados:productos.length, tasa_bcv:tasa, productos };
 // ¿el mejor resultado es DÉBIL? -> medida pedida ausente, o no comparte NINGUNA palabra de categoría
 let _debil = medMismatch;
-if (!_debil && textLargas.length>0 && unicos.length>0){
+if (!_debil && textLargas.length>0 && unicos.length>0 && !unicos[0]._aprendido){
   const _w = norm(unicos[0].descripcion).split(/[\s\-x]+/);
   if (!textLargas.some(t => _w.includes(t))) _debil = true; // el "match" es solo por subcadena/numero -> otra cosa
 }

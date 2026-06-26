@@ -38,6 +38,7 @@ services:
       # con guion bajo; esta ruta alcanza n8n por el puerto publicado en el host.
       - WHATSAPP_HOOK_URL=http://host.docker.internal:5678/webhook/whatsapp/inbound
       - WHATSAPP_HOOK_EVENTS=message
+      - WHATSAPP_DOWNLOAD_MEDIA=true
     volumes:
       - waha_session_storage:/app/.sessions
 
@@ -66,6 +67,8 @@ services:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - ENGRAM_HOST=${ENGRAM_HOST:-host.docker.internal:7437}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
       - N8N_DEFAULT_PRODUCTION_WORKFLOW_ACTIVE=true
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
     volumes:
