@@ -12,10 +12,10 @@ const observations = [
     content: 'Ferretería El Serrucho atiende al público de Lunes a Sábado de 08:00 AM a 06:00 PM, con un descanso para el almuerzo de 01:00 PM a 02:00 PM. Los domingos y días feriados nacionales la tienda permanece cerrada y no se atienden consultas de WhatsApp.'
   },
   {
-    title: 'Ubicación de la Tienda y Políticas de Retiro',
+    title: 'Ubicación de la Tienda, Retiro y Transporte',
     type: 'policy',
     topic_key: 'bot:ubicacion',
-    content: 'La tienda física de Ferretería El Serrucho está ubicada en Mene Mauroa, Estado Falcón, Venezuela. No se realizan envíos a domicilio ni despachos de mercancía por encomienda. Todas las compras deben ser retiradas de manera presencial por el cliente en la tienda física.'
+    content: 'La tienda física de Ferretería El Serrucho está ubicada en Mene Mauroa, Estado Falcón, Venezuela. El cliente puede retirar sus compras de manera presencial en la tienda. Además se ofrece transporte de materiales a $10 dentro del casco central de Mene Mauroa; para entregas fuera del casco central el costo varía según la distancia y lo coordina un empleado (el bot no estima ese monto, deriva a un empleado).'
   },
   {
     title: 'Métodos de Pago Aceptados',

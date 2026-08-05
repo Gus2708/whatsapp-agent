@@ -19,7 +19,7 @@ Arquitectura local dirigida por eventos. WhatsApp entra por **WAHA**, n8n orques
 graph TD
     Client[📱 Cliente WhatsApp] <-->|Mensajes| WAHA[🐋 WAHA · puerto 3000<br/>engine NOWEB]
     WAHA -->|Webhook 'message'| N8N[🐋 n8n · puerto 5678]
-    N8N -->|Razonamiento| Model[🧠 OpenRouter<br/>openai/gpt-4.1-mini · temp 0.3]
+    N8N -->|Razonamiento| Model[🧠 OpenRouter<br/>openai/gpt-5.6-luna · temp 0.3]
     N8N -->|Notas de voz → texto| Groq[🎙️ Groq Whisper]
     N8N -->|Inventario / precios / ventas| Supabase[(☁️ Supabase PostgreSQL)]
     N8N -->|Memoria de clientes| Engram[💻 Engram · host puerto 7437]
@@ -33,11 +33,37 @@ graph TD
 | :--- | :--- |
 | WhatsApp HTTP API | [WAHA](https://waha.devlike.pro/) (Docker, engine NOWEB) |
 | Orquestación de flujos | [n8n](https://n8n.io/) (Docker) |
-| Inferencia LLM | [OpenRouter](https://openrouter.ai/) → `openai/gpt-4.1-mini` (temp 0.3) |
+| Inferencia LLM | [OpenRouter](https://openrouter.ai/) → `openai/gpt-5.6-luna` (temp 0.3) |
 | Transcripción de voz | [Groq](https://groq.com/) Whisper |
-| Base de datos | [Supabase](https://supabase.com/) (PostgreSQL + `pg_trgm`) |
+| Base de datos | [Supabase](https://supabase.com/) (PostgreSQL + `pg_trgm` + `pgvector`) |
+| Embeddings | OpenAI `text-embedding-3-small` (opcional — ver nota abajo) |
 | Memoria a largo plazo | [Engram](https://github.com/EngineVault/engram) |
 | Runtime | Node.js 18+ |
+
+### Cómo encuentra un producto (cascada de 5 capas)
+
+El cliente escribe como habla, no como está escrito el catálogo. La búsqueda baja por capas
+y **solo pasa a la siguiente si la anterior no encontró nada**, así que el caso normal
+(«cemento gris») se resuelve en la primera, en ~900 ms y sin gastar un centavo.
+
+| # | Capa | Qué resuelve |
+| :-- | :--- | :--- |
+| 1 | **Léxico** (`ilike` + `SIN` + medidas) | El grueso. Sinónimos a mano, medidas NxM/fracciones/calibre, stopwords conversacionales. |
+| 2 | **Diccionario de catálogo** (`catalogo_vocabulario`, 3.4k términos) | Coloquialismos generados leyendo el catálogo: *chapa*→cerradura, *foco*→bombillo, *cincho*→abrazadera. |
+| 3 | **Relajación + fuzzy `pg_trgm`** | Erratas fuertes y consultas que fallan por una palabra. |
+| 4 | **Búsqueda vectorial** (`pgvector`, umbral 0.58) | Variantes de nombre. **Aporte medido: 0 sobre 320 casos** — ver nota. |
+| 5 | **Rescate semántico** (Luna + las 710 categorías) | El cliente describe la FUNCIÓN: *«lo que se usa para pegar los bloques»* → cemento. Lo que acierta se guarda en el diccionario: la próxima vez es gratis. |
+
+Las capas 4 y 5 devuelven una **hipótesis**, no un hallazgo: el bot está obligado a preguntar
+«¿te refieres a…?» y a emitir `[PEDIR_AYUDA]` si el cliente lo refuta.
+
+> **Nota honesta sobre embeddings.** Medidos sobre 320 consultas coloquiales, con y sin capa
+> vectorial: **72,2 % de recall exacto en ambos casos**, idéntico caso por caso. Este catálogo
+> son cadenas de SKU cortas, no prosa, así que el vector acaba capturando solapamiento léxico
+> —lo que `pg_trgm` ya hacía—, y su suelo de ruido es altísimo (`"asdfgh qwerty"` puntúa 0.467).
+> Queda desplegada como seguro latente y desactivable: **si `OPENAI_API_KEY` está vacía, la
+> búsqueda funciona igual**. Lo que sí bajó los fallos (10 % → 5 % en su momento) fueron las
+> stopwords y el peso del sustantivo principal, no los vectores.
 
 ### Flujo del mensaje (workflow n8n, 30 nodos)
 
@@ -119,7 +145,7 @@ El instalador (`setup.js`) verifica Node/Git/Docker (instala con `winget` en Win
 | `WAHA_DASHBOARD_USERNAME` / `WAHA_DASHBOARD_PASSWORD` | Login del panel de WAHA. |
 | `WAHA_API_KEY` | Clave que usan n8n ↔ WAHA para enviar mensajes. |
 | `SUPABASE_URL` / `SUPABASE_ANON_KEY` | Base de datos en la nube. |
-| `OPENROUTER_API_KEY` | Inferencia del modelo (`openai/gpt-4.1-mini`). |
+| `OPENROUTER_API_KEY` | Inferencia del modelo (`openai/gpt-5.6-luna`). |
 | `GROQ_API_KEY` | Transcripción de notas de voz (Whisper). |
 | `ENGRAM_HOST` | Servidor de memorias (por defecto `host.docker.internal:7437`). |
 | `N8N_API_KEY` | Solo para los scripts de desarrollo/despliegue (`scripts/patch_*.js`). |
@@ -163,7 +189,7 @@ Cuando el bot no basta, encola al cliente y un empleado lo atiende desde una app
 
 * **Precios reales de la BD** — USD (*Precio Divisas*) y bolívares con el recargo de tienda aplicado y la tasa BCV; nunca revela el porcentaje de recargo ni inventa impuestos.
 * **Datos de pago** — el bot **nunca** comparte números de pago/cuentas; para pagar deriva a un empleado o a la tienda física.
-* **Retiro en tienda** (Mene Mauroa) + transporte local de materiales según el caso.
+* **Retiro en tienda** (Mene Mauroa) + **transporte de materiales a $10** dentro del casco central; fuera del casco central el costo lo coordina un empleado.
 * **Notas de voz** — se transcriben automáticamente (Groq Whisper); imágenes/stickers reciben respuesta amable pidiendo texto.
 * **Rate limiting** — 10 mensajes / minuto por teléfono.
 * **Handover manual** — si un empleado toma el chat (`chat_sessions.estado = 'manual'`), el bot deja de responder.
@@ -181,7 +207,8 @@ Cuando el bot no basta, encola al cliente y un empleado lo atiende desde una app
 | `n8n_workflow.json` | Snapshot completo del flujo de n8n (importable / recuperación). |
 | `scripts/` | Despliegue (`patch_*.js`), inspección (`_inspect_live.js`), build/guards (`build_workflow.js`, `check_*_sync.js`) y harnesses de prueba (`_test_*.js`). |
 | `tests/` | Unit tests de `lib` (`node --test`). |
-| `supabase_schema.sql` | DDL completo (12 tablas, índices, RPC, RLS). |
+| `supabase_schema.sql` | DDL completo (índices, RPC, RLS). Ojo: las tablas de vocabulario/embeddings se crearon por migración y no están aquí. |
+| `scratch_live/_coloquial_set*.json` | Sets de prueba cacheados (320 y 80 casos) para que el antes/después sea comparable. |
 | `docker-compose.yml` · `Dockerfile` | n8n (con docker-cli) + WAHA. |
 | `setup.js` · `start_agent.ps1` · `seed_memory.js` | Instalación, arranque y siembra de memorias base. |
 | `boot_serrucho.*` · `catchup_serrucho.*` · `waha_watchdog.*` | Arranque automático, recuperación de mensajes y watchdog de sesión. |
@@ -196,12 +223,39 @@ Cuando el bot no basta, encola al cliente y un empleado lo atiende desde una app
 
 ```bash
 npm test                                   # guards de sincronía + unit tests de lib
-node scripts/_test_busqueda_50.js          # 50 búsquedas reales vs Supabase real
-node scripts/_test_conversacional_50.js    # 50 flujos conversacionales (buscar + presupuesto)
+node scripts/_test_busqueda_50.js          # 51 búsquedas reales vs Supabase real (regresión)
+node scripts/_test_fallos_reales.js --prod # las consultas que de verdad hicieron fallar al bot
+node scripts/_test_coloquial.js            # recall sobre 320 consultas coloquiales (set cacheado)
+node scripts/_test_coloquial.js --sin-vector   # el mismo set sin capa vectorial, para comparar
+node scripts/_test_modelo.js               # end-to-end del agente: prompt real + tools reales
 node scripts/_inspect_live.js              # re-dumpear el workflow vivo a scratch_live/
 ```
 
 > Los harnesses `_test_*.js` ejecutan el **cuerpo real** de las tools contra la base de datos de producción (solo lectura), para cazar fallas del algoritmo con mensajes fieles a los chats reales.
+>
+> `_test_coloquial.js` cachea sus consultas en `scratch_live/_coloquial_set.json` **a propósito**:
+> comparar dos corridas con preguntas distintas no mide nada. Regenerar con `--generar N` solo
+> cuando quieras un set nuevo, y entonces re-medir la línea base.
+
+### Ciclo de despliegue
+
+```bash
+node scripts/deploy_nodos.js               # dumps scratch_live/ -> nodos del n8n vivo
+node scripts/export_workflow.js            # n8n vivo -> n8n_workflow.json (snapshot fiel)
+node scripts/build_workflow.js             # normaliza el JSON desde los dumps
+npm test                                   # verifica que todo quedó sincronizado
+```
+
+### Mantenimiento del diccionario y los vectores
+
+```bash
+node scripts/generar_vocabulario.js --dry  # qué términos generaría (sin escribir)
+node scripts/generar_vocabulario.js        # incremental: solo categorías nuevas/cambiadas
+node scripts/generar_embeddings.js         # incremental por hash de descripción
+```
+
+El workflow n8n **«Sync Vocabulario Catálogo»** (cron 3:00 AM) hace ambas cosas solo, por hash
+y por categoría, así que un producto nuevo no obliga a regenerar las 710.
 
 ---
 

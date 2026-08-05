@@ -37,7 +37,10 @@ services:
       # Se usa host.docker.internal (no 'n8n_serrucho') porque WAHA rechaza hostnames
       # con guion bajo; esta ruta alcanza n8n por el puerto publicado en el host.
       - WHATSAPP_HOOK_URL=http://host.docker.internal:5678/webhook/whatsapp/inbound
-      - WHATSAPP_HOOK_EVENTS=message
+      # message.any incluye los mensajes SALIENTES (fromMe): necesario para detectar
+      # cuando un empleado le escribe al cliente desde el mismo WhatsApp (handoff humano).
+      # El bot ignora sus propios salientes vía la tabla mensajes_bot (nodo Detectar Handoff Empleado).
+      - WHATSAPP_HOOK_EVENTS=message.any
       - WHATSAPP_DOWNLOAD_MEDIA=true
     volumes:
       - waha_session_storage:/app/.sessions
@@ -69,6 +72,9 @@ services:
       - ENGRAM_HOST=${ENGRAM_HOST:-host.docker.internal:7437}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - GROQ_API_KEY=${GROQ_API_KEY}
+      # Solo para embeber la consulta del cliente en la busqueda semantica (pgvector).
+      # Si esta vacia, buscar_productos se salta esa capa y sigue funcionando igual.
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - N8N_DEFAULT_PRODUCTION_WORKFLOW_ACTIVE=true
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
     volumes:

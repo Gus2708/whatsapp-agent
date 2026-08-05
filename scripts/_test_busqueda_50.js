@@ -70,15 +70,21 @@ const TESTS = [
   { q: 'pintura blanca de caucho', exists: null, src: 'cat' },
   { q: 'tubo de luz de 1/2', exists: true, src: 'cat' },
   { q: 'angulo de 1 pulgada', exists: null, src: 'cat' },
-  { q: 'fregadero de un poceta', exists: null, src: 'cat' },
+  { q: 'fregadero sencillo', exists: true, src: 'cat' },
 ];
 
 function classify(parsed, t) {
   const flags = [];
-  const pedir = parsed.instruccion && /PEDIR_AYUDA/.test(parsed.instruccion);
+  // Contrato v11: encontrados>0 = HAY producto util (aunque sea 'parcial' con [PEDIR_AYUDA] como
+  // ultimo recurso en la instruccion). Solo es MISS si no hay producto O es de OTRA categoria (débil).
   const debil = parsed.instruccion && /NO coincide|casualidad/.test(parsed.instruccion);
-  if (parsed.encontrados === 0 || pedir) {
-    flags.push(t.exists === true ? '❌ FALSO-NEGATIVO?(esperado existe)' : '· no encontrado');
+  const sinProducto = parsed.encontrados === 0 || debil;
+  if (sinProducto) {
+    if (parsed.aclarar) flags.push('· aclarar');
+    else if (parsed.no_vendido) flags.push('· no_vendido');
+    else flags.push(t.exists === true ? '❌ FALSO-NEGATIVO?(esperado existe)' : '· no encontrado');
+  } else if (parsed.parcial) {
+    flags.push('🟡 parcial');
   }
   if (debil) flags.push('⚠ DÉBIL');
   // ¿el top está agotado teniendo el algoritmo que priorizar disponibles?

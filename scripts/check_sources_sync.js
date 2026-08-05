@@ -30,6 +30,16 @@ for (const name of sharedFns) {
     `lib.${name} source not found verbatim in scratch_live/live_buscar.js (lib drifted)`
   );
 }
+// presupuesto tambien duplica scoreMatch/expandir (y por tanto ALIAS/aliasDe, del que scoreMatch
+// depende): un drift aqui paso desapercibido una vez (scoreMatch referenciaba aliasDe sin que
+// existiera en este archivo -> ReferenceError en vivo en cuanto un item tenia 2+ candidatos).
+const presupuestoFns = ['norm', 'normMedida', 'medPresent', 'stemColor', 'singular', 'expandir', 'esGranel', 'scoreMatch'];
+for (const name of presupuestoFns) {
+  assert.ok(
+    presupuesto.includes(L[name].toString().replace(/\r\n/g, '\n')),
+    `lib.${name} source not found verbatim in scratch_live/live_presupuesto.js (lib drifted)`
+  );
+}
 assert.ok(
   presupuesto.includes(L.parseItems.toString().replace(/\r\n/g, '\n')),
   'lib.parseItems source not found verbatim in scratch_live/live_presupuesto.js'

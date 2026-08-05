@@ -8,8 +8,18 @@
     }
   },
   "politicas_despacho": {
-    "disponible": false,
-    "mensaje": "No contamos con servicio de envíos a domicilio. Todos los pedidos deben ser retirados en nuestra tienda física."
+    "disponible": true,
+    "retiro_en_tienda": true,
+    "transporte_casco_central": {
+      "disponible": true,
+      "costo_usd": 10,
+      "zona": "casco central de Mene Mauroa"
+    },
+    "transporte_fuera_casco_central": {
+      "disponible": true,
+      "costo": "Variable según la distancia; lo coordina un empleado (no estimar el monto)."
+    },
+    "mensaje": "Retiro en tienda física en Mene Mauroa. También hacemos transporte de materiales a $10 dentro del casco central de Mene Mauroa; fuera del casco central el costo varía según la distancia y lo coordina un empleado."
   },
   "metodos_pago_aceptados": [
     "Pago Móvil (tasa oficial BCV)",
