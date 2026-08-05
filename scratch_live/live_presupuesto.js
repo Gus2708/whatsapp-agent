@@ -81,9 +81,9 @@ function medPresent(med, nd){
 const SIN = {
   'calibre':'cal','cal.':'cal',
   'rieles':'tubo herreria','riel':'tubo herreria',
-  'lavaplatos':'fregadero','lavaplato':'fregadero','lava platos':'fregadero','lava plato':'fregadero','elegante':'lujo','corrugada':'estriada','corrugado':'estriado','varilla':'cabilla','varillas':'cabilla','hierro':'cabilla','cabillas':'cabilla',
+  'lavaplatos':'fregadero','lavaplato':'fregadero','lava platos':'fregadero','lava plato':'fregadero','elegante':'lujo','corrugada':'estriada','corrugado':'estriado','varilla':'cabilla','varillas':'cabilla','cabillas':'cabilla',
   'simento':'cemento','simanto':'cemento','saco de cemento':'cemento','bolsa de cemento':'cemento','saco cemento':'cemento','bolsa cemento':'cemento',
-  'clavo':'clavos','clavillo':'clavos','tornillo':'tornillos',
+  'clavillo':'clavos',
   'tubo cuadrado':'tubo herreria','tubo metalico':'tubo herreria','tuberia metalica':'tubo herreria',
   'tubo electrico':'tubo electricidad','tubo de luz':'tubo electricidad','tubo luz':'tubo electricidad',
   'tubo sanitario':'tubo agua negra','tubo aguas negras':'tubo agua negra','tubo cloaca':'tubo agua negra','tubo aguas servidas':'tubo agua negra',
@@ -164,6 +164,12 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
   // "cinta aislante" existe TAL CUAL en el catalogo; mapearla a teipe la volvia
   // inencontrable. Se deja pasar y que el resto de los tokens desempate.
   s = s.replace(/\btriple a\b/g, 'aaa');
+  // "hierro" solo significa CABILLA cuando va solo. Con otro sustantivo de cabeza es el
+  // material ("mecha de hierro", "lima para hierro") y mapearlo a cabilla devolvia cabillas.
+  if (/\bhierro\b/.test(s)) {
+    if (/\btubos?\b/.test(s)) s = s.replace(/\btubos?\s+(de\s+)?hierro\b/g, 'tubo herreria');
+    else if (/\b(mecha|mechas|lima|limas|sierra|sierras|alambre|alambres|tornillos?|clavos?|disco|discos|plancha|planchas|lamina|laminas|angulo|angulos|pletina|pletinas|malla|mallas)\b/.test(s)) s = s.replace(/\s*\b(de\s+)?hierro\b/g, '');
+  }
   // "tubo/perfil/angulo ... pesado" = linea ESTRUCTURAL (pared gruesa, la que el catalogo etiqueta
   // en mm: 100X100, 140X60...). El termino puede ir antes o despues de la medida ("tubo 4x4 pesado"),
   // por eso se resuelve por presencia en toda la frase (no por adyacencia, que exige un SIN normal).
@@ -256,9 +262,13 @@ async function buscarUno(nombre){
     if (granelIntent){ try{ const r=await axios.get(SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+'&'+GRANEL_OR+'&order=existencia.desc.nullslast&limit=1000',{headers:H}); cand=r.data||[]; }catch(e){} }
     if (cand.length===0){ try{ const r=await axios.get(SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+'&order=existencia.desc.nullslast&limit=1000',{headers:H}); cand=r.data||[]; }catch(e){} }
   }
-  // relajacion drop-one: el AND de categoria fallo -> reintenta quitando UNA palabra a la vez
+  // relajacion drop-one: el AND de categoria fallo -> reintenta quitando UNA palabra a la vez.
+  // Se empieza por la ULTIMA y NUNCA se suelta la primera: esa es la categoria del producto.
+  // Antes iba de 0 en adelante, o sea que lo primero que sacrificaba era el sustantivo
+  // principal: "tubo pvc electrico 3/4" quedaba en "pvc electrico 3/4" y cotizaba 28
+  // unidades de CINTA AISLANTE ELECTRICO PVC 3/4 en vez de tubos (caso real, 2026-08-04).
   if (cand.length===0 && textLargas.length>=2 && textLargas.length<=6){
-    for (let _i=0; _i<textLargas.length && cand.length===0; _i++){
+    for (let _i=textLargas.length-1; _i>=1 && cand.length===0; _i--){
       const _sub = textLargas.filter((_w,_j)=>_j!==_i);
       const q = _sub.map(w => { if (ACCENTS[w]) return `or=(descripcion.ilike.*${w}*,descripcion.ilike.*${ACCENTS[w]}*)`; return 'descripcion=ilike.*' + encodeURIComponent(w) + '*'; }).join('&');
       try{ const r=await axios.get(SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+'&order=existencia.desc.nullslast&limit=1000',{headers:H}); cand=r.data||[]; }catch(e){}

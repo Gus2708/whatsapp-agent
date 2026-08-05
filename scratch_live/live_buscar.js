@@ -81,9 +81,9 @@ function medPresent(med, nd){
 const SIN = {
   'calibre':'cal','cal.':'cal',
   'rieles':'tubo herreria','riel':'tubo herreria',
-  'lavaplatos':'fregadero','lavaplato':'fregadero','lava platos':'fregadero','lava plato':'fregadero','elegante':'lujo','corrugada':'estriada','corrugado':'estriado','varilla':'cabilla','varillas':'cabilla','hierro':'cabilla','cabillas':'cabilla',
+  'lavaplatos':'fregadero','lavaplato':'fregadero','lava platos':'fregadero','lava plato':'fregadero','elegante':'lujo','corrugada':'estriada','corrugado':'estriado','varilla':'cabilla','varillas':'cabilla','cabillas':'cabilla',
   'simento':'cemento','simanto':'cemento','saco de cemento':'cemento','bolsa de cemento':'cemento','saco cemento':'cemento','bolsa cemento':'cemento',
-  'clavo':'clavos','clavillo':'clavos','tornillo':'tornillos',
+  'clavillo':'clavos',
   'tubo cuadrado':'tubo herreria','tubo metalico':'tubo herreria','tuberia metalica':'tubo herreria',
   'tubo electrico':'tubo electricidad','tubo de luz':'tubo electricidad','tubo luz':'tubo electricidad',
   'tubo sanitario':'tubo agua negra','tubo aguas negras':'tubo agua negra','tubo cloaca':'tubo agua negra','tubo aguas servidas':'tubo agua negra',
@@ -164,6 +164,12 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
   // "cinta aislante" existe TAL CUAL en el catalogo; mapearla a teipe la volvia
   // inencontrable. Se deja pasar y que el resto de los tokens desempate.
   s = s.replace(/\btriple a\b/g, 'aaa');
+  // "hierro" solo significa CABILLA cuando va solo. Con otro sustantivo de cabeza es el
+  // material ("mecha de hierro", "lima para hierro") y mapearlo a cabilla devolvia cabillas.
+  if (/\bhierro\b/.test(s)) {
+    if (/\btubos?\b/.test(s)) s = s.replace(/\btubos?\s+(de\s+)?hierro\b/g, 'tubo herreria');
+    else if (/\b(mecha|mechas|lima|limas|sierra|sierras|alambre|alambres|tornillos?|clavos?|disco|discos|plancha|planchas|lamina|laminas|angulo|angulos|pletina|pletinas|malla|mallas)\b/.test(s)) s = s.replace(/\s*\b(de\s+)?hierro\b/g, '');
+  }
   // "tubo/perfil/angulo ... pesado" = linea ESTRUCTURAL (pared gruesa, la que el catalogo etiqueta
   // en mm: 100X100, 140X60...). El termino puede ir antes o despues de la medida ("tubo 4x4 pesado"),
   // por eso se resuelve por presencia en toda la frase (no por adyacencia, que exige un SIN normal).
@@ -373,8 +379,11 @@ if (res.length===0 && textLargas.length>0) res = await ilike(textLargas, 60);
 let _dropped = null; // palabra que la relajacion tuvo que ignorar (hay que confesarlo)
 if (res.length===0 && textLargas.length>=2 && textLargas.length<=6){
   const _esMod = w => MODIFIERS.has(w) || COLOR_STEM[w] || stemColor(w)!==w;
-  const _rank = w => (_esMod(w)?0:1000) + w.length; // modificador primero, luego mas corto
-  const _order = textLargas.map((_w,_i)=>_i).sort((a,b)=>_rank(textLargas[a])-_rank(textLargas[b]));
+  // La PRIMERA palabra de contenido es la categoria del producto; soltarla devuelve
+  // cualquier cosa que comparta el adjetivo ("tornillos galvanizados" -> Bushing Galvanizado).
+  // Orden de sacrificio: modificadores -> palabras posteriores mas cortas -> nunca la cabeza.
+  const _rank = (w,i) => (_esMod(w)?0:1000) + (i===0?100000:0) + w.length;
+  const _order = textLargas.map((_w,_i)=>_i).sort((a,b)=>_rank(textLargas[a],a)-_rank(textLargas[b],b));
   for (const _i of _order){
     const _sub = textLargas.filter((_w,_j)=>_j!==_i);
     if (_sub.every(_esMod)) continue; // no busques dejando solo modificadores
