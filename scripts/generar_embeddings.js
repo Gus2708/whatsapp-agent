@@ -60,12 +60,19 @@ async function traerTodo(tabla, select, orden) {
 // natural que le faltaba y mete el vocabulario venezolano DENTRO del espacio semántico:
 //   "TAPA DE INODORO ... | sanitario tapa | como lo pide el cliente: tapa de poceta,
 //    asiento para wc, tapa del baño"
+// v3: se añade la descripción en lenguaje natural generada por Luna
+// (producto_descripcion, solo para lo vendido en 365 días). Es lo que dice QUÉ ES y PARA
+// QUÉ SIRVE, que es justo lo que una cadena de SKU no dice y lo que el cliente describe
+// cuando no sabe el nombre técnico.
 let VOCAB_POR_CAT = new Map();
+let DESC_IA = new Map();
 function textoDe(p) {
   const desc = p.descripcion.trim();
   const cat = norm(desc).split(' ')[0];
   const sinon = (VOCAB_POR_CAT.get(cat) || []).slice(0, 12);
+  const ia = DESC_IA.get(p.codigo_interno);
   let t = desc;
+  if (ia) t += ' | ' + ia;
   if (cat) t += ' | categoria: ' + cat;
   if (sinon.length) t += ' | como lo pide el cliente: ' + sinon.join(', ');
   return t;
@@ -100,6 +107,14 @@ async function embeber(textos) {
     VOCAB_POR_CAT.get(v.categoria).push(v.termino);
   }
   console.log(`  ${vocab.length} términos coloquiales en ${VOCAB_POR_CAT.size} categorías`);
+
+  // descripciones generadas por Luna (paginado: PostgREST corta a 1000)
+  for (let off = 0; ; off += 1000) {
+    const d = await sbGet(`producto_descripcion?select=codigo_interno,descripcion_ia&offset=${off}&limit=1000`);
+    for (const x of d) DESC_IA.set(x.codigo_interno, x.descripcion_ia);
+    if (d.length < 1000) break;
+  }
+  console.log(`  ${DESC_IA.size} descripciones en lenguaje natural`);
 
   const previos = new Map(
     (await traerTodo('productos_embedding', 'codigo_interno,hash_desc', 'codigo_interno.asc'))
