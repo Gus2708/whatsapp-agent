@@ -382,9 +382,33 @@ bloque += '💵 *Pagando en dólares: '+nUSD(totUSD)+'$*\n';
 if (tasa) bloque += '🇻🇪 *Pagando en bolívares: '+nUSD(totUSD*RECARGO)+'$ = Bs '+nBsInt(totBs)+'*';
 else bloque += '_(tasa BCV no disponible para el monto en Bs)_';
 
+// RENGLON QUE NO SE ENCONTRO: NO puede desaparecer en silencio.
+// Antes solo se mencionaba en `nota`, un campo blando que el agente podia ignorar, y el
+// total salia como si estuviera completo: el cliente recibia un presupuesto al que le
+// faltaban renglones sin saberlo. Es el unico fallo del sistema que toca lo que se factura.
+// Ahora el aviso va DENTRO del texto que se envia (aunque el bot copie el bloque tal cual,
+// el cliente lo ve) y ademas se emite una `instruccion` dura que el prompt obliga a cumplir.
+if (noEnc.length){
+  bloque += '\n\n⚠️ *OJO: este presupuesto está INCOMPLETO.*\n';
+  bloque += 'No conseguí en el catálogo: *' + noEnc.join('*, *') + '*.\n';
+  bloque += '_El total de arriba NO incluye ' + (noEnc.length === 1 ? 'ese renglón' : 'esos ' + noEnc.length + ' renglones') + '._';
+}
+
 const notaParts = [];
 if (noEnc.length) notaParts.push('no ubiqué en catálogo: ' + noEnc.join(', '));
 if (hasAgotado) notaParts.push('algunos productos están agotados (marcados con Agotado)');
 const nota = notaParts.length ? ('Ojo: ' + notaParts.join('; ') + '.') : '';
 const alternativas_texto = altLines.length ? altLines.join('\n') : '';
-return JSON.stringify({ ok:true, presupuesto_texto: bloque, alternativas_texto, nota });
+
+const _out = { ok:true, presupuesto_texto: bloque, alternativas_texto, nota };
+if (noEnc.length){
+  _out.incompleto = true;
+  _out.faltantes = noEnc;
+  _out.instruccion = 'ATENCION: el presupuesto esta INCOMPLETO. NO conseguí ' + noEnc.length +
+    ' de los productos que pidio el cliente: ' + noEnc.join(', ') + '. ' +
+    'ES OBLIGATORIO que se lo digas EXPLICITAMENTE y que aclares que el total NO los incluye. ' +
+    'PROHIBIDO presentar el total como si fuera el presupuesto completo: el cliente se llevaria una ' +
+    'cifra equivocada y eso es un error de facturacion. Ofrecele que un empleado le consiga esos ' +
+    'renglones (puedes usar [PEDIR_AYUDA] si insiste en ellos).';
+}
+return JSON.stringify(_out);
