@@ -161,6 +161,44 @@ de hipótesis, 7,8 s → probable timeout de los 9 s). HNSW es aproximado y la l
 OpenAI varía; conviene instrumentar por qué no propuso antes de asumir que la condición
 es el único problema.
 
+### DISEÑO PARA EL INTENTO 4 — respaldado por el diagnóstico, SIN implementar
+
+Tras arreglar el timeout de `buscar_semantico` (ver commit del índice HNSW) el diagnóstico
+`scripts/_diag_vector.js` deja claro qué distingue los dos casos, y NO es la identidad del
+producto ni la categoría:
+
+| Consulta | Léxico | ¿Está bien? | Vector |
+| :--- | :--- | :--- | :--- |
+| `disco de corte` | Disco C/metal Fino Covo | **SÍ** (80 facturas) | DISCO DE CORTE HIL (0.687) |
+| `tapa para el baño` | Tapa P/toma 270 | **NO** (es de tomacorriente) | TAPA DE INODORO (0.544) |
+| `algo para cortar cabilla` | Aquafina SET Fregadero | **NO** | TENAZA CABILLERA (0.608) |
+
+La señal que los separa es **si el resultado léxico está semánticamente cerca de la
+consulta**. Eso el embedding lo sabe: basta comparar la similitud del TOP LÉXICO con la del
+TOP VECTORIAL contra el mismo embedding de la consulta.
+
+- Si son parecidas → lo léxico está bien, **no adoptar** (caso `disco de corte`).
+- Si la del léxico es mucho menor → lo léxico se equivocó, **adoptar** el vector.
+
+Ya existe la RPC para medirlo: `similitud_de_codigos(embedding, codigos[])`, un lookup por
+PK, no un scan.
+
+**BLOQUEO CONOCIDO:** `buscar_productos` NO expone `codigo_interno` en su salida (solo
+`nombre`, `disponible`, `precio_divisas_texto`, `precio_bs_texto`), así que hoy no se puede
+pedir la similitud del top léxico desde fuera. Hay que resolver eso primero — internamente
+el nodo sí tiene los códigos en `unicos`, así que el cálculo puede hacerse DENTRO del nodo
+sin cambiar el contrato de salida.
+
+**Para la causa 2**, una vez adoptado el vector: el problema es que `vMap` (ventas) reordena
+el conjunto rescatado. El intento 2 falló por hacer DOS cambios a la vez (saltar `vMap` y
+además saltar el desempate por `scoreMatch`) y por asumir que el orden de entrada era
+semántico —falso en la ruta de Luna, donde viene de `rpc(categoria)` ordenado por existencia—.
+Hacer **solo** lo mínimo: cuando hay `_rescate`, ordenar el conjunto por similitud vectorial
+(que sí es semántica y ya se puede pedir) y dejar que `vMap` desempate únicamente entre
+productos de similitud parecida.
+
+**Medir entre cada paso.** Los cuatro intentos previos cambiaron varias cosas a la vez.
+
 ### Los dos van acoplados
 
 Arreglar solo la causa 1 hace que más consultas lleguen a la ruta de rescate, donde la
