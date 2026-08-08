@@ -67,6 +67,45 @@ Línea base a batir (mismo set de 320, ya medido):
 | v3 con vector | 246 (76,9%) | 20 (6,3%) |
 | sin vector (control) | 239 (74,7%) | 24 (7,5%) |
 
+## INTENTO 1 (2026-08-08) — implementado, medido, REVERTIDO
+
+Se implementó RRF condicional con k=60 y popularidad multiplicativa, tal como se describe
+arriba. **Falló en el caso que la capa vectorial existía para resolver**, dos veces:
+
+| Pesos | `"tapa para el baño"` | Esperado |
+| :--- | :--- | :--- |
+| léxico 1 / vector 1 | Tapa P/toma 270 ❌ | Tapa de Inodoro |
+| léxico 1 / vector 3 | Tapa P/toma 270 ❌ | Tapa de Inodoro |
+
+**Modo de fallo A — el consenso premia equivocarse en grupo.** Aquí solo se fusiona cuando
+lo léxico ya es *sospechoso*. Lo léxico trae MUCHAS variantes malas de la misma familia
+("Tapa P/toma 270 blanco", "…marfil", "Tapa Plast Marfil P/toma…") que aparecen en las dos
+listas y suman RRF dos veces cada una, mientras el acierto del vector aparece UNA vez. El
+error tiene mayoría. Subir el peso del vector a 3 no bastó.
+
+**Modo de fallo B — la popularidad pelea contra la semántica.** Y este es más profundo:
+las tapas de tomacorriente se venden constantemente; los asientos de inodoro casi no. El
+factor multiplicativo de `producto_popularidad` rescata el resultado equivocado justo
+cuando la corrección semántica lo estaba arreglando.
+
+**OJO — B ya está pasando en producción, sin RRF.** Al revertir se comprobó que
+`"tapa para el baño"` devuelve *Tapa P/toma* también en el estado actual. Cuando ese caso
+se verificó como correcto (embeddings v2), el ranking por ventas todavía no existía. Es
+decir: **la señal de ventas está pisando la corrección semántica hoy mismo**. No lo
+introdujo RRF; RRF solo lo hizo visible.
+
+### Qué probar en el intento 2
+
+1. **Resolver primero el modo B**, que es independiente de RRF: la popularidad no debería
+   aplicarse —o debería aplicarse muy amortiguada— cuando el resultado viene de una
+   corrección semántica (`_rescate`). Es la señal de "el cliente no está pidiendo lo que
+   más se vende, está pidiendo otra cosa".
+2. **Deduplicar por familia antes de fusionar**: colapsar variantes que comparten las
+   primeras 2-3 palabras a un solo representante, para que una familia no vote N veces.
+3. Solo entonces reintentar RRF, y medir con el A/B de 320.
+
+**No repetir el intento 1 tal cual.** Está medido que no funciona.
+
 ## Advertencias aprendidas a golpes
 
 - **HNSW es aproximado**: dos corridas del mismo probe pueden dar 3/7 y 5/7. No interpretar
