@@ -94,6 +94,51 @@ se verificó como correcto (embeddings v2), el ranking por ventas todavía no ex
 decir: **la señal de ventas está pisando la corrección semántica hoy mismo**. No lo
 introdujo RRF; RRF solo lo hizo visible.
 
+## INTENTO 2 (2026-08-08) — arreglar el modo B: también revertido, pero AISLÓ LAS CAUSAS
+
+Se intentó que la popularidad no reordenara cuando el resultado viene de una corrección
+semántica (`_rescate`), conservando el orden de entrada. **Falló y empeoró un caso.** Pero
+al medirlo quedaron aisladas dos causas distintas, y las dos están VIVAS en producción.
+
+### Causa 1 — la condición de adopción del vector descarta aciertos
+
+`"tapa para el baño"` NO es un problema de popularidad. El resultado correcto del vector
+(*Tapa de Inodoro*, similitud 0.601) **se descarta** aquí:
+
+```js
+if (_vec.length > 0 && _vcat !== _d0.split(" ")[0])   // live_buscar.js, gatillo del vector
+```
+
+La condición exige que la categoría del vector DIFIERA de la léxica. Pero *Tapa P/toma* y
+*Tapa de Inodoro* empiezan ambas por `tapa`, así que el acierto se tira y `_rescate` ni se
+marca. La popularidad nunca llega a intervenir.
+
+**Arreglo:** comparar el PRODUCTO (codigo_interno), no la primera palabra. Si el vector
+propone un producto que no está en el top léxico, es una propuesta legítima aunque comparta
+categoría.
+
+### Causa 2 — la popularidad sí deshace el rescate de Luna
+
+`"algo para cortar cabilla"` devolvía *Cizalla / Tenaza Cabillera* antes del ranking por
+ventas; hoy devuelve **Cabilla Estriada**. Aquí Luna SÍ acierta la categoría (`cizalla`),
+pero el desempate por ventas la deshace: las cabillas se venden muchísimo más que las
+cizallas. **Este es el modo B genuino.**
+
+**Por qué el arreglo del intento 2 no sirvió:** asumí que bastaba con conservar el orden de
+entrada cuando hay `_rescate`. Es FALSO en la ruta de Luna: ahí las filas vienen de
+`rpc(_rs.categoria)`, ordenadas por existencia, no por semántica. Conservar ese orden no
+conserva nada útil.
+
+**Arreglo:** ordenar semánticamente las filas del rescate ANTES de que la popularidad las
+toque (p.ej. por `scoreMatch` contra la categoría deducida, o pidiendo al vector que ordene
+ese conjunto), y solo entonces permitir que las ventas desempaten dentro de lo ya relevante.
+
+### Los dos van acoplados
+
+Arreglar solo la causa 1 hace que más consultas lleguen a la ruta de rescate, donde la
+causa 2 las degrada. Hay que hacer los dos, y medir después de cada uno con el A/B de 320
+más los 51 de regresión.
+
 ### Qué probar en el intento 2
 
 1. **Resolver primero el modo B**, que es independiente de RRF: la popularidad no debería
