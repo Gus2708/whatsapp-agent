@@ -449,11 +449,15 @@ async function buscarVectorial(){
   try {
     const _e = await axios.post('https://api.openai.com/v1/embeddings',
       { model: 'text-embedding-3-small', input: String(p_busqueda).slice(0, 500), dimensions: 1536 },
-      { headers: { Authorization: 'Bearer ' + _k, 'Content-Type': 'application/json' }, timeout: 5000 });
+      { headers: { Authorization: 'Bearer ' + _k, 'Content-Type': 'application/json' }, timeout: 9000 });
     const _v = _e.data && _e.data.data && _e.data.data[0] && _e.data.data[0].embedding;
     if (!_v) return [];
+    // Umbral 0.45 (antes 0.58). Con los embeddings v2 (texto enriquecido con categoria y
+    // vocabulario coloquial) el suelo de ruido se desplomo: basura puntua 0.364-0.368 y la
+    // peor consulta legitima 0.491, o sea margen 0.123 frente a los 0.012 de v1. Por eso
+    // ahora SI existe un umbral que separa senal de ruido, y puede ser mas permisivo.
     const _r = await axios.post(SB + '/rest/v1/rpc/buscar_semantico',
-      { p_embedding: JSON.stringify(_v), p_umbral: 0.58, p_limite: 8 }, { headers: H });
+      { p_embedding: JSON.stringify(_v), p_umbral: 0.45, p_limite: 8 }, { headers: H });
     return Array.isArray(_r.data) ? _r.data : [];
   } catch (e) { console.warn('[vectorial] fallo:', e.message); return []; }
 }
@@ -492,6 +496,33 @@ if (res.length===0){
 // Solo adoptamos la lectura de Luna si DISCREPA de la categoria que trajo lo lexico: si
 // coinciden, lo lexico ya estaba bien y no se toca. Va aqui, sobre las filas CRUDAS, para
 // no tener que rehacer el formateo de mas abajo.
+// SECUESTRO POR PALABRA INCIDENTAL: lo lexico devolvio algo, pero su primer resultado NO
+// empieza por el sustantivo principal de la consulta. El catalogo SIEMPRE empieza por la
+// categoria, asi que eso delata que gano un producto por una palabra de paso:
+// "tapa para el bano" -> "Tapa P/toma 270". Aqui la capa vectorial SI aporta (con los
+// embeddings v2 devuelve TAPA DE INODORO a 0.601), y es ~80x mas barata que preguntarle
+// a Luna, asi que se intenta primero. Solo se adopta si DISCREPA de lo lexico.
+if (!_rescate && res.length > 0){
+  // Senal de secuestro: al primer resultado le FALTA alguna palabra de la consulta.
+  // "tapa para el bano" -> "Tapa P/toma 270" comparte "tapa" pero no "bano". Mirar solo
+  // el sustantivo principal no bastaba, porque en ese caso tambien coincide.
+  // Si estan TODAS (p.ej. "cemento gris" -> "Cemento Gris CSC"), lo lexico acerto y no se
+  // llama a OpenAI: el camino feliz sigue costando ~750 ms y cero.
+  const _d0 = norm(res[0].descripcion || '');
+  const _falta = qTokens.filter(t => !/\d/.test(t)).some(t => !aliasDe(t).some(a => _d0.includes(a)));
+  if (_falta){
+    const _vec = await buscarVectorial();
+    const _vcat = _vec.length ? norm(_vec[0].descripcion || '').split(' ')[0] : '';
+    if (_vec.length > 0 && _vcat !== _d0.split(" ")[0]){
+      res = _vec;
+      _rescate = { categoria: _vcat, termino: '', confianza: 4 };
+    }
+  }
+}
+
+// PERIFRASIS: el cliente describe PARA QUE sirve en vez de nombrarlo. Aqui manda Luna,
+// no el vector: medido, el vector daba "Juego de Mechas" y "Pega Loka" donde Luna acierta
+// cemento y cizalla. Solo se adopta si DISCREPA de lo lexico.
 if (!_rescate && res.length > 0 &&
     /\b(algo|eso|cosa|aparato|maquina|herramienta)\s+(para|que|de)\b|\blo que (se )?(usa|sirve|echa|pone|hecha)\b|\bcon que\b|\bque me sirva\b|\bsirve para\b/.test(norm(_pb))){
   const _rp = await rescateSemantico();
@@ -549,13 +580,37 @@ const codes=unicos.map(p=>p.codigo_interno).slice(0,40);
 let vMap={};
 try{ const vr=await axios.post(SB+'/rest/v1/rpc/popularidad_productos',{p_codigos:codes},{headers:H}); for(const v of(vr.data||[])) vMap[v.codigo_producto]=Number(v.total); }catch(e){}
 
-// ordenar: aprendido primero, luego relevancia, luego disponibilidad (en stock primero), luego mas vendido
+// ¿la descripcion cumple TODOS los tokens de la consulta? (misma condicion que el +50 de
+// scoreMatch, pero como booleano: separa "esto es exactamente lo que pidio" de "se acerca").
+function fullMatch(descripcion, qTokens){
+  const d = norm(descripcion);
+  const nd = normMedida(descripcion);
+  const words = d.split(/[\s\-x]+/);
+  for (const t of qTokens){
+    if (t === 'corte'){ if (!(words.includes('corte') || words.includes('c/') || d.includes('c/'))) return false; continue; }
+    if (/\d/.test(t)){ if (!medPresent(t, nd)) return false; continue; }
+    let hit = false;
+    for (const a of aliasDe(t)){ if (words.includes(a) || (a.length>=3 && d.includes(a))){ hit=true; break; } }
+    if (!hit) return false;
+  }
+  return qTokens.length > 0;
+}
+// ordenar: aprendido primero; entre los que cumplen TODO lo pedido manda quien mas se vende
+// (en stock primero); entre coincidencias parciales manda la relevancia, como antes.
 unicos.sort((a,b)=>{
   if (!!a._aprendido !== !!b._aprendido) return a._aprendido ? -1 : 1;
-  const ds=scoreMatch(b.descripcion,qTokens)-scoreMatch(a.descripcion,qTokens);
-  if(Math.abs(ds)>2) return ds; // dif. pequeña = solo ruido de conteo de palabras -> desempata disponibilidad
+  const aFull = fullMatch(a.descripcion, qTokens), bFull = fullMatch(b.descripcion, qTokens);
+  if (aFull !== bFull) return aFull ? -1 : 1;
   const aStock = esGranel(a.descripcion) || Number(a.existencia) > 0;
   const bStock = esGranel(b.descripcion) || Number(b.existencia) > 0;
+  if (aFull && bFull){
+    if (aStock !== bStock) return aStock ? -1 : 1;
+    const dv = (vMap[b.codigo_interno]||0)-(vMap[a.codigo_interno]||0);
+    if (dv !== 0) return dv;
+    return scoreMatch(b.descripcion,qTokens)-scoreMatch(a.descripcion,qTokens);
+  }
+  const ds=scoreMatch(b.descripcion,qTokens)-scoreMatch(a.descripcion,qTokens);
+  if(Math.abs(ds)>2) return ds; // dif. pequeña = solo ruido de conteo de palabras -> desempata disponibilidad
   if (aStock !== bStock) return aStock ? -1 : 1;
   return (vMap[b.codigo_interno]||0)-(vMap[a.codigo_interno]||0);
 });

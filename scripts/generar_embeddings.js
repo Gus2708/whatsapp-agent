@@ -10,6 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const norm = require(require('path').join(__dirname, '..', 'lib', 'serrucho-search.js')).norm;
 
 const ROOT = path.join(__dirname, '..');
 const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
@@ -49,9 +50,26 @@ async function traerTodo(tabla, select, orden) {
   return out;
 }
 
-// El texto que se embebe: la descripción tal cual. Es lo único que describe el producto
-// y es como lo escribe el catálogo; no inventamos contexto que luego no exista.
-const textoDe = p => p.descripcion.trim();
+// TEXTO ENRIQUECIDO (v2). Antes se embebía la descripción cruda y el resultado fue nulo:
+// una cadena de SKU de 36 caracteres ("TAPA DE INODORO CIERRE SUAVE 17X14 BEIGE AQUAFINA")
+// no es prosa, así que el vector acababa midiendo solapamiento léxico —lo que pg_trgm ya
+// hacía— y su suelo de ruido quedaba altísimo ("asdfgh qwerty" puntuaba 0.467).
+//
+// Ahora se le añade la CATEGORÍA y los términos coloquiales que ya tenemos en
+// catalogo_vocabulario para esa categoría. Eso le da al vector el contexto en lenguaje
+// natural que le faltaba y mete el vocabulario venezolano DENTRO del espacio semántico:
+//   "TAPA DE INODORO ... | sanitario tapa | como lo pide el cliente: tapa de poceta,
+//    asiento para wc, tapa del baño"
+let VOCAB_POR_CAT = new Map();
+function textoDe(p) {
+  const desc = p.descripcion.trim();
+  const cat = norm(desc).split(' ')[0];
+  const sinon = (VOCAB_POR_CAT.get(cat) || []).slice(0, 12);
+  let t = desc;
+  if (cat) t += ' | categoria: ' + cat;
+  if (sinon.length) t += ' | como lo pide el cliente: ' + sinon.join(', ');
+  return t;
+}
 const hashDe = t => crypto.createHash('md5').update(t).digest('hex');
 
 async function embeber(textos) {
@@ -74,6 +92,15 @@ async function embeber(textos) {
     .filter(p => p.descripcion && p.descripcion.trim());
   console.log(`  ${productos.length} productos`);
 
+  // diccionario coloquial agrupado por categoría, para enriquecer el texto a embeber
+  const vocab = await traerTodo('catalogo_vocabulario', 'termino,categoria&activo=eq.true', 'categoria.asc');
+  for (const v of vocab) {
+    if (!v.categoria) continue;
+    if (!VOCAB_POR_CAT.has(v.categoria)) VOCAB_POR_CAT.set(v.categoria, []);
+    VOCAB_POR_CAT.get(v.categoria).push(v.termino);
+  }
+  console.log(`  ${vocab.length} términos coloquiales en ${VOCAB_POR_CAT.size} categorías`);
+
   const previos = new Map(
     (await traerTodo('productos_embedding', 'codigo_interno,hash_desc', 'codigo_interno.asc'))
       .map(r => [r.codigo_interno, r.hash_desc])
@@ -86,6 +113,19 @@ async function embeber(textos) {
 
   const tokensEst = Math.ceil(pendientes.reduce((a, p) => a + textoDe(p).length, 0) / 4);
   console.log(`  ~${tokensEst} tokens ≈ $${(tokensEst / 1e6 * PRECIO_M).toFixed(4)}`);
+
+  // El índice HNSW reconstruye el grafo en CADA insert. Con pocas filas da igual, pero en
+  // una carga grande revienta el statement_timeout de Supabase (error 57014) a mitad de
+  // camino, después de haberle pagado los embeddings a OpenAI. La anon key no puede hacer
+  // DDL, así que no se puede automatizar: se avisa para no perder la corrida.
+  if (pendientes.length > 500) {
+    console.log(`\n  ⚠  ${pendientes.length} filas es una carga grande. Si existe el índice HNSW`);
+    console.log('     esto va a fallar con "statement timeout" (57014) a mitad. Antes de seguir:');
+    console.log('       drop index if exists idx_productos_embedding_hnsw;');
+    console.log('     y al terminar recrearlo:');
+    console.log('       create index idx_productos_embedding_hnsw on productos_embedding');
+    console.log('         using hnsw (embedding extensions.vector_cosine_ops);\n');
+  }
   if (DRY) { console.log('\n--dry: no se llamó a OpenAI ni se escribió nada.'); return; }
 
   let tokens = 0, escritos = 0;
