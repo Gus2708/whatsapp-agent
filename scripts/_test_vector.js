@@ -19,9 +19,13 @@ const CASOS = [
   { q: 'tapa para el bano', espera: /inodoro|poceta|wc/i, nota: 'v1: 0.619, el único donde ganaba' },
   { q: 'aparato para medir la corriente', espera: /multimetro|tester|amperimetr/i, nota: '' },
   { q: 'lo que se usa para pegar los bloques', espera: /cemento|mortero/i, nota: 'v1 daba Juego de Mechas' },
-  { q: 'algo para cortar cabilla', espera: /cizalla|segueta|disco|sierra/i, nota: 'v1 daba Cabilla Estriada' },
-  { q: 'motor para hacer huecos', espera: /taladro|hoyadora|rotomartillo/i, nota: 'v1 daba Cabo para Hacha' },
-  { q: 'tornillos galvanizados', espera: /tornillo/i, nota: '' },
+  // OJO con estas dos: las escribí mal la primera vez y el probe reportó 1/7 y 2/7 cuando
+  // el acierto real era 6/7. "TENAZA CABILLERA" ES la herramienta de cortar cabilla, y el
+  // catálogo abrevia "TORNILLO" como "TORN". Una expectativa mal escrita hace que una
+  // medición correcta parezca un fracaso, y eso lleva a revertir algo que funciona.
+  { q: 'algo para cortar cabilla', espera: /cizalla|segueta|disco|sierra|tenaza|cortadora/i, nota: 'v1 daba Cabilla Estriada' },
+  { q: 'motor para hacer huecos', espera: /taladro|hoyadora|rotomartillo|percutor/i, nota: 'v1 daba Cabo para Hacha' },
+  { q: 'tornillos galvanizados', espera: /tornillo|\btorn\b/i, nota: 'el catálogo abrevia TORN' },
 ];
 const BASURA = ['asdfgh qwerty', 'hola buenas tardes como estan', 'xxxxx zzzz'];
 
