@@ -42,6 +42,28 @@ const MAPA = [
   if (!cambios) { console.log('\nSin cambios que desplegar.'); return; }
   if (DRY) { console.log(`\n--dry: ${cambios} nodo(s) cambiarían; no se tocó n8n.`); return; }
 
+  // GUARD: nunca desplegar sin que los tests pasen. Esta sesión ya vio un archivo con un
+  // `else` huérfano y regex con las barras comidas llegar hasta aquí; lo cazó `npm test`,
+  // no la revisión a ojo. Desplegar a n8n es publicar en producción: el bot atiende
+  // clientes reales en cuanto el PUT devuelve 200.
+  // --sin-test lo salta, pero hay que escribirlo a propósito y queda dicho en la salida.
+  if (process.argv.includes('--sin-test')) {
+    console.log('\n⚠  --sin-test: desplegando SIN verificar. Bajo tu responsabilidad.');
+  } else {
+    process.stdout.write('\nVerificando (npm test)… ');
+    const { spawnSync } = require('child_process');
+    const t = spawnSync('npm', ['test'], { cwd: ROOT, encoding: 'utf8', shell: true });
+    if (t.status !== 0) {
+      console.log('FALLÓ.\n');
+      const salida = ((t.stdout || '') + (t.stderr || '')).split('\n');
+      // las líneas que dicen algo: assertions y el veredicto de los guards de sincronía
+      console.log(salida.filter(l => /AssertionError|drifted|verbatim|in sync|fail \d|✖/.test(l)).slice(0, 8).join('\n'));
+      console.log('\nNO se desplegó nada. Arregla lo anterior o usa --sin-test si sabes lo que haces.');
+      process.exit(1);
+    }
+    console.log('OK');
+  }
+
   const allowed = ['saveExecutionProgress', 'saveManualExecutions', 'saveDataErrorExecution', 'saveDataSuccessExecution', 'executionTimeout', 'errorWorkflow', 'timezone', 'executionOrder'];
   const cs = {};
   for (const k of allowed) if (wf.settings && wf.settings[k] !== undefined) cs[k] = wf.settings[k];
