@@ -456,28 +456,46 @@ async function rescateSemantico(){
 // solapamiento lexico — lo que pg_trgm ya hace. Donde SI gana es en variantes de nombre:
 // "tapa para el bano" -> TAPA DE INODORO (0.619). Por debajo de 0.58 no aporta senal, solo
 // ruido con cara de resultado, y es mejor dejar que responda Luna.
-async function buscarVectorial(){
+// Devuelve { filas, simLex }. simLex = que tan cerca esta SEMANTICAMENTE el primer
+// resultado lexico de lo que pidio el cliente. Es la senal que decide si adoptar el vector:
+// medido, el lexico ACIERTA con 0.606 y se EQUIVOCA con 0.443 y 0.399, asi que un corte en
+// 0.52 los separa con margen por ambos lados. Ni "categoria distinta" (demasiado estricto)
+// ni "producto distinto" (demasiado laxo) median si el lexico habia acertado.
+async function buscarVectorial(_codLex){
   const _k = (typeof $env !== 'undefined' && $env && $env.OPENAI_API_KEY) || '';
-  if (!_k) return [];
+  if (!_k) return { filas: [], simLex: null };
   try {
     const _e = await axios.post('https://api.openai.com/v1/embeddings',
       { model: 'text-embedding-3-small', input: String(p_busqueda).slice(0, 500), dimensions: 1536 },
       { headers: { Authorization: 'Bearer ' + _k, 'Content-Type': 'application/json' }, timeout: 9000 });
     const _v = _e.data && _e.data.data && _e.data.data[0] && _e.data.data[0].embedding;
-    if (!_v) return [];
+    if (!_v) return { filas: [], simLex: null };
     // Umbral 0.45 (antes 0.58). Con los embeddings v2 (texto enriquecido con categoria y
     // vocabulario coloquial) el suelo de ruido se desplomo: basura puntua 0.364-0.368 y la
     // peor consulta legitima 0.491, o sea margen 0.123 frente a los 0.012 de v1. Por eso
     // ahora SI existe un umbral que separa senal de ruido, y puede ser mas permisivo.
     const _r = await axios.post(SB + '/rest/v1/rpc/buscar_semantico',
       { p_embedding: JSON.stringify(_v), p_umbral: 0.45, p_limite: 8 }, { headers: H });
-    return Array.isArray(_r.data) ? _r.data : [];
-  } catch (e) { console.warn('[vectorial] fallo:', e.message); return []; }
+    // Similitud del top lexico contra el MISMO embedding: lookup por PK, no scan.
+    let _sl = null;
+    if (_codLex) {
+      try {
+        const _s = await axios.post(SB + '/rest/v1/rpc/similitud_de_codigos',
+          { p_embedding: JSON.stringify(_v), p_codigos: [_codLex] }, { headers: H });
+        if (Array.isArray(_s.data) && _s.data[0]) _sl = Number(_s.data[0].similitud);
+      } catch (e) { /* sin simLex se cae al comportamiento anterior */ }
+    }
+    return { filas: Array.isArray(_r.data) ? _r.data : [], simLex: _sl };
+  } catch (e) { console.warn('[vectorial] fallo:', e.message); return { filas: [], simLex: null }; }
 }
+// Por debajo de esto, lo que trajo la busqueda lexica no tiene que ver con lo que pidio el
+// cliente. Medido: acierta 0.606; se equivoca 0.443 y 0.399.
+const UMBRAL_LEXICO_FIABLE = 0.52;
 
 if (res.length===0){
   if (await esNoVendido()) return NO_VENDIDO_JSON();
-  const _vec = await buscarVectorial();
+  // Sin resultados lexicos no hay nada que comparar: cualquier propuesta del vector mejora.
+  const _vec = (await buscarVectorial(null)).filas;
   if (_vec.length > 0){
     res = _vec;
     // Tratado como HIPOTESIS igual que el rescate: es una interpretacion, no un hallazgo.
@@ -524,9 +542,15 @@ if (!_rescate && res.length > 0){
   const _d0 = norm(res[0].descripcion || '');
   const _falta = qTokens.filter(t => !/\d/.test(t)).some(t => !aliasDe(t).some(a => _d0.includes(a)));
   if (_falta){
-    const _vec = await buscarVectorial();
+    const _vr = await buscarVectorial(res[0].codigo_interno);
+    const _vec = _vr.filas;
     const _vcat = _vec.length ? norm(_vec[0].descripcion || '').split(' ')[0] : '';
-    if (_vec.length > 0 && _vcat !== _d0.split(" ")[0]){
+    // Se adopta el vector solo si lo LEXICO se equivoco, medido semanticamente. Si simLex
+    // no se pudo calcular, se cae a la regla anterior (categoria distinta) para no quedarse
+    // sin criterio. "disco de corte" sobrevive porque su lexico puntua 0.606: acerto.
+    const _lexFalla = _vr.simLex !== null ? (_vr.simLex < UMBRAL_LEXICO_FIABLE)
+                                          : (_vcat !== _d0.split(' ')[0]);
+    if (_vec.length > 0 && _lexFalla){
       res = _vec;
       _rescate = { categoria: _vcat, termino: '', confianza: 4 };
     }
@@ -612,6 +636,18 @@ function fullMatch(descripcion, qTokens){
 // (en stock primero); entre coincidencias parciales manda la relevancia, como antes.
 unicos.sort((a,b)=>{
   if (!!a._aprendido !== !!b._aprendido) return a._aprendido ? -1 : 1;
+  // POPULARIDAD vs SEMANTICA. Si el conjunto lo trajo la capa vectorial, sus filas llevan
+  // `similitud` y ESE es el orden bueno. Sin esto, "algo para cortar cabilla" adoptaba
+  // TENAZA CABILLERA (0.608) y el desempate por ventas la hundia bajo Cabilla Estriada,
+  // porque las cabillas se venden muchisimo mas que las tenazas: la senal de ventas
+  // deshacia la correccion semantica justo despues de acertarla.
+  // Las ventas siguen mandando entre productos de similitud PARECIDA (<0.03), que es donde
+  // aportan de verdad: elegir la variante que la gente compra dentro de lo ya relevante.
+  if (_rescate && typeof a.similitud === 'number' && typeof b.similitud === 'number'){
+    const _dsim = b.similitud - a.similitud;
+    if (Math.abs(_dsim) >= 0.03) return _dsim;
+    return (vMap[b.codigo_interno]||0) - (vMap[a.codigo_interno]||0);
+  }
   const aFull = fullMatch(a.descripcion, qTokens), bFull = fullMatch(b.descripcion, qTokens);
   if (aFull !== bFull) return aFull ? -1 : 1;
   const aStock = esGranel(a.descripcion) || Number(a.existencia) > 0;
