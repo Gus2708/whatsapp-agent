@@ -133,6 +133,34 @@ conserva nada útil.
 toque (p.ej. por `scoreMatch` contra la categoría deducida, o pidiendo al vector que ordene
 ese conjunto), y solo entonces permitir que las ventas desempaten dentro de lo ya relevante.
 
+### INTENTO 3 (2026-08-08) — arreglar la causa 1: revertido, pero acota la solución
+
+Se cambió la condición de adopción de comparar CATEGORÍA a comparar PRODUCTO:
+
+```js
+if (_vec.length > 0 && _vec[0].codigo_interno !== res[0].codigo_interno)
+```
+
+**Regresión inmediata en el caso insignia:** `"disco de corte"` pasó de devolver
+*Disco C/metal Fino 4-1/2X3.2 Covo* —el de 80 facturas, justo lo que el ranking por ventas
+existe para lograr— a *Disco Diamantado*. Y `"tapa para el baño"` **seguía sin arreglarse**.
+
+**Lo que esto enseña:** la condición vieja (categoría distinta) es demasiado ESTRICTA y la
+nueva (producto distinto) demasiado LAXA. Con "producto distinto", el vector pisa cualquier
+resultado léxico que estuviera bien, porque casi siempre propone algo distinto.
+
+**La condición correcta no es una comparación de identidad, sino de CONFIANZA:** adoptar el
+vector solo cuando hay evidencia de que lo léxico se equivocó, no solo de que opina distinto.
+Ideas a probar (ninguna medida aún):
+- exigir similitud alta del vector (p.ej. ≥0.55) **además** de que falte una palabra;
+- comparar la fuerza relativa: adoptar solo si el `scoreMatch` del top léxico es bajo;
+- exigir que el top léxico NO empiece por el sustantivo principal **y** que el del vector sí.
+
+Ojo con `"tapa para el baño"`: en esta corrida el vector no llegó a proponer nada (sin marca
+de hipótesis, 7,8 s → probable timeout de los 9 s). HNSW es aproximado y la latencia de
+OpenAI varía; conviene instrumentar por qué no propuso antes de asumir que la condición
+es el único problema.
+
 ### Los dos van acoplados
 
 Arreglar solo la causa 1 hace que más consultas lleguen a la ruta de rescate, donde la
