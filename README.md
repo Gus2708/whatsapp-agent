@@ -48,22 +48,32 @@ y **solo pasa a la siguiente si la anterior no encontró nada**, así que el cas
 
 | # | Capa | Qué resuelve |
 | :-- | :--- | :--- |
-| 1 | **Léxico** (`ilike` + `SIN` + medidas) | El grueso. Sinónimos a mano, medidas NxM/fracciones/calibre, stopwords conversacionales. |
-| 2 | **Diccionario de catálogo** (`catalogo_vocabulario`, 3.4k términos) | Coloquialismos generados leyendo el catálogo: *chapa*→cerradura, *foco*→bombillo, *cincho*→abrazadera. |
+| 1 | **Léxico** (`ilike` + `SIN` + medidas) | El grueso. Sinónimos a mano (con límite de palabra), medidas NxM/fracciones/calibre, stopwords conversacionales. |
+| 2 | **Diccionario de catálogo** (`catalogo_vocabulario`, 3.5k términos) | Coloquialismos generados leyendo el catálogo: *chapa*→cerradura, *foco*→bombillo, *cincho*→abrazadera. |
 | 3 | **Relajación + fuzzy `pg_trgm`** | Erratas fuertes y consultas que fallan por una palabra. |
-| 4 | **Búsqueda vectorial** (`pgvector`, umbral 0.58) | Variantes de nombre. **Aporte medido: 0 sobre 320 casos** — ver nota. |
+| 4 | **Búsqueda vectorial** (`pgvector`, umbral 0.45) | Variantes de nombre: *tapa para el baño* → TAPA DE INODORO. **+7 aciertos medidos** sobre 320. |
 | 5 | **Rescate semántico** (Luna + las 710 categorías) | El cliente describe la FUNCIÓN: *«lo que se usa para pegar los bloques»* → cemento. Lo que acierta se guarda en el diccionario: la próxima vez es gratis. |
+| ★ | **Ventas recientes** (`producto_popularidad`) | Señal transversal que reordena: lo que de verdad se vende sube, el stock fantasma cae. |
 
 Las capas 4 y 5 devuelven una **hipótesis**, no un hallazgo: el bot está obligado a preguntar
 «¿te refieres a…?» y a emitir `[PEDIR_AYUDA]` si el cliente lo refuta.
 
-> **Nota honesta sobre embeddings.** Medidos sobre 320 consultas coloquiales, con y sin capa
-> vectorial: **72,2 % de recall exacto en ambos casos**, idéntico caso por caso. Este catálogo
-> son cadenas de SKU cortas, no prosa, así que el vector acaba capturando solapamiento léxico
-> —lo que `pg_trgm` ya hacía—, y su suelo de ruido es altísimo (`"asdfgh qwerty"` puntúa 0.467).
-> Queda desplegada como seguro latente y desactivable: **si `OPENAI_API_KEY` está vacía, la
-> búsqueda funciona igual**. Lo que sí bajó los fallos (10 % → 5 % en su momento) fueron las
-> stopwords y el peso del sustantivo principal, no los vectores.
+**Estado medido** (320 consultas coloquiales): **76,9 % de recall exacto, 6,3 % de fallos.**
+Con la capa vectorial 246 aciertos frente a 239 sin ella, o sea **+7 atribuibles al vector**.
+
+> **Sobre los embeddings — hubo que enriquecer el texto para que sirvieran.** Embebiendo la
+> descripción cruda el aporte fue **cero** (72,2 % con y sin, idéntico caso por caso): son
+> cadenas de SKU cortas, no prosa, y el vector acababa midiendo solapamiento léxico, lo que
+> `pg_trgm` ya hacía. Al embeber `descripción + categoría + coloquialismos` el margen
+> señal/ruido pasó de **0.012 a 0.123** y empezó a aportar. Sigue siendo desactivable: **si
+> `OPENAI_API_KEY` está vacía, la búsqueda funciona igual**.
+>
+> **Ojo con el stock fantasma:** de 5.046 productos con existencia, **2.559 (51 %) no venden
+> hace un año**. Por eso el ranking por ventas usa nº de FACTURAS, no unidades: 80 facturas
+> son 80 decisiones de compra, las unidades las distorsiona un mayorista.
+
+Para el detalle completo —estadísticas, decisiones, lo que se probó y **no** funcionó, y
+dónde investigar mejoras— ver **[RAG.md](RAG.md)**.
 
 ### Flujo del mensaje (workflow n8n, 30 nodos)
 
@@ -207,7 +217,9 @@ Cuando el bot no basta, encola al cliente y un empleado lo atiende desde una app
 | `n8n_workflow.json` | Snapshot completo del flujo de n8n (importable / recuperación). |
 | `scripts/` | Despliegue (`patch_*.js`), inspección (`_inspect_live.js`), build/guards (`build_workflow.js`, `check_*_sync.js`) y harnesses de prueba (`_test_*.js`). |
 | `tests/` | Unit tests de `lib` (`node --test`). |
-| `supabase_schema.sql` | DDL completo (índices, RPC, RLS). Ojo: las tablas de vocabulario/embeddings se crearon por migración y no están aquí. |
+| `supabase_schema.sql` | DDL completo (índices, RPC, RLS). Ojo: las tablas de vocabulario, embeddings, descripciones y popularidad se crearon por migración y **no están aquí**. |
+| [`RAG.md`](RAG.md) | Cómo funciona la búsqueda, estadísticas medidas y dónde investigar mejoras. |
+| `plans/` | Notas de cambios técnicos. [`006`](plans/006-fusion-hibrida-rrf.md) documenta la fusión RRF pendiente y los intentos fallidos. |
 | `scratch_live/_coloquial_set*.json` | Sets de prueba cacheados (320 y 80 casos) para que el antes/después sea comparable. |
 | `docker-compose.yml` · `Dockerfile` | n8n (con docker-cli) + WAHA. |
 | `setup.js` · `start_agent.ps1` · `seed_memory.js` | Instalación, arranque y siembra de memorias base. |
@@ -228,6 +240,8 @@ node scripts/_test_fallos_reales.js --prod # las consultas que de verdad hiciero
 node scripts/_test_coloquial.js            # recall sobre 320 consultas coloquiales (set cacheado)
 node scripts/_test_coloquial.js --sin-vector   # el mismo set sin capa vectorial, para comparar
 node scripts/_test_modelo.js               # end-to-end del agente: prompt real + tools reales
+node scripts/_test_vector.js               # margen señal/ruido del espacio vectorial
+node scripts/_audit_sin.js                 # audita el mapa SIN contra el catálogo real
 node scripts/_inspect_live.js              # re-dumpear el workflow vivo a scratch_live/
 ```
 
@@ -243,19 +257,35 @@ node scripts/_inspect_live.js              # re-dumpear el workflow vivo a scrat
 node scripts/deploy_nodos.js               # dumps scratch_live/ -> nodos del n8n vivo
 node scripts/export_workflow.js            # n8n vivo -> n8n_workflow.json (snapshot fiel)
 node scripts/build_workflow.js             # normaliza el JSON desde los dumps
-npm test                                   # verifica que todo quedó sincronizado
 ```
 
-### Mantenimiento del diccionario y los vectores
+> `deploy_nodos.js` corre **`npm test` antes del PUT** y aborta si falla: desplegar a n8n es
+> publicar en producción, el bot atiende clientes reales en cuanto el PUT devuelve 200.
+> `--sin-test` lo salta, pero hay que escribirlo a propósito.
+
+### Mantenimiento del diccionario, los vectores y las ventas
 
 ```bash
 node scripts/generar_vocabulario.js --dry  # qué términos generaría (sin escribir)
 node scripts/generar_vocabulario.js        # incremental: solo categorías nuevas/cambiadas
-node scripts/generar_embeddings.js         # incremental por hash de descripción
+node scripts/generar_embeddings.js         # incremental por hash del texto enriquecido
+node scripts/generar_descripciones.js      # descripciones con Luna (solo lo vendido en 365 días)
 ```
 
-El workflow n8n **«Sync Vocabulario Catálogo»** (cron 3:00 AM) hace ambas cosas solo, por hash
-y por categoría, así que un producto nuevo no obliga a regenerar las 710.
+El workflow n8n **«Sync Vocabulario Catálogo»** (cron 3:00 AM) lo mantiene solo:
+
+```
+Cada noche 3:00 → Sincronizar Vocabulario → Sync Embeddings → Refrescar Popularidad
+```
+
+Todo incremental y por hash, así que un producto nuevo no obliga a regenerar las 710
+categorías ni los 7.5k vectores. Va en un workflow **aparte** del flujo de mensajes para no
+sumar latencia a ningún cliente.
+
+> **Trampa de carga masiva:** el índice HNSW reconstruye el grafo en cada insert y revienta
+> el `statement_timeout` de Supabase (error `57014`) a mitad, ya pagados los embeddings.
+> Orden correcto: `drop index` → cargar → `create index`. El script avisa si hay >500 filas
+> pendientes; no puede automatizarlo porque la anon key no hace DDL.
 
 ---
 
