@@ -1,13 +1,24 @@
-// READ-ONLY: audita las 93 entradas escritas a mano del mapa SIN contra el catálogo REAL.
+// READ-ONLY: audita las entradas escritas a mano del mapa SIN contra el catálogo REAL.
 //
-// Un mapeo termino->canonico puede fallar de tres maneras:
-//   DAÑINO   el TÉRMINO ya existe literal en descripciones -> traducirlo vuelve
-//            inencontrable un producto que se llamaba justo así (caso 'cinta aislante').
-//   MUERTO   el CANÓNICO no aparece en ninguna descripción -> manda la búsqueda a la nada.
-//   ESTRECHO el canónico existe pero devuelve MENOS productos que el término original.
+// Veredictos:
+//   COLISION      la clave aparece DENTRO de otras palabras del catálogo. Sería destructivo
+//                 con reemplazo de subcadena ("media"->"1/2" volvía "mediano" en "1/2no").
+//                 **Hoy está CONTENIDO**: expandir() aplica SIN con límite de palabra. Se
+//                 sigue reportando a propósito — es riesgo LATENTE: si alguien quita el
+//                 límite de palabra, las colisiones vuelven todas de golpe.
+//   MUERTO        el CANÓNICO no aparece en ninguna descripción -> manda la búsqueda a la nada.
+//   DAÑINO        el TÉRMINO ya se encuentra solo y el canónico devuelve MENOS productos:
+//                 traducirlo solo puede restar (caso 'cinta aislante').
+//   inalcanzable  clave de varias palabras que exige adyacencia, pero el cliente escribe con
+//                 "de" en medio ("disco corte" no matchea "disco DE corte"). No se dispara,
+//                 así que no puede hacer daño; tampoco sirve para nada.
+//   revisar       el canónico ENSANCHA el resultado. Suele ser correcto; se lista por si acaso.
+//
+// OJO: este audit mide el riesgo en los DATOS, no si el código lo protege. Un COLISION
+// reportado no es un bug vivo mientras expandir() mantenga el límite de palabra.
 //
 //   node scripts/_audit_sin.js            # solo los sospechosos
-//   node scripts/_audit_sin.js --todos    # las 93, con sus conteos
+//   node scripts/_audit_sin.js --todos    # todas, con sus conteos
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -65,6 +76,14 @@ function cuenta(descs, frase) {
     const nT = cuenta(descs, termino);
     const nC = canonico === '' ? -1 : cuenta(descs, canonico);
     const col = colisiones(termino);
+    // ALCANZABILIDAD. Desde que SIN se aplica con límite de palabra, una clave de varias
+    // palabras exige que esas palabras vayan ADYACENTES. Pero el cliente escribe con "de"
+    // en medio: "disco corte" no matchea "disco DE corte", así que la entrada está muerta.
+    // Sin esta señal, el audit marca como peligrosas entradas que ni siquiera se disparan.
+    const inalcanzable = termino.includes(' ') &&
+      !termino.includes(' de ') &&
+      descs.some(d => new RegExp('(^|\\s)' + esc(termino.split(' ').join(' de ')) + '($|\\s)').test(d) ||
+                      d.includes(termino.split(' ').join(' de ')));
     let veredicto = 'ok';
     // El término ya se encuentra solo Y el canónico no aporta más: traducirlo solo puede restar.
     if (nT > 0 && canonico !== '' && nC >= 0 && nT >= nC) veredicto = 'DAÑINO';
@@ -73,10 +92,12 @@ function cuenta(descs, frase) {
     // La colisión manda sobre todo lo demás: rompe búsquedas que NO tienen nada que ver
     // con este sinónimo, así que el daño es mucho más ancho que un mapeo simplemente malo.
     if (col.n > 0) veredicto = 'COLISION';
-    filas.push({ termino, canonico, nT, nC, veredicto, col });
+    // Una entrada que no se dispara no puede hacer daño: baja de categoría, no sube.
+    if (inalcanzable && veredicto !== 'COLISION') veredicto = 'inalcanzable';
+    filas.push({ termino, canonico, nT, nC, veredicto, col, inalcanzable });
   }
 
-  const orden = { 'COLISION': 0, 'MUERTO': 1, 'DAÑINO': 2, 'revisar': 3, 'ok': 4 };
+  const orden = { 'COLISION': 0, 'MUERTO': 1, 'DAÑINO': 2, 'revisar': 3, 'inalcanzable': 4, 'ok': 5 };
   filas.sort((a, b) => orden[a.veredicto] - orden[b.veredicto] || b.nT - a.nT);
 
   const mostrar = TODOS ? filas : filas.filter(f => f.veredicto !== 'ok');
@@ -106,5 +127,5 @@ function cuenta(descs, frase) {
   }
 
   const c = v => filas.filter(f => f.veredicto === v).length;
-  console.log(`\nTOTAL ${filas.length} | COLISION ${c('COLISION')} | MUERTO ${c('MUERTO')} | DAÑINO ${c('DAÑINO')} | revisar ${c('revisar')} | ok ${c('ok')}`);
+  console.log(`\nTOTAL ${filas.length} | COLISION ${c('COLISION')} | MUERTO ${c('MUERTO')} | DAÑINO ${c('DAÑINO')} | revisar ${c('revisar')} | inalcanzable ${c('inalcanzable')} | ok ${c('ok')}`);
 })().catch(e => { console.error('ERROR', e.message); process.exit(1); });
