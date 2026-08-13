@@ -343,23 +343,39 @@ try{
 }catch(e){}
 
 // NEGATIVO: consultas que un empleado ya marco como "no lo vendemos" (caducidad 90 dias)
+//
+// La condicion es NEGATIVO ⊆ CONSULTA: solo se niega si el cliente pide algo AL MENOS tan
+// especifico como lo que el empleado descarto. Es la misma direccion que usa el aprendizaje
+// positivo de arriba (_rT.every(t=>qRawSet.has(t))).
+//
+// Al reves (consulta ⊆ negativo) el radio de daño CRECE con cada marca del empleado, porque
+// cuanto MAS GENERAL pregunta el cliente, mas facil le niegan el producto. Paso en vivo: un
+// empleado marco "angulo de 2x1 de 1 milimetro" (una medida que de verdad no existe) el
+// 2026-07-23 a las 19:11, y esa misma noche a las 21:05 el bot empezo a responder "no
+// manejamos angulos" teniendo 5 angulos en stock; lo repitio el 24/07 y el 03/08. Con solo
+// 4 filas en la tabla ya negaba tambien "agua", "motor", "estructura" y "huecos".
+// Medido en scripts/_diag_negativa.js: 10/14 veredictos equivocados antes, 0/14 despues.
+//
+// Ojo: NO filtrar MODIFIERS de los tokens del negativo. Quitarlos lo vuelve mas corto y por
+// tanto MAS facil de satisfacer: un negativo "lamina blanca" quedaria en {lamina} y negaria
+// cualquier lamina. Se exigen todos sus tokens tal cual.
 async function esNoVendido(){
   try{
     const _lim = new Date(Date.now()-90*24*3600*1000).toISOString();
     const r = await axios.get(SB+'/rest/v1/busqueda_negativa?select=termino_raw&creado_en=gte.'+encodeURIComponent(_lim)+'&limit=200',{headers:H});
-    const _qs = [...qRawSet].filter(w=>!MODIFIERS.has(w));
-    if(_qs.length===0) return false;
+    if(qRawSet.size===0) return false;
     for(const nrow of (r.data||[])){
-      const _nt = new Set(tokensDe(nrow.termino_raw||''));
-      if(_nt.size>0 && _nt.size<=8 && _qs.every(t=>_nt.has(t))) return true;
+      const _nt = [...new Set(tokensDe(nrow.termino_raw||''))];
+      if(_nt.length>0 && _nt.length<=8 && _nt.every(t=>qRawSet.has(t))) return true;
     }
   }catch(e){}
   return false;
 }
 const NO_VENDIDO_JSON = () => JSON.stringify({ encontrados:0, no_vendido:true, instruccion:'Un empleado ya CONFIRMO antes que este producto NO lo trabajamos. NO uses [PEDIR_AYUDA]: dile al cliente con calidez y honestidad que ese producto no lo manejamos y ofrecele ayudar con otra cosa de la ferreteria.', mensaje:'"' + p_busqueda + '" esta marcado como no vendido.' });
 
-// Si un empleado YA marco esta consulta exacta como "no la vendemos" y no hay aprendizaje que la
-// resuelva, cortamos aqui: evita matchear ruido (ej. "motor" en "hoyadora... motor para huecos").
+// Si un empleado YA marco esta consulta como "no la vendemos" y no hay aprendizaje que la
+// resuelva, cortamos aqui. El aprendizaje manda sobre el negativo: si un empleado eligio un
+// producto concreto para una consulta asi, ese hallazgo es mas fresco que la marca negativa.
 if (aprBoost.length===0 && await esNoVendido()) return NO_VENDIDO_JSON();
 
 const granelIntent = /\b(por|al|x|cada|el|un|1)\s*(metro|metros|mt|mts)\b/.test(norm(_pb)) || /\bmetros?\s+de\b/.test(norm(_pb));
