@@ -254,6 +254,11 @@ const IGNORED = new Set([
   'bs', 'bolivares', 'bolivar', 'dolar', 'dolares', 'divisas', 'usd',
   'importa', 'marca', 'modelo', 'solo', 'sola', 'mismo', 'misma', 'igual', 'cualquier', 'cualquiera', 'tambien', 'ambos', 'ambas',
   'este', 'esta', 'estos', 'estas', 'ese', 'esa', 'eso', 'esos', 'esas', 'aqui', 'aca', 'alla', 'ahi', 'hoy', 'ahora', 'pues', 'ud', 'uds', 'usted', 'ustedes',
+  // Saludos y muletillas. Sin esto, un simple "como esta todo" cotizaba 4 productos: el
+  // token "todo" casa con "Disco P/lijad TODO" y "SueldaTODO", asi que la consulta parecia
+  // tener contenido y el guardia de consulta vaga no saltaba.
+  'todo', 'toda', 'todos', 'todas', 'como', 'asi', 'buenas', 'buenos', 'dia', 'dias', 'tarde', 'tardes', 'noche', 'noches',
+  'saludos', 'gracias', 'favor', 'porfavor', 'porfa', 'amigo', 'amiga', 'hermano', 'disculpe', 'disculpa', 'bendiciones',
   'venden', 'vendes', 'vende', 'vendera', 'venderan', 'tienen', 'tiene', 'tienes', 'tenes', 'tendra', 'tendras', 'tendran', 'tuviera', 'tuvieran', 'habra', 'hay', 'sera', 'seria', 'sirve', 'sirven',
   // Verbos de cualidad: el cliente los usa para describir ("pega que AGUANTE humedad") pero
   // no son parte del nombre del producto. Si cuentan como palabra de contenido, el ilike
@@ -319,7 +324,10 @@ const termExp = normMedida(expandir(_pbv));
 const qTokens = tokensDe(expandir(_pbv));
 const qTokensRaw = tokensDe(_pb); // SIN sinonimos: para casar contra aprendizaje/negativa guardados
 const qRawSet = new Set(qTokensRaw);
-const largas = qTokens.filter(w => w.length>=3 || /\d/.test(w));
+// Un "0" suelto no es una medida: no dice nada del producto, pero casa con "AL 0%" y hacia
+// que un mensaje de puro ruido ("0;  b b.") devolviera varillas de soldar. Las medidas de
+// verdad ("0.30", "3/8", "2x2", "12") siguen entrando.
+const largas = qTokens.filter(w => (w.length>=3 || /\d/.test(w)) && w !== '0');
 const textLargas = largas.filter(w => !/\d/.test(w));
 const medLargas = largas.filter(w => /\d/.test(w));
 
@@ -398,10 +406,21 @@ async function fuzzy(t){ try { const r=await axios.post(SB+'/rest/v1/rpc/buscar_
 
 // Fetch: si hay palabras de texto (categoria), trae amplio por categoria y filtra la medida en JS
 // (las descripciones guardan las medidas con formatos inconsistentes, por eso no las metemos al ilike).
+// Los ilike son de SUBCADENA ('%pega%' trae "Pegable"), lo cual esta bien para RECALL pero
+// no para dar por buena la busqueda. Si NINGUN candidato casa por palabra, es un falso
+// positivo del SQL: "pega para tubo pvc" devolvia un "Tubo PVC A/B Pegable" AGOTADO sin
+// mencionar la pega, y encima impedia que corriera el drop-one porque el AND "encontro algo".
+// Devolver [] deja que sigan las demas estrategias.
+function casanDeVerdad(rows, tokens){
+  const _t = (tokens||[]).filter(w => !/\d/.test(w) && w.length>=3);
+  if (!rows || !rows.length || !_t.length) return rows || [];
+  const ok = rows.filter(r => _t.every(w => aliasDe(w).some(a => casaPalabra(a, norm(r.descripcion)))));
+  return ok.length ? ok : [];
+}
 let res = [];
 let _fuzzy = false;
-if (granelIntent && textLargas.length>0) res = await ilike(textLargas, 60, GRANEL_OR);
-if (res.length===0 && textLargas.length>0) res = await ilike(textLargas, 60);
+if (granelIntent && textLargas.length>0) res = casanDeVerdad(await ilike(textLargas, 60, GRANEL_OR), textLargas);
+if (res.length===0 && textLargas.length>0) res = casanDeVerdad(await ilike(textLargas, 60), textLargas);
 // RELAJACION drop-one: el AND completo fallo -> reintenta quitando UNA palabra a la vez,
 // soltando primero la MENOS especifica (modificadores/colores/palabras cortas) y NUNCA
 // dejando solo modificadores. Se queda con el primer intento que traiga resultados.
@@ -416,7 +435,7 @@ if (res.length===0 && textLargas.length>=2 && textLargas.length<=6){
   for (const _i of _order){
     const _sub = textLargas.filter((_w,_j)=>_j!==_i);
     if (_sub.every(_esMod)) continue; // no busques dejando solo modificadores
-    const _r = await ilike(_sub, 60);
+    const _r = casanDeVerdad(await ilike(_sub, 60), _sub);
     if (_r.length>0){ res=_r; _dropped=textLargas[_i]; break; }
   }
 }

@@ -94,10 +94,11 @@ const TESTS = [
   { q: 'No me importa la marca solo el modelo', exists: null, src: 'anafora' },
   { q: 'no eso no son paneles adhesivos', exists: null, src: 'anafora' },
   // esperaVago: no es una consulta de producto. Debe pedir aclaracion, NO cotizar.
-  { q: 'Vallalo currucho como esta todo', exists: false, src: 'ruido', esperaVago: true,
-    conocido: 'el token "todo" del saludo casa con Disco P/lijad TODO y SueldaTODO -> cotiza 4 productos a quien solo saludo' },
-  { q: '0;   b b.', exists: false, src: 'ruido', esperaVago: true,
-    conocido: 'el "0" suelto se trata como medida y casa con "AL 0%" -> devuelve varillas de soldar para ruido puro' },
+  // Regresion: "todo" cotizaba 4 productos (casaba con Disco P/lijad TODO y SueldaTODO);
+  // ahora esta en IGNORED junto al resto de saludos y muletillas.
+  { q: 'Vallalo currucho como esta todo', exists: false, src: 'ruido', esperaVago: true },
+  // Regresion: el "0" suelto se trataba como medida y casaba con "AL 0%" -> varillas de soldar.
+  { q: '0;   b b.', exists: false, src: 'ruido', esperaVago: true },
   { q: 'Ok gracias tienes fotos', exists: false, src: 'ruido', esperaVago: true },
 
   // ---- LOS MAS VENDIDOS deben encontrarse por su nombre coloquial ----
@@ -123,8 +124,9 @@ const TESTS = [
   // OJO: los regex de `top` llevan \b a proposito. Con /pega/i este mismo caso pasaba en
   // verde devolviendo "Tubo PVC A/B PEGAble", porque el regex casaba dentro de la palabra:
   // el mismo error de subcadena que se acaba de corregir en el buscador, cometido en el test.
-  { q: 'pega para tubo pvc', exists: true, src: 'subcadena', top: /\bpega\b/i,
-    conocido: 'drop-one suelta el sustantivo principal ("pega") en vez del complemento ("tubo") y devuelve un tubo pegable agotado' },
+  // Regresion: el ilike '%pega%' traia "Tubo PVC A/B PEGAble" y el AND daba por buena la
+  // busqueda, asi que devolvia un tubo AGOTADO sin mencionar la pega. Ver casanDeVerdad().
+  { q: 'pega para tubo pvc', exists: true, src: 'subcadena', top: /\bpega\b/i, notTop: /pegable/i },
   { q: 'pega soldadura', exists: true, src: 'subcadena', top: /\bpega\b/i, notTop: /pegable/i },
 ];
 
