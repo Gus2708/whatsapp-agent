@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-20T04:58:02.142Z",
+  "updatedAt": "2026-08-20T05:19:29.861Z",
   "createdAt": "2026-06-05T05:13:56.483Z",
   "id": "ugHOTQv3Vb6cuTct",
   "name": "whatsapp agent",
@@ -599,7 +599,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Registra una solicitud de ayuda (el bot no encontro algo o el cliente refuto el resultado).\n// La app de empleados elige el/los producto(s) y n8n reenvia. Dedup: una solicitud 'pendiente' por telefono.\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nlet telefono = null, consulta = null, pushName = null;\ntry { telefono = $('Webhook Trigger').first().json.body.payload.from; } catch (e) {}\ntry { consulta = ($('Webhook Trigger').first().json.body.payload.body || '').toString().slice(0, 500) || null; } catch (e) {}\ntry { const _p = $('Webhook Trigger').first().json.body.payload; pushName = (_p && _p._data && _p._data.pushName) || (_p && _p.notifyName) || (_p && _p.pushName) || null; } catch (e) {}\ntry {\n  if (telefono) {\n    const ex = await axios.get(SB + '/rest/v1/solicitudes_ayuda?status=eq.pendiente&select=id&telefono=eq.' + encodeURIComponent(telefono), { headers: H });\n    if (!ex.data || ex.data.length === 0) {\n      let nombre = null;\n      try { const c = await axios.get(SB + '/rest/v1/clientes_chat?select=nombre&telefono=eq.' + encodeURIComponent(telefono), { headers: H }); nombre = (c.data && c.data[0] && c.data[0].nombre) || null; } catch (e) {}\n      if (!nombre && pushName) nombre = String(pushName).slice(0, 80);\n      await axios.post(SB + '/rest/v1/solicitudes_ayuda', { telefono, nombre, consulta, motivo: 'no_encontrado', status: 'pendiente' }, { headers: H });\n    }\n  }\n} catch (e) {}\nreturn [{ json: $json }];"
+        "jsCode": "// Registra una solicitud de ayuda (el bot no encontro algo o el cliente refuto el resultado).\n// La app de empleados elige el/los producto(s) y n8n reenvia.\n//\n// consulta        -> lo que LEE EL EMPLEADO: mensaje + contexto de la conversacion.\n// consulta_limpia -> lo que APRENDE EL BUSCADOR (fn_aprender_item). Solo el mensaje.\n// No mezclar los dos: con el contexto dentro, el motor aprenderia la respuesta del bot.\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nconst DEDUP_HORAS = 3;\nconst MARCADORES = ['[pedir_ayuda]', '[escalar_humano]'];\nconst limpiar = (t) => String(t || '').replace(/\\s+/g, ' ').trim();\n\nlet telefono = null, consulta = null, pushName = null, msgId = '';\ntry {\n  // Transcribir Nota de Voz, no Webhook Trigger: en una nota de voz o una foto el body del\n  // webhook es el media crudo; aqui ya viene la transcripcion o la descripcion.\n  const p = $('Transcribir Nota de Voz').first().json.body.payload;\n  telefono = p && p.from;\n  msgId = String((p && p.id) || '');\n  consulta = limpiar(p && p.body).slice(0, 300) || null;\n  pushName = (p && p._data && p._data.pushName) || (p && p.notifyName) || (p && p.pushName) || null;\n} catch (e) {}\n\n// Contexto: sin esto el empleado recibe \"De este\" y no puede hacer nada.\nlet contexto = '';\ntry {\n  if (telefono) {\n    const r = await axios.get(SB + '/rest/v1/mensajes_procesados?chat_id=eq.' + encodeURIComponent(telefono) + '&select=message_id,texto,procesado_at&order=procesado_at.desc&limit=8', { headers: H, timeout: 4000 });\n    const previos = (r.data || [])\n      .filter(f => String(f.message_id) !== msgId && f.texto)\n      .slice(0, 3)\n      .reverse()\n      .map(f => limpiar(f.texto).slice(0, 90))\n      .filter(Boolean);\n    if (previos.length) contexto = 'antes dijo: ' + previos.map(t => '\"' + t + '\"').join(' · ');\n\n    const b = await axios.get(SB + '/rest/v1/mensajes_bot?chat_id=eq.' + encodeURIComponent(telefono) + '&select=texto_norm&order=created_at.desc&limit=5', { headers: H, timeout: 4000 });\n    const ultima = (b.data || [])\n      .map(x => limpiar(x.texto_norm))\n      .find(t => t && MARCADORES.indexOf(t) === -1);\n    if (ultima) contexto += (contexto ? ' | ' : '') + 'Perucho respondio: ' + ultima.slice(0, 150);\n  }\n} catch (e) {}\n\ntry {\n  if (telefono) {\n    // El bloqueo por duplicado CADUCA: una solicitud pendiente sin atender no puede dejar\n    // al cliente sin poder pedir ayuda para siempre.\n    const desde = new Date(Date.now() - DEDUP_HORAS * 3600000).toISOString();\n    const ex = await axios.get(SB + '/rest/v1/solicitudes_ayuda?status=eq.pendiente&select=id&telefono=eq.' + encodeURIComponent(telefono) + '&creado_en=gte.' + encodeURIComponent(desde), { headers: H });\n    if (!ex.data || ex.data.length === 0) {\n      let nombre = null;\n      try { const c = await axios.get(SB + '/rest/v1/clientes_chat?select=nombre&telefono=eq.' + encodeURIComponent(telefono), { headers: H }); nombre = (c.data && c.data[0] && c.data[0].nombre) || null; } catch (e) {}\n      if (!nombre && pushName) nombre = String(pushName).slice(0, 80);\n      const consultaConContexto = contexto\n        ? (consulta || '(sin texto)') + '\\n— ' + contexto.slice(0, 260)\n        : consulta;\n      await axios.post(SB + '/rest/v1/solicitudes_ayuda', {\n        telefono, nombre,\n        consulta: consultaConContexto,\n        consulta_limpia: consulta,\n        motivo: 'no_encontrado', status: 'pendiente',\n      }, { headers: H });\n    }\n  }\n} catch (e) {}\nreturn [{ json: $json }];"
       },
       "id": "code_registrar_solicitud_node",
       "name": "Registrar Solicitud Ayuda",
@@ -1066,9 +1066,9 @@
   "meta": {},
   "nodeGroups": [],
   "pinData": {},
-  "versionId": "04847f5d-cf38-4819-891c-52f248b504f7",
-  "activeVersionId": "04847f5d-cf38-4819-891c-52f248b504f7",
-  "versionCounter": 166,
+  "versionId": "52a61dcf-7342-4951-9fde-86265684e54d",
+  "activeVersionId": "52a61dcf-7342-4951-9fde-86265684e54d",
+  "versionCounter": 167,
   "triggerCount": 1,
   "sourceWorkflowId": null,
   "shared": [
@@ -1093,9 +1093,9 @@
   ],
   "tags": [],
   "activeVersion": {
-    "updatedAt": "2026-08-20T04:58:02.147Z",
-    "createdAt": "2026-08-20T04:58:02.147Z",
-    "versionId": "04847f5d-cf38-4819-891c-52f248b504f7",
+    "updatedAt": "2026-08-20T05:19:29.866Z",
+    "createdAt": "2026-08-20T05:19:29.866Z",
+    "versionId": "52a61dcf-7342-4951-9fde-86265684e54d",
     "workflowId": "ugHOTQv3Vb6cuTct",
     "nodes": [
       {
@@ -1690,7 +1690,7 @@
       },
       {
         "parameters": {
-          "jsCode": "// Registra una solicitud de ayuda (el bot no encontro algo o el cliente refuto el resultado).\n// La app de empleados elige el/los producto(s) y n8n reenvia. Dedup: una solicitud 'pendiente' por telefono.\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nlet telefono = null, consulta = null, pushName = null;\ntry { telefono = $('Webhook Trigger').first().json.body.payload.from; } catch (e) {}\ntry { consulta = ($('Webhook Trigger').first().json.body.payload.body || '').toString().slice(0, 500) || null; } catch (e) {}\ntry { const _p = $('Webhook Trigger').first().json.body.payload; pushName = (_p && _p._data && _p._data.pushName) || (_p && _p.notifyName) || (_p && _p.pushName) || null; } catch (e) {}\ntry {\n  if (telefono) {\n    const ex = await axios.get(SB + '/rest/v1/solicitudes_ayuda?status=eq.pendiente&select=id&telefono=eq.' + encodeURIComponent(telefono), { headers: H });\n    if (!ex.data || ex.data.length === 0) {\n      let nombre = null;\n      try { const c = await axios.get(SB + '/rest/v1/clientes_chat?select=nombre&telefono=eq.' + encodeURIComponent(telefono), { headers: H }); nombre = (c.data && c.data[0] && c.data[0].nombre) || null; } catch (e) {}\n      if (!nombre && pushName) nombre = String(pushName).slice(0, 80);\n      await axios.post(SB + '/rest/v1/solicitudes_ayuda', { telefono, nombre, consulta, motivo: 'no_encontrado', status: 'pendiente' }, { headers: H });\n    }\n  }\n} catch (e) {}\nreturn [{ json: $json }];"
+          "jsCode": "// Registra una solicitud de ayuda (el bot no encontro algo o el cliente refuto el resultado).\n// La app de empleados elige el/los producto(s) y n8n reenvia.\n//\n// consulta        -> lo que LEE EL EMPLEADO: mensaje + contexto de la conversacion.\n// consulta_limpia -> lo que APRENDE EL BUSCADOR (fn_aprender_item). Solo el mensaje.\n// No mezclar los dos: con el contexto dentro, el motor aprenderia la respuesta del bot.\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nconst DEDUP_HORAS = 3;\nconst MARCADORES = ['[pedir_ayuda]', '[escalar_humano]'];\nconst limpiar = (t) => String(t || '').replace(/\\s+/g, ' ').trim();\n\nlet telefono = null, consulta = null, pushName = null, msgId = '';\ntry {\n  // Transcribir Nota de Voz, no Webhook Trigger: en una nota de voz o una foto el body del\n  // webhook es el media crudo; aqui ya viene la transcripcion o la descripcion.\n  const p = $('Transcribir Nota de Voz').first().json.body.payload;\n  telefono = p && p.from;\n  msgId = String((p && p.id) || '');\n  consulta = limpiar(p && p.body).slice(0, 300) || null;\n  pushName = (p && p._data && p._data.pushName) || (p && p.notifyName) || (p && p.pushName) || null;\n} catch (e) {}\n\n// Contexto: sin esto el empleado recibe \"De este\" y no puede hacer nada.\nlet contexto = '';\ntry {\n  if (telefono) {\n    const r = await axios.get(SB + '/rest/v1/mensajes_procesados?chat_id=eq.' + encodeURIComponent(telefono) + '&select=message_id,texto,procesado_at&order=procesado_at.desc&limit=8', { headers: H, timeout: 4000 });\n    const previos = (r.data || [])\n      .filter(f => String(f.message_id) !== msgId && f.texto)\n      .slice(0, 3)\n      .reverse()\n      .map(f => limpiar(f.texto).slice(0, 90))\n      .filter(Boolean);\n    if (previos.length) contexto = 'antes dijo: ' + previos.map(t => '\"' + t + '\"').join(' · ');\n\n    const b = await axios.get(SB + '/rest/v1/mensajes_bot?chat_id=eq.' + encodeURIComponent(telefono) + '&select=texto_norm&order=created_at.desc&limit=5', { headers: H, timeout: 4000 });\n    const ultima = (b.data || [])\n      .map(x => limpiar(x.texto_norm))\n      .find(t => t && MARCADORES.indexOf(t) === -1);\n    if (ultima) contexto += (contexto ? ' | ' : '') + 'Perucho respondio: ' + ultima.slice(0, 150);\n  }\n} catch (e) {}\n\ntry {\n  if (telefono) {\n    // El bloqueo por duplicado CADUCA: una solicitud pendiente sin atender no puede dejar\n    // al cliente sin poder pedir ayuda para siempre.\n    const desde = new Date(Date.now() - DEDUP_HORAS * 3600000).toISOString();\n    const ex = await axios.get(SB + '/rest/v1/solicitudes_ayuda?status=eq.pendiente&select=id&telefono=eq.' + encodeURIComponent(telefono) + '&creado_en=gte.' + encodeURIComponent(desde), { headers: H });\n    if (!ex.data || ex.data.length === 0) {\n      let nombre = null;\n      try { const c = await axios.get(SB + '/rest/v1/clientes_chat?select=nombre&telefono=eq.' + encodeURIComponent(telefono), { headers: H }); nombre = (c.data && c.data[0] && c.data[0].nombre) || null; } catch (e) {}\n      if (!nombre && pushName) nombre = String(pushName).slice(0, 80);\n      const consultaConContexto = contexto\n        ? (consulta || '(sin texto)') + '\\n— ' + contexto.slice(0, 260)\n        : consulta;\n      await axios.post(SB + '/rest/v1/solicitudes_ayuda', {\n        telefono, nombre,\n        consulta: consultaConContexto,\n        consulta_limpia: consulta,\n        motivo: 'no_encontrado', status: 'pendiente',\n      }, { headers: H });\n    }\n  }\n} catch (e) {}\nreturn [{ json: $json }];"
         },
         "id": "code_registrar_solicitud_node",
         "name": "Registrar Solicitud Ayuda",
@@ -2156,18 +2156,18 @@
     "autosaved": false,
     "workflowPublishHistory": [
       {
-        "createdAt": "2026-08-20T04:58:02.677Z",
-        "id": 345,
+        "createdAt": "2026-08-20T05:19:30.547Z",
+        "id": 347,
         "workflowId": "ugHOTQv3Vb6cuTct",
-        "versionId": "04847f5d-cf38-4819-891c-52f248b504f7",
+        "versionId": "52a61dcf-7342-4951-9fde-86265684e54d",
         "event": "activated",
         "userId": "a9174cb6-6525-426b-9005-30bde1cb175c"
       },
       {
-        "createdAt": "2026-08-20T04:58:02.527Z",
-        "id": 344,
+        "createdAt": "2026-08-20T05:19:30.461Z",
+        "id": 346,
         "workflowId": "ugHOTQv3Vb6cuTct",
-        "versionId": "04847f5d-cf38-4819-891c-52f248b504f7",
+        "versionId": "52a61dcf-7342-4951-9fde-86265684e54d",
         "event": "deactivated",
         "userId": "a9174cb6-6525-426b-9005-30bde1cb175c"
       }
