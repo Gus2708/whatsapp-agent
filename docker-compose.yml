@@ -33,14 +33,21 @@ services:
       # Store de NOWEB: necesario para historial/contactos y mayor estabilidad de sesión.
       - WHATSAPP_DEFAULT_CONFIG_NOWEB_STORE_ENABLED=True
       - WHATSAPP_DEFAULT_CONFIG_NOWEB_STORE_FULLSYNC=True
-      # Webhook global -> al escanear el QR los mensajes entrantes van directo a n8n.
+      # OJO: el webhook NO se define aquí. La sesión "default" ya lo tiene persistido
+      # en el volumen (/app/.sessions/noweb/default/.waha.session.config.json) con
+      # url=http://host.docker.internal:5678/webhook/whatsapp/inbound y events=[message.any].
       # Se usa host.docker.internal (no 'n8n_serrucho') porque WAHA rechaza hostnames
       # con guion bajo; esta ruta alcanza n8n por el puerto publicado en el host.
-      - WHATSAPP_HOOK_URL=http://host.docker.internal:5678/webhook/whatsapp/inbound
+      #
+      # WHATSAPP_HOOK_URL/WHATSAPP_HOOK_EVENTS se retiraron el 2026-08-13: el hook global
+      # del env se SUMA al de la sesión, así que WAHA entregaba CADA evento DOS veces
+      # (mismo event.id, dos POST) y n8n ejecutaba el workflow por duplicado.
+      # Si algún día hay que recrear la sesión desde cero, defínelo en la sesión
+      # (API/dashboard), no aquí, para no volver a duplicar.
+      #
       # message.any incluye los mensajes SALIENTES (fromMe): necesario para detectar
       # cuando un empleado le escribe al cliente desde el mismo WhatsApp (handoff humano).
       # El bot ignora sus propios salientes vía la tabla mensajes_bot (nodo Detectar Handoff Empleado).
-      - WHATSAPP_HOOK_EVENTS=message.any
       - WHATSAPP_DOWNLOAD_MEDIA=true
     volumes:
       - waha_session_storage:/app/.sessions
@@ -77,6 +84,17 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - N8N_DEFAULT_PRODUCTION_WORKFLOW_ACTIVE=true
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - NODE_OPTIONS=--max-old-space-size=4096
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=72
+      - EXECUTIONS_DATA_PRUNE_MAX_COUNT=2000
+      # DB_SQLITE_VACUUM_ON_STARTUP se desactivó el 2026-08-18: con la base ya en 1.5 GB
+      # (más un WAL huérfano de 1.6 GB tras un crash) el VACUUM de arranque nunca terminaba.
+      # n8n se quedaba 13+ min bloqueado sin montar el editor ni los webhooks, así que WAHA
+      # recibía 404 en /webhook/whatsapp/inbound y los mensajes de los clientes se perdían.
+      # El prune incremental de arriba mantiene la base a raya sin bloquear el arranque.
+      # Si hace falta compactar, correr el VACUUM a mano con n8n detenido, no al arrancar.
+      # - DB_SQLITE_VACUUM_ON_STARTUP=true
     volumes:
       - n8n_data:/home/node/.n8n
       - /var/run/docker.sock:/var/run/docker.sock
