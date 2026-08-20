@@ -71,6 +71,61 @@ const TESTS = [
   { q: 'tubo de luz de 1/2', exists: true, src: 'cat' },
   { q: 'angulo de 1 pulgada', exists: null, src: 'cat' },
   { q: 'fregadero sencillo', exists: true, src: 'cat' },
+
+  // ---- 2026-08-20: mas consultas REALES de solicitudes_ayuda que no estaban cubiertas ----
+  { q: '2/1  1mm. Cuanto cuesta', exists: null, src: 'real' },
+  { q: 'Arquitectónica de 6 metros roja a cómo la tenés calibre 35 en bs', exists: null, src: 'real' },
+  { q: 'Buen día, que precio tienen  la holladoras, motor para hacer huecos para meter estanquillo.', exists: null, src: 'real' },
+  { q: 'Bueno días q precio tiene el sip pintado', exists: null, src: 'real' },
+  { q: 'Buenos días que cuesta el pigmento en polvo para pisos', exists: null, src: 'real' },
+  { q: 'Buenos días. Precio de el rollo de cable #8 12 xfavr', exists: null, src: 'real' },
+  { q: 'Es kit de sanitario y kit de lavamano', exists: null, src: 'real' },
+  { q: 'Hermano una pregunta ustedes venden popotes de hechar agua y que precio tiene', exists: null, src: 'real' },
+  { q: 'Para saber si llego ángulo de 2x1 de 1 milímetro', exists: null, src: 'real' },
+  { q: 'Pero en estos días pregunté y me dijeron que habían llegado los alambres de pua', exists: null, src: 'real' },
+  { q: 'Que precio tiene la tela pollera', exists: false, src: 'real' },
+  { q: 'Y la cerradura para soldar', exists: null, src: 'real' },
+  { q: 'Thiban estore', exists: false, src: 'real' },
+
+  // ---- anaforas y ruido: NO debe inventarse un producto con seguridad ----
+  // Estas son las que acababan en 'descartado' porque al empleado le llegaba la frase suelta.
+  { q: 'De la de 3.60', exists: null, src: 'anafora' },
+  { q: 'Y el saco de cemento', exists: true, src: 'anafora' },
+  { q: 'No me importa la marca solo el modelo', exists: null, src: 'anafora' },
+  { q: 'no eso no son paneles adhesivos', exists: null, src: 'anafora' },
+  // esperaVago: no es una consulta de producto. Debe pedir aclaracion, NO cotizar.
+  { q: 'Vallalo currucho como esta todo', exists: false, src: 'ruido', esperaVago: true,
+    conocido: 'el token "todo" del saludo casa con Disco P/lijad TODO y SueldaTODO -> cotiza 4 productos a quien solo saludo' },
+  { q: '0;   b b.', exists: false, src: 'ruido', esperaVago: true,
+    conocido: 'el "0" suelto se trata como medida y casa con "AL 0%" -> devuelve varillas de soldar para ruido puro' },
+  { q: 'Ok gracias tienes fotos', exists: false, src: 'ruido', esperaVago: true },
+
+  // ---- LOS MAS VENDIDOS deben encontrarse por su nombre coloquial ----
+  // Si un cliente pide un superventas y el bot no lo saca primero, es el fallo mas caro.
+  // Orden real de producto_popularidad (facturas 90d) al 2026-08-20.
+  { q: 'clavos', exists: true, src: 'top-venta', top: /clavo/i },
+  { q: 'un saco de cemento gris', exists: true, src: 'top-venta', top: /cemento/i },
+  { q: 'tubo de herreria 2x1', exists: true, src: 'top-venta', top: /tubo.*herrer/i },
+  { q: 'alambre de amarre', exists: true, src: 'top-venta', top: /alambre/i },
+  { q: 'electrodos para soldar', exists: true, src: 'top-venta', top: /electrodo/i },
+  { q: 'cabilla de 10', exists: true, src: 'top-venta', top: /cabilla/i },
+  { q: 'cercha', exists: true, src: 'top-venta', top: /cercha/i },
+  { q: 'disco para cortar metal', exists: true, src: 'top-venta', top: /disco/i },
+  { q: 'cajetin 4x2', exists: true, src: 'top-venta', top: /cajetin/i },
+  { q: 'bloque 10', exists: true, src: 'top-venta', top: /bloque/i },
+  { q: 'gancho para techo', exists: true, src: 'top-venta', top: /gancho/i },
+  { q: 'thinner', exists: true, src: 'top-venta', top: /thinner/i },
+  { q: 'lamina de zinc azul', exists: true, src: 'top-venta', top: /zinc/i },
+
+  // ---- clase "subcadena": el token no debe casar DENTRO de otra palabra ----
+  // "pega" casaba con "pegable" y el desempate por ventas subia el accesorio (TEE PVC
+  // Pegable, score 3.52) por encima de la pega de verdad (3.34). Ver casaPalabra().
+  // OJO: los regex de `top` llevan \b a proposito. Con /pega/i este mismo caso pasaba en
+  // verde devolviendo "Tubo PVC A/B PEGAble", porque el regex casaba dentro de la palabra:
+  // el mismo error de subcadena que se acaba de corregir en el buscador, cometido en el test.
+  { q: 'pega para tubo pvc', exists: true, src: 'subcadena', top: /\bpega\b/i,
+    conocido: 'drop-one suelta el sustantivo principal ("pega") en vez del complemento ("tubo") y devuelve un tubo pegable agotado' },
+  { q: 'pega soldadura', exists: true, src: 'subcadena', top: /\bpega\b/i, notTop: /pegable/i },
 ];
 
 function classify(parsed, t) {
@@ -90,6 +145,21 @@ function classify(parsed, t) {
   // ¿el top está agotado teniendo el algoritmo que priorizar disponibles?
   if (parsed.productos && parsed.productos.length > 1 && parsed.productos[0].disponible === false && parsed.productos.some(p => p.disponible)) {
     flags.push('⚠ TOP-AGOTADO-con-disponibles');
+  }
+  // ¿es el PRIMERO el producto correcto? El resumen no miraba esto, y por eso "pega para
+  // pvc" devolvia TEE PVC Pegable en el top-1 sin que nada se quejara: habia que leer la
+  // salida a ojo para verlo. Con `top`/`notTop` el fallo de ranking sale en el resumen.
+  const top1 = parsed.productos && parsed.productos[0] && parsed.productos[0].nombre;
+  if (top1) {
+    if (t.top && !t.top.test(top1)) flags.push(`❌ TOP-INESPERADO (esperaba ${t.top} y salio "${top1.slice(0, 40)}")`);
+    if (t.notTop && t.notTop.test(top1)) flags.push(`❌ TOP-PROHIBIDO (${t.notTop} casa con "${top1.slice(0, 40)}")`);
+  } else if (t.top) {
+    flags.push(`❌ TOP-INESPERADO (sin resultados, esperaba ${t.top})`);
+  }
+  // Un saludo o un texto sin sentido NO es una consulta de producto: cotizarlo con
+  // seguridad es peor que no encontrar nada, porque el cliente recibe precios que no pidio.
+  if (t.esperaVago && !sinProducto && !parsed.aclarar && !parsed.parcial) {
+    flags.push('❌ RUIDO-COTIZADO (deberia pedir aclaracion)');
   }
   return flags;
 }
@@ -117,7 +187,15 @@ function classify(parsed, t) {
   const agot = results.filter(r => r.flags.some(f => f.includes('AGOTADO-con')));
   const exc = results.filter(r => r.flags.some(f => f.includes('EXCEPCIÓN')));
   const noEnc = results.filter(r => r.parsed.encontrados === 0);
-  console.log('Total:', results.length, '| sin resultados:', noEnc.length, '| FALSO-NEGATIVO sospechoso:', fn.length, '| débiles:', debil.length, '| top-agotado:', agot.length, '| excepciones:', exc.length);
+  // Un caso marcado `conocido` es un fallo REAL ya diagnosticado que todavía no se arregla.
+  // Se cuenta aparte para que el contador principal siga sirviendo de linea base de
+  // regresiones, pero se imprime siempre: no es un test silenciado, es deuda a la vista.
+  const rankTodos = results.filter(r => r.flags.some(f => f.includes('TOP-INESPERADO') || f.includes('TOP-PROHIBIDO') || f.includes('RUIDO-COTIZADO')));
+  const rank = rankTodos.filter(r => !r.t.conocido);
+  const conocidos = rankTodos.filter(r => r.t.conocido);
+  console.log('Total:', results.length, '| sin resultados:', noEnc.length, '| FALSO-NEGATIVO sospechoso:', fn.length, '| débiles:', debil.length, '| top-agotado:', agot.length, '| RANKING malo:', rank.length, '| excepciones:', exc.length, '| conocidos pendientes:', conocidos.length);
+  if (conocidos.length) { console.log('\n-- CONOCIDOS PENDIENTES (fallo real, ya diagnosticado, sin arreglar) --'); conocidos.forEach(r => console.log('  #' + r.i, '"' + r.t.q + '"\n      ' + r.t.conocido)); }
   if (fn.length) { console.log('\n-- FALSOS NEGATIVOS SOSPECHOSOS (producto debería existir) --'); fn.forEach(r => console.log('  #' + r.i, '"' + r.t.q.slice(0, 70) + '"')); }
+  if (rank.length) { console.log('\n-- RANKING: el primero no es el producto correcto --'); rank.forEach(r => console.log('  #' + r.i, '"' + r.t.q.slice(0, 50) + '"', r.flags.filter(f => f.includes('TOP-')).join(' '))); }
   if (exc.length) { console.log('\n-- EXCEPCIONES --'); exc.forEach(r => console.log('  #' + r.i, r.flags.join(' '))); }
 })().catch(e => { console.error('FATAL', e); process.exit(1); });
