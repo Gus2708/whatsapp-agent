@@ -635,6 +635,17 @@ try{ const vr=await axios.post(SB+'/rest/v1/rpc/popularidad_productos',{p_codigo
 
 // ¿la descripcion cumple TODOS los tokens de la consulta? (misma condicion que el +50 de
 // scoreMatch, pero como booleano: separa "esto es exactamente lo que pidio" de "se acerca").
+// Coincidencia de PALABRA, no de subcadena. "pega" no debe casar con "pegable": eso hacia
+// que TEE PVC PEGABLE contara como coincidencia COMPLETA de "pega para pvc" y, al empatar,
+// el desempate por ventas la pusiera por encima de la PEGA SOLDADURA de verdad (3.52 vs
+// 3.34 de score). Se admite el plural o derivado corto (clavo->clavos, lamina->laminas):
+// hasta 2 letras de mas y luego limite de palabra. Se prueba contra `d` y no contra `words`
+// porque words parte por 'x' y romperia "oxido"/"exxel".
+function casaPalabra(a, d){
+  if (!a || a.length < 3) return false;
+  const esc = a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('(^|[^a-z0-9])' + esc + '[a-z]{0,2}([^a-z0-9]|$)').test(d);
+}
 function fullMatch(descripcion, qTokens){
   const d = norm(descripcion);
   const nd = normMedida(descripcion);
@@ -643,7 +654,7 @@ function fullMatch(descripcion, qTokens){
     if (t === 'corte'){ if (!(words.includes('corte') || words.includes('c/') || d.includes('c/'))) return false; continue; }
     if (/\d/.test(t)){ if (!medPresent(t, nd)) return false; continue; }
     let hit = false;
-    for (const a of aliasDe(t)){ if (words.includes(a) || (a.length>=3 && d.includes(a))){ hit=true; break; } }
+    for (const a of aliasDe(t)){ if (words.includes(a) || casaPalabra(a, d)){ hit=true; break; } }
     if (!hit) return false;
   }
   return qTokens.length > 0;
