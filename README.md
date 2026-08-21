@@ -12,12 +12,10 @@ El asistente se llama **"Perucho"** 👨🏻‍🔧 y corre sobre infraestructur
 
 ### 🎥 Demo
 
-<video src="assets/demo.mp4" controls width="480">
-  Tu visor no reproduce el video embebido — descárgalo directo: <a href="assets/demo.mp4">assets/demo.mp4</a>
-</video>
+**[▶ Ver video — Perucho respondiendo por WhatsApp en producción](https://raw.githubusercontent.com/Gus2708/whatsapp-agent/master/assets/demo.mp4)**
 
-> Perucho respondiendo por WhatsApp en producción. Si GitHub no lo reproduce inline, usa el
-> [enlace directo](assets/demo.mp4).
+> GitHub no reproduce videos alojados en el repo dentro del README (solo los subidos con su propio
+> uploader); el link de arriba apunta al archivo real y lo reproduce/descarga directo desde el navegador.
 
 ---
 
