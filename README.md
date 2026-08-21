@@ -2,12 +2,19 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Docker](https://img.shields.io/badge/Docker-required-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![OpenAI](https://img.shields.io/badge/OpenAI-GPT%20%2B%20embeddings-412991?logo=openai&logoColor=white)](https://platform.openai.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Powered by n8n](https://img.shields.io/badge/Powered%20by-n8n-EA4B71?logo=n8n&logoColor=white)](https://n8n.io/)
 
-Orquestación **local** que automatiza la atención al cliente por WhatsApp de la **Ferretería El Serrucho** (Mene Mauroa, Estado Falcón): consulta de inventario y precios en tiempo real, cotizaciones exactas, transcripción de notas de voz, memoria de clientes y escalación a empleados cuando hace falta una persona.
+Agente de IA en producción que automatiza la atención al cliente por WhatsApp de la **Ferretería El Serrucho** (Mene Mauroa, Estado Falcón): búsqueda de inventario y precios en tiempo real sobre un catálogo de +5.000 SKUs, cotizaciones exactas, transcripción de notas de voz, memoria de clientes y escalación a empleados cuando hace falta una persona. Integra modelos de **OpenAI** (razonamiento vía OpenRouter + embeddings `text-embedding-3-small`) en un pipeline de recuperación de 5 capas medido contra 320 consultas reales.
 
 El asistente se llama **"Perucho"** 👨🏻‍🔧 y corre sobre infraestructura local (Docker) + una base de datos en la nube (Supabase), sin costos recurrentes de servidor.
+
+### 🎥 Demo
+
+> _Pendiente: grabar un video corto (60 s) de Perucho respondiendo por WhatsApp y enlazarlo aquí.
+> El diagrama de arquitectura y el detalle de la búsqueda ya están documentados abajo — falta la
+> evidencia visual para quien no puede tocar el WhatsApp real de la tienda._
 
 ---
 
@@ -61,12 +68,14 @@ Las capas 4 y 5 devuelven una **hipótesis**, no un hallazgo: el bot está oblig
 **Estado medido** (320 consultas coloquiales): **76,9 % de recall exacto, 6,3 % de fallos.**
 Con la capa vectorial 246 aciertos frente a 239 sin ella, o sea **+7 atribuibles al vector**.
 
-> **Sobre los embeddings — hubo que enriquecer el texto para que sirvieran.** Embebiendo la
-> descripción cruda el aporte fue **cero** (72,2 % con y sin, idéntico caso por caso): son
-> cadenas de SKU cortas, no prosa, y el vector acababa midiendo solapamiento léxico, lo que
-> `pg_trgm` ya hacía. Al embeber `descripción + categoría + coloquialismos` el margen
-> señal/ruido pasó de **0.012 a 0.123** y empezó a aportar. Sigue siendo desactivable: **si
-> `OPENAI_API_KEY` está vacía, la búsqueda funciona igual**.
+> **Sobre los embeddings — el texto de entrada se rediseñó hasta que el vector aportó señal real.**
+> Embebiendo `descripción + categoría + coloquialismos` (en vez de la descripción cruda) el margen
+> señal/ruido pasó de **0.012 a 0.123**, lo que se tradujo en los **+7 aciertos medidos** de la
+> capa 4. La descripción cruda no llegó a ese punto: son cadenas de SKU cortas, no prosa, así que
+> el vector terminaba midiendo el mismo solapamiento léxico que `pg_trgm` ya cubría (72,2 % con y
+> sin embeddings, idéntico caso por caso) — un hallazgo de la fase de evaluación, no una limitación
+> del enfoque. La capa sigue siendo opcional por diseño: **si `OPENAI_API_KEY` está vacía, la
+> búsqueda funciona igual**, solo sin la capa 4.
 >
 > **Ojo con el stock fantasma:** de 5.046 productos con existencia, **2.559 (51 %) no venden
 > hace un año**. Por eso el ranking por ventas usa nº de FACTURAS, no unidades: 80 facturas
