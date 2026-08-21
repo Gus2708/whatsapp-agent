@@ -12,9 +12,12 @@ El asistente se llama **"Perucho"** 👨🏻‍🔧 y corre sobre infraestructur
 
 ### 🎥 Demo
 
-> _Pendiente: grabar un video corto (60 s) de Perucho respondiendo por WhatsApp y enlazarlo aquí.
-> El diagrama de arquitectura y el detalle de la búsqueda ya están documentados abajo — falta la
-> evidencia visual para quien no puede tocar el WhatsApp real de la tienda._
+<video src="assets/demo.mp4" controls width="480">
+  Tu visor no reproduce el video embebido — descárgalo directo: <a href="assets/demo.mp4">assets/demo.mp4</a>
+</video>
+
+> Perucho respondiendo por WhatsApp en producción. Si GitHub no lo reproduce inline, usa el
+> [enlace directo](assets/demo.mp4).
 
 ---
 
