@@ -12,10 +12,9 @@ El asistente se llama **"Perucho"** 👨🏻‍🔧 y corre sobre infraestructur
 
 ### 🎥 Demo
 
-**[▶ Ver video — Perucho respondiendo por WhatsApp en producción](https://raw.githubusercontent.com/Gus2708/whatsapp-agent/master/assets/demo.mp4)**
+https://github.com/user-attachments/assets/fe28172d-64c1-45f9-9b08-edaab0f9a69c
 
-> GitHub no reproduce videos alojados en el repo dentro del README (solo los subidos con su propio
-> uploader); el link de arriba apunta al archivo real y lo reproduce/descarga directo desde el navegador.
+> Perucho respondiendo por WhatsApp en producción.
 
 ---
 
