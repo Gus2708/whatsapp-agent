@@ -86,11 +86,18 @@ async function generar(n) {
     return generar(n);
   }
   if (!fs.existsSync(SET)) throw new Error('no existe el set; corre primero: node scripts/_test_coloquial.js --generar 80');
-  const casos = JSON.parse(fs.readFileSync(SET, 'utf8'));
+  const todos = JSON.parse(fs.readFileSync(SET, 'utf8'));
   const etiqueta = process.argv.includes('--etiqueta') ? process.argv[process.argv.indexOf('--etiqueta') + 1] : '';
+  // --limit N: corre solo los primeros N casos. El set completo tarda ~16 min porque cada
+  // consulta que llega a la capa vectorial cuesta 4-7 s (las demás resuelven en ~650 ms).
+  // Es para verificación rápida: el número oficial se mide SIEMPRE sobre el set completo.
+  const limite = process.argv.includes('--limit') ? Number(process.argv[process.argv.indexOf('--limit') + 1]) : 0;
+  const casos = limite > 0 ? todos.slice(0, limite) : todos;
+  if (limite > 0) console.log(`PARCIAL: ${casos.length} de ${todos.length} casos (--limit) — no es el número oficial\n`);
 
-  let exacto = 0, categoria = 0, nada = 0;
+  let exacto = 0, categoria = 0, nada = 0, hechos = 0;
   const fallos = [];
+  const t0 = Date.now();
   for (const c of casos) {
     const res = await buscar(c.consulta);
     const prods = res.productos || [];
@@ -104,7 +111,14 @@ async function generar(n) {
     if (hit) exacto++;
     else if (catHit) categoria++;
     else { nada++; fallos.push(c); }
+    // Progreso en UNA línea que se sobreescribe (mismo idioma que generar()): sin esto la
+    // terminal queda muda ~16 min y parece colgada. El reporte final no cambia.
+    hechos++;
+    const seg = (Date.now() - t0) / 1000;
+    const falta = Math.round((seg / hechos) * (casos.length - hechos));
+    process.stdout.write(`\r  ${hechos}/${casos.length}  ·  exacto ${exacto}  ·  ${seg.toFixed(0)}s transcurridos, ~${falta}s restantes    `);
   }
+  process.stdout.write('\r' + ' '.repeat(76) + '\r');
   const pct = n => ((n / casos.length) * 100).toFixed(1) + '%';
   console.log(`\n========= RECALL COLOQUIAL ${etiqueta ? '[' + etiqueta + ']' : ''} =========`);
   console.log(`casos: ${casos.length}`);

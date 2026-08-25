@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Powered by n8n](https://img.shields.io/badge/Powered%20by-n8n-EA4B71?logo=n8n&logoColor=white)](https://n8n.io/)
 
-Agente de IA en producción que automatiza la atención al cliente por WhatsApp de la **Ferretería El Serrucho** (Mene Mauroa, Estado Falcón): búsqueda de inventario y precios en tiempo real sobre un catálogo de +7.500 SKUs, cotizaciones exactas, transcripción de notas de voz, memoria de clientes y escalación a empleados cuando hace falta una persona. Integra modelos de **OpenAI** (razonamiento vía OpenRouter + embeddings `text-embedding-3-small`) en un pipeline de recuperación de 5 capas medido contra 320 consultas reales.
+Agente de IA en producción que automatiza la atención al cliente por WhatsApp de la **Ferretería El Serrucho** (Mene Mauroa, Estado Falcón): búsqueda de inventario y precios en tiempo real sobre un catálogo de 7.650 SKUs, cotizaciones exactas, transcripción de notas de voz, memoria de clientes y escalación a empleados cuando hace falta una persona. Integra modelos de **OpenAI** (razonamiento vía OpenRouter + embeddings `text-embedding-3-small`) en un pipeline de recuperación de 5 capas medido contra 320 consultas reales.
 
 El asistente se llama **"Perucho"** 👨🏻‍🔧 y corre sobre infraestructura local (Docker) + una base de datos en la nube (Supabase), sin costos recurrentes de servidor.
 
