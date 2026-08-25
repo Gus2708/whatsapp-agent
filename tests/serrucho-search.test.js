@@ -32,13 +32,31 @@ test('singular: reduces Spanish plurals', () => {
   assert.strictEqual(L.singular('alambrones'), 'alambron');
 });
 
-test('stemColor: neutralizes gender/number', () => {
+test('stemColor: neutralizes gender/number and common typos', () => {
   assert.strictEqual(L.stemColor('blanca'), 'blanc');
   assert.strictEqual(L.stemColor('blancos'), 'blanc');
+  assert.strictEqual(L.stemColor('blanvo'), 'blanc');
+  assert.strictEqual(L.stemColor('cris'), 'gris');
+  assert.strictEqual(L.stemColor('griss'), 'gris');
+  assert.strictEqual(L.stemColor('asul'), 'azul');
+  assert.strictEqual(L.stemColor('amariyo'), 'amarill');
 });
 
-test('expandir: applies synonyms (varilla -> cabilla)', () => {
+test('expandir: applies synonyms (varilla -> cabilla, paint typos & intents, serchas)', () => {
   assert.strictEqual(L.expandir('varilla 1/2'), 'cabilla 1/2');
+  assert.strictEqual(L.expandir('Me da Precio de las serchas?.'), 'me da precio de las cercha .');
+  assert.strictEqual(L.expandir('pintura cris para exterior'), 'pintura gris para exterior');
+  assert.strictEqual(L.expandir('pintura para exterior'), 'pintura exterior');
+  assert.strictEqual(L.expandir('brillo de seda'), 'pintura satinada');
+  assert.strictEqual(L.expandir('cunete de pintura blanca'), 'cuñete de pintura blanca');
+  assert.strictEqual(L.expandir('cocaleta para sacar tierra'), 'cavadora para sacar tierra');
+  assert.strictEqual(L.expandir('holladoras motor'), 'cavadora motor');
+  assert.strictEqual(L.expandir('bloquen de 10'), 'bloque de 10');
+  assert.strictEqual(L.expandir('tornillos con rampluj'), 'tornillos con ramplug');
+  assert.strictEqual(L.expandir('iman de pesca neodimio'), 'iman neodimio neodimio');
+  assert.strictEqual(L.expandir('pigmento en polvo para pisos'), 'polvo piso');
+  assert.strictEqual(L.expandir('cerradura para soldar'), 'cerradura sobreponer');
+  assert.strictEqual(L.expandir('malla pollera'), 'malla gallinero');
 });
 
 test('nUSD: money formatting', () => {

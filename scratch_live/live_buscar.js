@@ -96,11 +96,37 @@ const SIN = {
   'llave paso':'llave bola','grifo':'llave bola',
   'caja luz':'cajetin','caja electrica':'cajetin',
   'tepe':'teipe','tepe negro':'teipe','teipe negro':'teipe',
-  'tela pollera':'malla gallinero','tela de gallinero':'malla gallinero','tela gallinero':'malla gallinero','malla para pollos':'malla pollito','malla de pollo':'malla pollito','malla pollo':'malla pollito',
+  'tela pollera':'malla gallinero','tela de gallinero':'malla gallinero','tela gallinero':'malla gallinero','malla para pollos':'malla pollito','malla de pollo':'malla pollito','malla pollo':'malla pollito','malla pollera':'malla gallinero',
+  'cocaleta':'cavadora','cocaletas':'cavadora','cachicama':'cavadora','cachicamas':'cavadora','holladora':'cavadora','holladoras':'cavadora','hoyadora':'cavadora','hoyadoras':'cavadora','cava hoyos':'cavadora','cavahoyos':'cavadora',
+  'bloquen':'bloque','bloquens':'bloque','bloque de diez':'bloque 10','bloques de diez':'bloque 10','bloque de 10':'bloque 10','bloque diez':'bloque 10','bloque de quince':'bloque 15','bloques de quince':'bloque 15','bloque de 15':'bloque 15','bloque quince':'bloque 15',
+  'rampluj':'ramplug','ramplu':'ramplug','ranplug':'ramplug','ranplu':'ramplug','ranpluj':'ramplug',
+  'iman de pesca':'iman neodimio','imanes de pesca':'iman neodimio',
+  'cerradura para soldar':'cerradura sobreponer','cerradura de soldar':'cerradura sobreponer','cerraduras para soldar':'cerradura sobreponer',
+  'vigas de techo':'viga','viga de techo':'viga','vigas para techo':'viga','viga para techo':'viga',
+  'bombona':'gas','bombonas':'gas','chupon':'clip on','chupones':'clip on',
+  'franquilla':'drywall','franquillas':'drywall',
   'pipotes de agua':'tanque','pipote de agua':'tanque','popotes de agua':'tanque','pipas de agua':'tanque','pipa de agua':'tanque','pipotes':'tanque','pipote':'tanque','popotes':'tanque','popote':'tanque',
-  'pigmentos':'oxido','pigmento':'oxido',
+  'pigmento en polvo para pisos':'polvo piso','pigmento para pisos':'polvo piso','pigmento para piso':'polvo piso','pigmento en polvo':'polvo piso','pigmentos para pisos':'polvo piso','pigmentos para piso':'polvo piso','pigmento piso':'polvo piso','pigmentos':'polvo piso','pigmento':'polvo piso',
   'cielo raso':'drywall','cielo razo':'drywall','cielorraso':'drywall',
   'prepintadas':'','prepintada':'','prepintados':'','prepintado':'',
+  'serchas':'cercha','sercha':'cercha','serchita':'cercha','serchitas':'cercha',
+  'cierra':'sierra','cierras':'sierra',
+  'sinta':'cinta','sintas':'cinta',
+  'serradura':'cerradura','serraduras':'cerradura',
+  'sincel':'cincel','sinceles':'cincel',
+  'cifon':'sifon',
+  'selador':'sellador','seladores':'sellador',
+  'sica':'sika',
+  'cris':'gris','griss':'gris','asul':'azul','asules':'azul',
+  'blanvo':'blanco','vlanco':'blanco','vlancom':'blanco',
+  'amariyo':'amarillo',
+  'cunete':'cuñete','cunetes':'cuñete','cuñetes':'cuñete','tobo de pintura':'cuñete','balde de pintura':'cuñete',
+  'cuartico':'1/4','cuartico de pintura':'1/4',
+  'esmalte sintetico':'pintura aceite','pintura sintetica':'pintura aceite',
+  'brillo de seda':'pintura satinada','brillo seda':'pintura satinada','seda styl':'pintura satinada',
+  'pintura de exterior':'pintura exterior','pintura para exterior':'pintura exterior','pintura de afuera':'pintura exterior','pintura para afuera':'pintura exterior','pintura fachada':'pintura exterior','pintura para fachada':'pintura exterior','pintura intemperie':'pintura exterior',
+  'pintura de interior':'pintura interior','pintura para interior':'pintura interior','pintura de adentro':'pintura interior','pintura para adentro':'pintura interior',
+  'pintura para techos':'pintura impermeabilizante','pintura para techo':'pintura impermeabilizante','pintura de techo':'pintura impermeabilizante',
   'media':'1/2','medio':'1/2','un cuarto':'1/4','cuarto':'1/4','tres cuartos':'3/4','tres octavos':'3/8','un octavo':'1/8'
 };
 // Sinonimos que CONVIVEN en el catalogo: el MISMO producto esta escrito de las dos
@@ -130,16 +156,18 @@ const ACCENTS = {
 // colores: neutraliza genero/numero a una raiz (blanco/blanca/blancos/blancas -> blanc)
 // asi "pintura blanca" coincide con "PINTURA ... BLANCO" en la BD.
 const COLOR_STEM = {
-  'blanco':'blanc','blanca':'blanc','blancos':'blanc','blancas':'blanc',
+  'blanco':'blanc','blanca':'blanc','blancos':'blanc','blancas':'blanc','blanvo':'blanc','vlanco':'blanc','vlancom':'blanc',
   'negro':'negr','negra':'negr','negros':'negr','negras':'negr',
   'rojo':'roj','roja':'roj','rojos':'roj','rojas':'roj',
-  'amarillo':'amarill','amarilla':'amarill','amarillos':'amarill','amarillas':'amarill',
+  'amarillo':'amarill','amarilla':'amarill','amarillos':'amarill','amarillas':'amarill','amariyo':'amarill','amariyos':'amarill','amariya':'amarill','amariyas':'amarill',
   'morado':'morad','morada':'morad','morados':'morad','moradas':'morad',
   'dorado':'dorad','dorada':'dorad','dorados':'dorad','doradas':'dorad',
   'plateado':'platead','plateada':'platead','plateados':'platead','plateadas':'platead',
   'rosado':'rosad','rosada':'rosad','rosados':'rosad','rosadas':'rosad',
-  'gris':'gris','grises':'gris','verde':'verde','verdes':'verde',
-  'azul':'azul','azules':'azul','marron':'marron','marrones':'marron',
+  'gris':'gris','grises':'gris','cris':'gris','griss':'gris',
+  'verde':'verde','verdes':'verde',
+  'azul':'azul','azules':'azul','asul':'azul','asules':'azul',
+  'marron':'marron','marrones':'marron',
   'naranja':'naranja','naranjas':'naranja','beige':'beige','cafe':'cafe',
   'celeste':'celeste','celestes':'celeste'
 };
@@ -183,6 +211,7 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
   s = s.replace(/(\d+)\s*vatios?\b/g,'$1w').replace(/(\d+)\s*toneladas?\b/g,'$1 ton');
   s = s.replace(/\bun metro\b/g,'1 metro').replace(/\bdos metros\b/g,'2 metros');
   s = s.replace(/\bdoble a\b/g,'aa').replace(/\bempotrar\b/g,'emp');
+  s = s.replace(/\bpinturas?\s+cris\b/g, 'pintura gris');
   // SIN se aplica con LIMITE DE PALABRA, no como subcadena. Con split/join naive, una clave
   // que aparece DENTRO de otra palabra la destroza: "media"->"1/2" convertia "mediano" en
   // "1/2no", "zinc"->"lamina zinc" convertia "zincada" en "lamina zincada", y "riel" rompia
@@ -283,7 +312,8 @@ const IGNORED = new Set([
 ]);
 const MODIFIERS = new Set([
   'multifuncional', 'pulgada', 'pulgadas', 'media', 'cuarto', 'octavo', 'metro', 'metros', 'pies', 'pulg', 'mm', 'cm', 'mts',
-  'negro', 'negra', 'blanco', 'blanca', 'gris', 'azul', 'rojo', 'verde', 'amarillo', 'amarilla'
+  'negro', 'negra', 'blanco', 'blanca', 'gris', 'cris', 'griss', 'azul', 'asul', 'rojo', 'roja', 'verde', 'amarillo', 'amarilla',
+  'exterior', 'exteriores', 'interior', 'interiores', 'fachada', 'intemperie', 'clase', 'tipo', 'calidad'
 ]);
 
 // "5 metros de cable" / "2 sacos de cemento": el numero es CANTIDAD, no medida del producto
@@ -419,8 +449,10 @@ function casanDeVerdad(rows, tokens){
 }
 let res = [];
 let _fuzzy = false;
-if (granelIntent && textLargas.length>0) res = casanDeVerdad(await ilike(textLargas, 60, GRANEL_OR), textLargas);
-if (res.length===0 && textLargas.length>0) res = casanDeVerdad(await ilike(textLargas, 60), textLargas);
+const isPaintQuery = qTokens.includes('pintura') || /\b(pinturas?|esmalte|esmaltes|satinad\w*|caucho|oleo|anticorrosiv\w*|sellafill|imperflex|impermeabilizante|spray|aerosol)\b/.test(norm(_pb));
+const textLargasSql = isPaintQuery ? textLargas.filter(w => !['exterior','exteriores','interior','interiores','fachada','intemperie','clase','tipo','calidad'].includes(w)) : textLargas;
+if (granelIntent && textLargasSql.length>0) res = casanDeVerdad(await ilike(textLargasSql, 60, GRANEL_OR), textLargasSql);
+if (res.length===0 && textLargasSql.length>0) res = casanDeVerdad(await ilike(textLargasSql, 60), textLargasSql);
 // RELAJACION drop-one: el AND completo fallo -> reintenta quitando UNA palabra a la vez,
 // soltando primero la MENOS especifica (modificadores/colores/palabras cortas) y NUNCA
 // dejando solo modificadores. Se queda con el primer intento que traiga resultados.
@@ -619,6 +651,132 @@ for(const p of res){ if(!seen.has(p.codigo_interno)){ seen.add(p.codigo_interno)
 // fregadero completo y ganaban el desempate por stock, tapando el producto que el cliente pidio.
 // Si el cliente SI pidio un repuesto por su nombre, no tocar el resultado.
 { const nbq = norm(_pb); const accesorioFregadero = /\b(desague|l{1,3}ave|grifo|tapa|sifon|tapon|tornillo|herraje|balancin)\b/; if (qTokens.includes('fregadero') && !accesorioFregadero.test(nbq)) { const principal = unicos.filter(p => !accesorioFregadero.test(norm(p.descripcion))); if (principal.length>0){ unicos.length=0; for(const x of principal) unicos.push(x); } } }
+
+// Regla negocio PINTURA: clases (A, B, C), acabados (caucho, aceite/esmalte, satinada, impermeabilizante, spray), uso (exterior, interior), color y presentación (cuñete, galón, 1/4)
+{
+  const nbq = norm(_pb);
+  const isPaint = /\b(pinturas?|esmalte|esmaltes|satinad\w*|caucho|oleo|anticorrosiv\w*|sellafill|imperflex|impermeabilizante|spray|aerosol)\b/.test(nbq) || qTokens.includes('pintura');
+  if (isPaint) {
+    const isExterior = /\b(exterior|exteriores|afuera|fachadas?|intemperie|sol\s+y\s+agua|sol\s+y\s+lluvia)\b/.test(nbq);
+    const isInterior = /\b(interior|interiores|adentro|salas?|cuartos?|habitaci\w*)\b/.test(nbq);
+    const wantClaseA = /\b(clase\s*a|tipo\s*a|primera\s*calidad|de\s*primera|la\s*mejor)\b/.test(nbq);
+    const wantClaseB = /\b(clase\s*b|tipo\s*b|segunda\s*calidad|de\s*segunda|intermedia)\b/.test(nbq);
+    const wantClaseC = /\b(clase\s*c|tipo\s*c|tercera\s*calidad|de\s*tercera|economica|barata|para\s*techo|cielo\s*raso)\b/.test(nbq);
+    const wantAceite = /\b(aceite|esmalte|sintetic\w*|2\s*en\s*1|3\s*en\s*1|para\s*hierro|para\s*metal|para\s*rejas?|para\s*porton)\b/.test(nbq);
+    const wantCaucho = /\b(caucho|de\s*agua|en\s*agua|emulsionada)\b/.test(nbq);
+    const wantSatinada = /\b(satinad\w*|brillo\s*de?\s*seda|seda\s*styl)\b/.test(nbq);
+    const wantImpermeabilizante = /\b(impermeabiliz\w*|sellafill|imperflex|para\s*goteras?|filtraci\w*)\b/.test(nbq);
+    const wantSpray = /\b(spray|aerosol|en\s*lata)\b/.test(nbq);
+    const wantCunete = /\b(cu[nñ]etes?|4\s*gl|4\s*gal\w*|5\s*gl|5\s*gal\w*|tobo|balde)\b/.test(nbq);
+    const wantCuarto = /\b(1\/4|cuartico|cuarto)\b/.test(nbq);
+    const wantGalon = /\b(galon|galones|x\s*galon|por\s*galon)\b/.test(nbq) && !wantCunete && !wantCuarto;
+
+    const _esA = d => /\bCLASE\s+A\b|\bTIPO\s+A\b|\bA\s+GAL\b|\bA\s+GALON\b|\bA\s+X\s+GALON\b|SUN\s+DECO|DELUXE\s+A|\bEVERY\b.*\bA\b|\bEVERCRIL\b.*\bA\b|\bEVERMAX\b.*\bA\b|PREMIUM.*FLORIPAINT/i.test(d) && !/\bCLASE\s+[BC]\b|\bTIPO\s+[BC]\b/i.test(d);
+    const _esB = d => /\bCLASE\s+B\b|\bTIPO\s+B\b|\bB\s+GAL\b|\bB\s+GALON\b|\bB\s+X\s+GALON\b|MAR\s+DECO|VINILEVERY|KOLOR\s*FLEX.*(?:\bB\b|CONC\.B)|INVERCOLOR.*TIPO\s*B|INVECOLOR.*TIPO\s*B|\bEVERY\b.*\bB\b/i.test(d) && !/\bCLASE\s+[AC]\b|\bTIPO\s+[AC]\b/i.test(d);
+    const _esC = d => /\bCLASE\s+C\b|\bTIPO\s+C\b|\bC\s+GAL\b|\bC\s+GALON\b|\bC\s+X\s+GALON\b|RIO\s+DECO|RIO\s+BLANCO|COLOR\s+PLUS.*TIPO\s*C|EVERAMA|EVERY.*C300|EVERY.*C-300|\bEVERY\b.*\bC\b/i.test(d) && !/\bCLASE\s+[AB]\b|\bTIPO\s+[AB]\b/i.test(d);
+    const _esAceite = d => /ACEITE|ESMALTE|2\s*EN\s*1|3\s*EN\s*1|EVERY\s+PLUS\s+E-|EL\s+PRO\s+30-|PRO\s+GOLD/i.test(d);
+    const _esSatin = d => /SATINAD|SEDA\s+STYL|BRILLO\s+SEDA|BRILLO\s+DE\s+SEDA|STYLE\s+BRILLO/i.test(d);
+    const _esImp = d => /IMPERMEABIL|SELLAFILL|IMPERFLEX|LOXON\s+PISCINA/i.test(d);
+    const _esSpray = d => /AEROSOL|AEREOSOL|SPRAY/i.test(d);
+    const _esCunete = d => /CUÑETE|CUÑETES|4GL|4GAL|4\s+GALONES|5\s+GALONES|5GL/i.test(d);
+    const _esCuarto = d => /\b1\/4\b/i.test(d);
+    const _esGalon = d => /GALON|GAL\b|POR\s+GALON|X\s+GALON/i.test(d) && !_esCunete(d) && !_esCuarto(d);
+
+    const _colorP = [
+      { r: 'gris', re: /\b(gris|grises|cris|griss|plomo|concreto|cemento)\b/i },
+      { r: 'blanc', re: /\b(blanco|blanca|blancos|blancas|blanvo|vlanco|vlancom|hueso|ostra|nieve|almendra)\b/i },
+      { r: 'negr', re: /\b(negro|negra|negros|negras)\b/i },
+      { r: 'roj', re: /\b(rojo|roja|rojos|rojas|colonial|teja|bermellon|escarlata|terracota|ladrillo|vinotinto)\b/i },
+      { r: 'amarill', re: /\b(amarillo|amarilla|amarillos|amarillas|amariyo|girasol|tractor|mostaza|ocre|caramelo)\b/i },
+      { r: 'azul', re: /\b(azul|azules|asul|asules|glacial|marino|cielo|rey|turquesa|milano|bahia|profundo)\b/i },
+      { r: 'verde', re: /\b(verde|verdes|manzana|menta|pistacho|primavera|prado|morichal|esmeralda|oliva|jade)\b/i },
+      { r: 'marfil', re: /\b(marfil|beige|crema|arena)\b/i },
+      { r: 'morad', re: /\b(morado|morada|morados|moradas|violeta|lila|fucsia|magenta|orquidea)\b/i },
+      { r: 'rosad', re: /\b(rosado|rosada|rosados|rosadas|rosa|coral|salmon|durazno|melon|melocoton)\b/i },
+      { r: 'dorad', re: /\b(dorado|dorada|oro)\b/i },
+      { r: 'platead', re: /\b(plateado|plateada|plata|aluminio|cromo)\b/i }
+    ];
+    let qColor = null;
+    for (const cp of _colorP) { if (cp.re.test(nbq)) { qColor = cp.r; break; } }
+
+    const _matchColorDesc = (desc, cr) => {
+      const nd = norm(desc);
+      if (cr === 'gris') return /gris|plomo|concreto|cemento/.test(nd);
+      if (cr === 'blanc') return /blanc|hueso|ostra|nieve|almendra/.test(nd);
+      if (cr === 'negr') return /negr/.test(nd);
+      if (cr === 'roj') return /roj|colonial|teja|bermellon|escarlata|terracota|ladrillo|vinotinto/.test(nd);
+      if (cr === 'amarill') return /amarill|girasol|tractor|mostaza|ocre|caramelo/.test(nd);
+      if (cr === 'azul') return /azul|glacial|marino|cielo|rey|turquesa|milano|bahia|profundo/.test(nd);
+      if (cr === 'verde') return /verde|manzana|menta|pistacho|primavera|prado|esmeralda|oliva|jade/.test(nd);
+      if (cr === 'marfil') return /marfil|beige|crema|arena/.test(nd);
+      if (cr === 'morad') return /morad|violeta|lila|fucsia|magenta|orquidea/.test(nd);
+      if (cr === 'rosad') return /rosad|rosa|coral|salmon|durazno|melon|melocoton/.test(nd);
+      if (cr === 'dorad') return /dorad|oro/.test(nd);
+      if (cr === 'platead') return /platead|plata|aluminio|cromo/.test(nd);
+      return nd.includes(cr);
+    };
+
+    let pf = unicos.filter(p => !/\b(alicate|funda|llave\s+arresto|guantes?|limpiador|medidor|lampara|cabezal|tubo)\b/i.test(p.descripcion));
+    if (pf.length === 0) pf = unicos;
+
+    if (qColor) {
+      const fc = pf.filter(p => _matchColorDesc(p.descripcion, qColor));
+      if (fc.length > 0) pf = fc;
+    }
+
+    if (wantClaseA) {
+      const fa = pf.filter(p => _esA(p.descripcion));
+      if (fa.length > 0) pf = fa;
+    } else if (wantClaseB) {
+      const fb = pf.filter(p => _esB(p.descripcion));
+      if (fb.length > 0) pf = fb;
+    } else if (wantClaseC) {
+      const fc = pf.filter(p => _esC(p.descripcion));
+      if (fc.length > 0) pf = fc;
+    }
+
+    if (isExterior && !wantClaseB && !wantClaseC) {
+      const fe = pf.filter(p => _esA(p.descripcion) || _esAceite(p.descripcion) || _esImp(p.descripcion));
+      if (fe.length > 0) pf = fe;
+    } else if (isInterior && !wantAceite && !wantSpray) {
+      const fi = pf.filter(p => !_esAceite(p.descripcion) && !_esSpray(p.descripcion));
+      if (fi.length > 0) pf = fi;
+    }
+
+    if (wantAceite) {
+      const fo = pf.filter(p => _esAceite(p.descripcion));
+      if (fo.length > 0) pf = fo;
+    } else if (wantCaucho) {
+      const fc = pf.filter(p => !_esAceite(p.descripcion) && !_esSpray(p.descripcion));
+      if (fc.length > 0) pf = fc;
+    } else if (wantSatinada) {
+      const fs = pf.filter(p => _esSatin(p.descripcion));
+      if (fs.length > 0) pf = fs;
+    } else if (wantImpermeabilizante) {
+      const fi = pf.filter(p => _esImp(p.descripcion));
+      if (fi.length > 0) pf = fi;
+    } else if (wantSpray) {
+      const fsp = pf.filter(p => _esSpray(p.descripcion));
+      if (fsp.length > 0) pf = fsp;
+    }
+
+    if (wantCunete) {
+      const fcu = pf.filter(p => _esCunete(p.descripcion));
+      if (fcu.length > 0) pf = fcu;
+    } else if (wantCuarto) {
+      const f4 = pf.filter(p => _esCuarto(p.descripcion));
+      if (f4.length > 0) pf = f4;
+    } else if (wantGalon) {
+      const fg = pf.filter(p => _esGalon(p.descripcion));
+      if (fg.length > 0) pf = fg;
+    }
+
+    if (pf.length > 0) {
+      unicos.length = 0;
+      for (const x of pf) unicos.push(x);
+    }
+  }
+}
 
 // Si pidio "por metro", prioriza los productos a granel (X MT)
 if (granelIntent){
