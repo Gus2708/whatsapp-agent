@@ -57,6 +57,8 @@ test('expandir: applies synonyms (varilla -> cabilla, paint typos & intents, ser
   assert.strictEqual(L.expandir('pigmento en polvo para pisos'), 'polvo piso');
   assert.strictEqual(L.expandir('cerradura para soldar'), 'cerradura sobreponer');
   assert.strictEqual(L.expandir('malla pollera'), 'malla gallinero');
+  assert.strictEqual(L.expandir('lamina de zinc de canal cuadrado'), 'lamina de lamina zinc cuadrada');
+  assert.strictEqual(L.expandir('lamina de zinc pintada'), 'lamina de lamina zinc');
 });
 
 test('nUSD: money formatting', () => {
