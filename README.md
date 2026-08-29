@@ -77,6 +77,12 @@ Con la capa vectorial 246 aciertos frente a 239 sin ella, o sea **+7 atribuibles
 > del enfoque. La capa sigue siendo opcional por diseño: **si `OPENAI_API_KEY` está vacía, la
 > búsqueda funciona igual**, solo sin la capa 4.
 >
+> **OpenAI bloquea Venezuela.** Sin VPN devuelve `403 unsupported_country_region_territory`,
+> y como la llamada va dentro de un `try/catch`, la capa 4 se apaga **en silencio**: el bot
+> sigue respondiendo, solo que peor. La VPN no es opcional para nada que toque embeddings —
+> ni generarlos ni usarlos en producción. `node rag.js estado` lo comprueba en cada corrida
+> y lo dice con todas las letras.
+>
 > **Ojo con el stock fantasma:** de 5.046 productos con existencia, **2.559 (51 %) no venden
 > hace un año**. Por eso el ranking por ventas usa nº de FACTURAS, no unidades: 80 facturas
 > son 80 decisiones de compra, las unidades las distorsiona un mayorista.

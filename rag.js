@@ -74,6 +74,29 @@ async function contar(tabla, filtro, col) {
   const r = await sb(`${tabla}?select=${col || 'codigo_interno'}&limit=1${filtro ? '&' + filtro : ''}`, { Prefer: 'count=exact' });
   return Number((r.headers.get('content-range') || '').split('/')[1] || 0);
 }
+// Comprueba que un proveedor responda de verdad, no solo que haya key.
+// OpenAI bloquea Venezuela: sin VPN devuelve 403 unsupported_country_region_territory, y
+// como buscar_productos envuelve la llamada en try/catch, la capa vectorial se apaga EN
+// SILENCIO. Este chequeo existe para que eso no pase desapercibido.
+async function sonda(nombre, url, opts, esperado) {
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), 8000);
+  const t0 = Date.now();
+  try {
+    const r = await fetch(url, Object.assign({ signal: ctrl.signal }, opts));
+    clearTimeout(to);
+    const ms = Date.now() - t0;
+    if (r.ok) return { nombre, ok: true, ms };
+    let codigo = '';
+    try { const j = await r.json(); codigo = (j.error && (j.error.code || j.error.type)) || ''; } catch (x) {}
+    const geo = r.status === 403 && /country|region|territory/i.test(codigo);
+    return { nombre, ok: false, ms, estado: r.status, codigo, geo, esperado };
+  } catch (x) {
+    clearTimeout(to);
+    return { nombre, ok: false, ms: Date.now() - t0, red: true, motivo: x.name === 'AbortError' ? 'sin respuesta en 8s' : x.message, esperado };
+  }
+}
+
 async function traerTodo(tabla, select, orden) {
   const out = [];
   for (let off = 0; ; off += 1000) {
@@ -159,8 +182,35 @@ async function estado() {
   fila('recalculado', dias(dPop), dPop !== null && dPop > 3 ? GL.warn : GL.ok);
   if (pctFantasma > 30) console.log('  ' + c.dim('└ el ranking por ventas los hunde solos: score 0 o negativo'));
 
+  // ── conectividad: sin esto, las capas 4 y 5 se apagan sin avisar
+  seccion('CONECTIVIDAD');
+  const OAI = pick('OPENAI_API_KEY');
+  const OR = pick('OPENROUTER_API_KEY');
+  const sondas = await Promise.all([
+    OR ? sonda('OpenRouter · Luna', 'https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + OR, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'openai/gpt-5.6-luna', max_tokens: 1, messages: [{ role: 'user', content: 'ok' }] }),
+    }, 'el bot no puede responder a nadie') : Promise.resolve({ nombre: 'OpenRouter · Luna', ok: false, faltaKey: true, esperado: 'el bot no puede responder a nadie' }),
+    OAI ? sonda('OpenAI · embeddings', 'https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + OAI, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'text-embedding-3-small', input: 'ok', dimensions: 1536 }),
+    }, 'capa vectorial apagada') : Promise.resolve({ nombre: 'OpenAI · embeddings', ok: false, faltaKey: true, esperado: 'capa vectorial apagada' }),
+  ]);
+
+  const caidos = [];
+  for (const s of sondas) {
+    if (s.ok) { fila(s.nombre, c.num(s.ms + ' ms'), GL.ok); continue; }
+    const detalle = s.faltaKey ? 'sin key' : s.geo ? 'bloqueo por país' : s.red ? s.motivo : `HTTP ${s.estado}`;
+    fila(s.nombre, c.err(detalle), GL.err);
+    if (s.geo) console.log('  ' + c.warn('└ ¿VPN caída? OpenAI bloquea Venezuela: sin VPN no hay embeddings'));
+    caidos.push(s);
+  }
+
   // ── veredicto
   const problemas = [];
+  for (const s of caidos) problemas.push([`${s.nombre} no responde → ${s.esperado}`, null]);
   if (sinVector.length) problemas.push([`${num(sinVector.length)} producto(s) sin vector`, 'embeddings']);
   if (movidas.length) problemas.push([`${num(movidas.length)} con la descripción cambiada`, 'embeddings']);
   if (vocabNuevo) problemas.push(['vocabulario más nuevo que los vectores', 'embeddings']);
@@ -173,8 +223,11 @@ async function estado() {
   }
   console.log(' ' + c.err('▎') + ' ' + c.bold('Requiere acción'));
   for (const [p] of problemas) console.log('   ' + GL.err + ' ' + p);
-  const cmds = [...new Set(problemas.map(p => p[1]))];
-  console.log('\n   ' + c.dim('ejecuta:') + '  ' + cmds.map(x => c.cyan('node rag.js ' + x)).join(c.dim('  y  ')));
+  // los fallos de red no se arreglan con un comando (van con null): no inventar uno
+  const cmds = [...new Set(problemas.map(p => p[1]).filter(Boolean))];
+  if (cmds.length) {
+    console.log('\n   ' + c.dim('ejecuta:') + '  ' + cmds.map(x => c.cyan('node rag.js ' + x)).join(c.dim('  y  ')));
+  }
   return 1;
 }
 
