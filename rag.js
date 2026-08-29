@@ -208,6 +208,33 @@ async function estado() {
     caidos.push(s);
   }
 
+  // ── el coseno en vivo: sin esto el margen señal/ruido puede derrumbarse sin que nadie
+  // lo note. Un vector "funciona" siempre (devuelve vecinos); lo que decide si SIRVE es la
+  // distancia entre una consulta legítima y texto sin sentido.
+  let margenVector = null;
+  if (sondas[1].ok) {
+    const vecs = await embeder([DEMO, BASURA]);
+    if (vecs) {
+      const [top, ruido] = await Promise.all([vecinos(vecs[0], 3), vecinos(vecs[1], 1)]);
+      if (top.length) {
+        const simRuido = ruido.length ? ruido[0].similitud : 0;
+        margenVector = top[0].similitud - simRuido;
+        seccion('EL COSENO EN VIVO');
+        console.log('  ' + c.dim('cos(θ) = (A · B) / (|A| · |B|)  sobre 1.536 dimensiones'));
+        console.log('  ' + c.bold(`"${DEMO}"`) + c.dim('  → vecinos más cercanos'));
+        for (const f of top) {
+          console.log('   ' + (f.similitud >= UMBRAL_VECTOR ? c.ok(f.similitud.toFixed(3)) : c.dim(f.similitud.toFixed(3))) +
+            ' ' + barraSim(f.similitud, 20) + ' ' + c.dim(f.descripcion.slice(0, 28)));
+        }
+        console.log('   ' + c.err(simRuido.toFixed(3)) + ' ' + barraSim(simRuido, 20) + ' ' + c.dim('texto sin sentido (suelo)'));
+        const sano = margenVector > 0.05;
+        console.log('  ' + (sano ? GL.ok : GL.err) + ' ' + c.bold('margen ' + margenVector.toFixed(3)) + '  ' +
+          (sano ? c.dim(`el umbral ${UMBRAL_VECTOR} separa de verdad`) : c.err('sin separación: la capa no aporta')));
+        console.log('  ' + c.dim('└ detalle: ') + c.cyan('node rag.js coseno "lo que sea"'));
+      }
+    }
+  }
+
   // ── veredicto
   const problemas = [];
   for (const s of caidos) problemas.push([`${s.nombre} no responde → ${s.esperado}`, null]);
@@ -215,6 +242,7 @@ async function estado() {
   if (movidas.length) problemas.push([`${num(movidas.length)} con la descripción cambiada`, 'embeddings']);
   if (vocabNuevo) problemas.push(['vocabulario más nuevo que los vectores', 'embeddings']);
   if (dPop !== null && dPop > 3) problemas.push([`ranking de ventas de ${dias(dPop)}`, 'popularidad']);
+  if (margenVector !== null && margenVector <= 0.05) problemas.push(['margen señal/ruido de ' + margenVector.toFixed(3) + ': la capa vectorial no aporta', 'embeddings']);
 
   console.log('');
   if (!problemas.length) {
@@ -229,6 +257,84 @@ async function estado() {
     console.log('\n   ' + c.dim('ejecuta:') + '  ' + cmds.map(x => c.cyan('node rag.js ' + x)).join(c.dim('  y  ')));
   }
   return 1;
+}
+
+// ───────────────────────────────────────────────────────────────────── coseno
+// Explica la capa vectorial con datos EN VIVO, no con un dibujo decorativo. Lo que hace
+// entendible este sistema no es la fórmula, es ver la distancia entre una consulta legítima
+// y texto sin sentido: si esa separación no existe, ningún umbral sirve y la capa es inútil
+// por diseño (fue exactamente lo que pasó con los embeddings v1, margen 0.012).
+const UMBRAL_VECTOR = 0.45;
+const BASURA = 'asdfgh qwerty zzz';
+const DEMO = 'tapa para el baño';
+
+async function embeder(textos) {
+  const OAI = pick('OPENAI_API_KEY');
+  if (!OAI) return null;
+  const r = await fetch('https://api.openai.com/v1/embeddings', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + OAI, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'text-embedding-3-small', input: textos, dimensions: 1536 }),
+  });
+  const j = await r.json();
+  if (!r.ok || j.error) return null;
+  return j.data.map(d => d.embedding);
+}
+async function vecinos(vec, limite) {
+  const r = await fetch(`${SB}/rest/v1/rpc/buscar_semantico`, {
+    method: 'POST', headers: H,
+    body: JSON.stringify({ p_embedding: JSON.stringify(vec), p_umbral: 0, p_limite: limite || 5 }),
+  });
+  try { const d = await r.json(); return Array.isArray(d) ? d : []; } catch (x) { return []; }
+}
+// barra proporcional a la similitud, con el umbral marcado en su posición real
+function barraSim(sim, ancho) {
+  const n = ancho || 24;
+  const llenos = Math.max(0, Math.min(n, Math.round(sim * n)));
+  const color = sim >= UMBRAL_VECTOR ? c.ok : c.dim;
+  return color('█'.repeat(llenos)) + c.dim('·'.repeat(n - llenos));
+}
+const grados = sim => (Math.acos(Math.max(-1, Math.min(1, sim))) * 180 / Math.PI).toFixed(0) + '°';
+
+async function coseno(consulta) {
+  const q = consulta || DEMO;
+  cabecera('CÓMO DECIDE EL VECTOR', 'similitud de coseno');
+
+  console.log(' ' + c.dim('Cada descripción se convierte en un vector de 1.536 números. Dos textos'));
+  console.log(' ' + c.dim('se comparan por el ÁNGULO entre sus vectores, no por sus palabras:'));
+  console.log('');
+  console.log('   ' + c.cyan('cos(θ) = (A · B) / (|A| · |B|)') + c.dim('     1 = mismo sentido · 0 = sin relación'));
+
+  const vecs = await embeder([q, BASURA]);
+  if (!vecs) { console.log('\n ' + GL.err + ' no pude embeber (¿VPN caída? OpenAI bloquea Venezuela)'); return 1; }
+
+  const [top, ruido] = await Promise.all([vecinos(vecs[0], 5), vecinos(vecs[1], 1)]);
+  if (!top.length) { console.log('\n ' + GL.err + ' la RPC no devolvió nada'); return 1; }
+
+  console.log('\n ' + c.bold(`"${q}"`) + c.dim('  → los 5 vectores más cercanos del catálogo'));
+  console.log(' ' + c.dim('─'.repeat(W - 2)));
+  for (const f of top) {
+    const pasa = f.similitud >= UMBRAL_VECTOR;
+    console.log('  ' + (pasa ? c.ok(f.similitud.toFixed(3)) : c.dim(f.similitud.toFixed(3))) +
+      ' ' + c.dim(padL(grados(f.similitud), 4)) + '  ' + barraSim(f.similitud) +
+      '  ' + f.descripcion.slice(0, 34));
+  }
+
+  // el umbral y el suelo de ruido, que es lo que de verdad explica la decisión
+  const simRuido = ruido.length ? ruido[0].similitud : 0;
+  console.log(' ' + c.dim('─'.repeat(W - 2)));
+  console.log('  ' + c.warn(UMBRAL_VECTOR.toFixed(3)) + c.dim('       ' + '╌'.repeat(24) + '  umbral: por debajo no se adopta'));
+  console.log('  ' + c.err(simRuido.toFixed(3)) + ' ' + c.dim(padL(grados(simRuido), 4)) + '  ' + barraSim(simRuido) +
+    '  ' + c.dim(`"${BASURA}" (sin sentido)`));
+
+  const margen = top[0].similitud - simRuido;
+  console.log('');
+  const sano = margen > 0.05;
+  console.log(' ' + (sano ? c.ok('▎') : c.err('▎')) + ' ' + c.bold('margen señal/ruido ' + margen.toFixed(3)) + '  ' +
+    (sano ? c.dim('hay separación: el umbral distingue de verdad') : c.err('NO hay umbral posible: la capa es inservible')));
+  console.log(' ' + c.dim('  Con los embeddings v1 este margen era 0.012 y la capa aportaba cero.'));
+  console.log(' ' + c.dim('  Enriquecer el texto (categoría + coloquialismos) lo llevó a ~0.12.'));
+  return 0;
 }
 
 // ───────────────────────────────────────────────────────────────────── buscar
@@ -346,6 +452,7 @@ function ayuda() {
     ['estado', 'salud de vectores, diccionario y ventas', '(por defecto)'],
     ['buscar "<consulta>"', 'ejecuta una búsqueda real y muestra qué devuelve'],
     ['diag "<consulta>"', 'por qué la capa vectorial actuó o no'],
+    ['coseno ["<consulta>"]', 'el coseno en vivo: vecinos, umbral y suelo de ruido'],
   ]);
   g('Métricas', [
     ['suite [--rapida]', 'TODOS los harness de una vez', '(~18 min)'],
@@ -376,6 +483,7 @@ const flags = rest.filter(a => a.startsWith('--'));
   switch ((cmd || 'estado').toLowerCase()) {
     case 'estado': case 'status':        return await estado();
     case 'buscar': case 'search':        return await buscar(resto.join(' '));
+    case 'coseno': case 'vectores':  return await coseno(resto.join(' '));
     case 'diag':                         return correr('scripts/_diag_vector.js', resto.length ? [resto.join(' ')] : []) ? 0 : 1;
     case 'suite':                        return await suite(flags);
     case 'medir': case 'bench':          return correr('scripts/_test_coloquial.js', flags) ? 0 : 1;

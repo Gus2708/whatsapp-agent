@@ -267,11 +267,21 @@ node rag.js ayuda                 # todos los comandos
   cobertura vectorial                                 100.0%
   ██████████████████████████████████████████████████████████
   sin vector                                               0 ✓
+
+ EL COSENO EN VIVO
+ ──────────────────────────────────────────────────────────────
+  cos(θ) = (A · B) / (|A| · |B|)  sobre 1.536 dimensiones
+  "tapa para el baño"  → vecinos más cercanos
+   0.631 █████████████······· TAPA DE POCETA COLORES
+   0.619 ████████████········ TAPA DE INODORO CIERRE SUAVE
+   0.610 ████████████········ TAPA DE INODORO  CIERRE SUAV
+   0.372 ███████············· texto sin sentido (suelo)
+  ✓ margen 0.260  el umbral 0.45 separa de verdad
 ```
 
 | Grupo | Comandos |
 | :--- | :--- |
-| **Diagnóstico** | `estado` · `buscar "<consulta>"` · `diag "<consulta>"` |
+| **Diagnóstico** | `estado` · `buscar "<consulta>"` · `diag "<consulta>"` · `coseno` |
 | **Métricas** | `suite [--rapida]` · `medir [--sin-vector]` · `regresion` · `vector` · `fallos` · `auditar` |
 | **Mantenimiento** | `embeddings` · `vocabulario` · `descripciones` · `popularidad` · `desplegar` |
 
@@ -282,6 +292,12 @@ node rag.js ayuda                 # todos los comandos
   el bot, con las marcas de hipótesis/parcial y la instrucción que recibe el modelo.
 - **`diag`** explica por qué la capa vectorial actuó o no en una consulta concreta:
   si el gatillo disparó, latencia del embedding, similitudes crudas y qué decidió la adopción.
+- **`coseno`** dibuja la capa vectorial **con datos en vivo**: los vecinos más cercanos de
+  una consulta, su ángulo, el umbral y el **suelo de ruido** (la similitud que alcanza un
+  texto sin sentido). La resta de ambos es el **margen señal/ruido**, y es la única cifra
+  que dice si la capa sirve: con los embeddings v1 era **0.012** y aportaba cero; enriquecer
+  el texto lo subió a ~0.12 y hoy ronda **0.26**. Una versión compacta va en `estado`, porque
+  un margen derrumbado no da error — devuelve vecinos igual, solo que equivocados.
 - **`suite`** corre todos los harness de una y resume: 443 casos con el recall completo,
   123 en `--rapida` (salta el recall de 320, que tarda ~15 min).
 
