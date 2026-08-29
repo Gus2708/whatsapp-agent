@@ -105,8 +105,21 @@ for (let i = 0; i < pendientes.length; i += LOTE_OAI){
   }
 }
 
+// ok=false si fallo algo. La version anterior devolvia ok:true SIEMPRE, con los errores
+// enterrados en lotes_fallidos, y estuvo 20 dias escribiendo CERO sin que nadie se enterara:
+// vocabulario y popularidad si corrian, asi que la cadena parecia sana desde fuera.
+// Causa de fondo de los fallos: el indice HNSW reconstruye el grafo en cada insert y las
+// escrituras revientan el statement_timeout. La anon key no puede hacer DDL, asi que el
+// nodo NO puede quitar el indice: si falla, hay que correr scripts/generar_embeddings.js
+// a mano con el drop/create alrededor. Al menos ahora se ve.
+const _huboFallos = fallos > 0 || (total > 0 && escritos === 0);
 return [{ json: {
-  ok: true,
+  ok: !_huboFallos,
+  error: _huboFallos
+    ? 'Se escribieron ' + escritos + ' de ' + total + ' pendientes (' + fallos + ' lote(s) fallaron). ' +
+      'Causa habitual: statement_timeout al escribir vectores con el indice HNSW presente. ' +
+      'Correr scripts/generar_embeddings.js con drop/create del indice alrededor.'
+    : null,
   productos: productos.length,
   pendientes: total,
   embebidos: escritos,

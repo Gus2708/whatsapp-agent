@@ -2,7 +2,7 @@
 const axios = require('axios');
 const SB = 'https://rgniqjfooifchyctnbzu.supabase.co';
 const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';
-const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
+const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', 'User-Agent': 'SerruchoBot/1.0 (WhatsApp Agent)' };
 function nUSD(n){ const r = Math.round(Number(n)*100)/100; return Number.isInteger(r) ? String(r) : r.toFixed(2); }
 function nBs(n){ return (Math.round(Number(n)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function nBsInt(n){ return Math.round(Number(n)).toLocaleString('en-US'); }
@@ -145,7 +145,11 @@ const ALIAS = {
   // la linea de Troen se escribe NORDIK; el cliente la pide como "nordico/nordica"
   'nordico':     ['nordik','nordico'],
   'nordica':     ['nordik','nordico'],
-  'nordik':      ['nordik','nordico']
+  'nordik':      ['nordik','nordico'],
+  // Clases de pintura (A, B, C): en el catalogo conviven como "CLASE B", "TIPO B", "B GAL" (Floripaint), etc.
+  'claseb':     ['clase b','tipo b','b gal','mar deco','vinilevery'],
+  'clasea':     ['clase a','tipo a','a gal','sun deco'],
+  'clasec':     ['clase c','tipo c','c gal','rio deco']
 };
 const aliasDe = w => ALIAS[w] || [w];
 const ACCENTS = {
@@ -213,6 +217,13 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
   s = s.replace(/\bun metro\b/g,'1 metro').replace(/\bdos metros\b/g,'2 metros');
   s = s.replace(/\bdoble a\b/g,'aa').replace(/\bempotrar\b/g,'emp');
   s = s.replace(/\bpinturas?\s+cris\b/g, 'pintura gris');
+  s = s.replace(/\b(por\s+|de\s+)?casualidad\b/g, ' ');
+  s = s.replace(/\b(clase|tipo)\s*b\b/gi, 'claseb');
+  s = s.replace(/\b(clase|tipo)\s*a\b/gi, 'clasea');
+  s = s.replace(/\b(clase|tipo)\s*c\b/gi, 'clasec');
+  s = s.replace(/\b(pinturas?|caucho)\s+b\b/gi, '$1 claseb');
+  s = s.replace(/\b(pinturas?|caucho)\s+a\b/gi, '$1 clasea');
+  s = s.replace(/\b(pinturas?|caucho)\s+c\b/gi, '$1 clasec');
   // SIN se aplica con LIMITE DE PALABRA, no como subcadena. Con split/join naive, una clave
   // que aparece DENTRO de otra palabra la destroza: "media"->"1/2" convertia "mediano" en
   // "1/2no", "zinc"->"lamina zinc" convertia "zincada" en "lamina zincada", y "riel" rompia
@@ -243,6 +254,7 @@ function scoreMatch(descripcion, qTokens){
       let hit = 0;
       for (const a of aliasDe(t)){
         if (words.includes(a)) { hit = 10; break; }
+        if (a.includes(' ') && (new RegExp('(^|[^a-z0-9])' + a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-z0-9]|$)').test(d) || d.includes(a))) { hit = 10; break; }
         if (a.length>=3 && d.includes(a)) hit = Math.max(hit, 5);
       }
       if (hit) s += hit; else all = false;
@@ -282,8 +294,9 @@ const { p_busqueda } = query;
 const IGNORED = new Set([
   'de', 'y', 'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'o', 'que', 'es', 'son', 'me', 'te', 'se', 'le', 'les', 'lo', 'mi', 'tu', 'su', 'ya', 'si', 'no', 'en', 'pero', 'aunque', 'entonces',
   'bs', 'bolivares', 'bolivar', 'dolar', 'dolares', 'divisas', 'usd',
-  'importa', 'marca', 'modelo', 'solo', 'sola', 'mismo', 'misma', 'igual', 'cualquier', 'cualquiera', 'tambien', 'ambos', 'ambas',
+  'importa', 'marca', 'marcas', 'modelo', 'modelos', 'solo', 'sola', 'mismo', 'misma', 'igual', 'cualquier', 'cualquiera', 'tambien', 'ambos', 'ambas',
   'este', 'esta', 'estos', 'estas', 'ese', 'esa', 'eso', 'esos', 'esas', 'aqui', 'aca', 'alla', 'ahi', 'hoy', 'ahora', 'pues', 'ud', 'uds', 'usted', 'ustedes',
+  'casualidad', 'calidad', 'calidades',
   // Saludos y muletillas. Sin esto, un simple "como esta todo" cotizaba 4 productos: el
   // token "todo" casa con "Disco P/lijad TODO" y "SueldaTODO", asi que la consulta parecia
   // tener contenido y el guardia de consulta vaga no saltaba.
@@ -853,7 +866,8 @@ unicos.sort((a,b)=>{
     if (Math.abs(_dsim) >= 0.03) return _dsim;
     return (vMap[b.codigo_interno]||0) - (vMap[a.codigo_interno]||0);
   }
-  const aFull = fullMatch(a.descripcion, qTokens), bFull = fullMatch(b.descripcion, qTokens);
+  const qTokensMatch = isPaintQuery ? qTokens.filter(t => !['exterior','exteriores','interior','interiores','fachada','intemperie','clase','tipo','calidad'].includes(t)) : qTokens;
+  const aFull = fullMatch(a.descripcion, qTokensMatch), bFull = fullMatch(b.descripcion, qTokensMatch);
   if (aFull !== bFull) return aFull ? -1 : 1;
   const aStock = esGranel(a.descripcion) || Number(a.existencia) > 0;
   const bStock = esGranel(b.descripcion) || Number(b.existencia) > 0;
@@ -861,9 +875,9 @@ unicos.sort((a,b)=>{
     if (aStock !== bStock) return aStock ? -1 : 1;
     const dv = (vMap[b.codigo_interno]||0)-(vMap[a.codigo_interno]||0);
     if (dv !== 0) return dv;
-    return scoreMatch(b.descripcion,qTokens)-scoreMatch(a.descripcion,qTokens);
+    return scoreMatch(b.descripcion,qTokensMatch)-scoreMatch(a.descripcion,qTokensMatch);
   }
-  const ds=scoreMatch(b.descripcion,qTokens)-scoreMatch(a.descripcion,qTokens);
+  const ds=scoreMatch(b.descripcion,qTokensMatch)-scoreMatch(a.descripcion,qTokensMatch);
   if(Math.abs(ds)>2) return ds; // dif. pequeña = solo ruido de conteo de palabras -> desempata disponibilidad
   if (aStock !== bStock) return aStock ? -1 : 1;
   return (vMap[b.codigo_interno]||0)-(vMap[a.codigo_interno]||0);

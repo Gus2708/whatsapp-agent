@@ -87,3 +87,18 @@ test('Cuñete Presentation: cuñete de pintura blanca', async () => {
   assert.strictEqual(res.encontrados > 0, true);
   assert.strictEqual(res.productos.some(p => /Cuñete|4G/i.test(p.nombre) && /Blanc/i.test(p.nombre)), true);
 });
+
+test('Liliana incident: Buenas tardes por casualidad que marca de pintura clase B para exterior tiene', async () => {
+  const res = await buscarLive('Buenas tardes por casualidad que marca de pintura clase B para exterior tiene');
+  assert.strictEqual(res.encontrados > 0, true, 'Should find paint products');
+  const names = res.productos.map(p => p.nombre);
+  assert.strictEqual(names.some(n => /Floripaint/i.test(n)), true, 'Should include Floripaint');
+  assert.strictEqual(names.some(n => /Mar Deco|Impacto|Vinilevery/i.test(n)), true, 'Should include Impacto or other Clase B brands');
+});
+
+test('Floripaint Class B: pintura floripaint clase b', async () => {
+  const res = await buscarLive('pintura floripaint clase b');
+  assert.strictEqual(res.encontrados > 0, true);
+  assert.strictEqual(res.productos.some(p => /Floripaint/i.test(p.nombre) && /\bB\b/i.test(p.nombre)), true);
+});
+
