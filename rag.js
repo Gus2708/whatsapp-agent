@@ -6,7 +6,8 @@
  *   node rag.js ayuda              # todos los comandos
  *
  * ORQUESTA los scripts existentes, no duplica su lógica: este repo ya pagó caro tener el
- * mismo matcher copiado en tres sitios. Lo único propio de aquí es `estado` y `buscar`.
+ * mismo matcher copiado en tres sitios. Lo único propio de aquí es `estado`, `buscar` y
+ * el resumen de `suite`.
  */
 const fs = require('fs');
 const path = require('path');
@@ -19,184 +20,287 @@ const SB = pick('SUPABASE_URL') || 'https://rgniqjfooifchyctnbzu.supabase.co';
 const ANON = pick('SUPABASE_ANON_KEY');
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
 
-// ─────────────────────────────────────────────────────────────── util de presentación
-const C = process.stdout.isTTY
-  ? { d: s => `\x1b[2m${s}\x1b[0m`, b: s => `\x1b[1m${s}\x1b[0m`, v: s => `\x1b[32m${s}\x1b[0m`, r: s => `\x1b[31m${s}\x1b[0m`, a: s => `\x1b[33m${s}\x1b[0m` }
-  : { d: s => s, b: s => s, v: s => s, r: s => s, a: s => s };
-const ok = s => C.v('✓ ') + s;
-const mal = s => C.r('✗ ') + s;
-const ojo = s => C.a('⚠ ') + s;
-const titulo = s => '\n' + C.b(s) + '\n' + C.d('─'.repeat(Math.max(s.length, 46)));
-const num = n => Number(n).toLocaleString('es-VE');
+// ───────────────────────────────────────────────────────────────────── presentación
+const TTY = process.stdout.isTTY;
+const W = 64;                                   // ancho fijo: alinea todo sin depender del contenido
+const e = (n, s) => (TTY ? `\x1b[${n}m${s}\x1b[0m` : s);
+const c = {
+  dim: s => e(2, s), bold: s => e(1, s),
+  ok: s => e(32, s), err: s => e(31, s), warn: s => e(33, s),
+  cyan: s => e(36, s), num: s => e(97, s),
+};
+// longitud visible (sin códigos de color) para poder alinear
+const vis = s => String(s).replace(/\x1b\[[0-9;]*m/g, '').length;
+const pad = (s, n) => s + ' '.repeat(Math.max(0, n - vis(s)));
+const padL = (s, n) => ' '.repeat(Math.max(0, n - vis(s))) + s;
 
-async function sb(q, extraHeaders) {
-  const r = await fetch(`${SB}/rest/v1/${q}`, { headers: Object.assign({}, H, extraHeaders || {}) });
+const GL = { ok: c.ok('✓'), err: c.err('✗'), warn: c.warn('▲'), dot: c.dim('·') };
+
+function cabecera(titulo, sub) {
+  const linea = '─'.repeat(W - 2);
+  console.log('\n' + c.dim('╭' + linea + '╮'));
+  const izq = ' ' + c.bold(c.cyan(titulo));
+  const der = sub ? c.dim(sub) + ' ' : '';
+  console.log(c.dim('│') + pad(izq, W - 2 - vis(der)) + der + c.dim('│'));
+  console.log(c.dim('╰' + linea + '╯'));
+}
+function seccion(t) {
+  console.log('\n ' + c.bold(t));
+  console.log(' ' + c.dim('─'.repeat(W - 2)));
+}
+// fila etiqueta ......... valor  [glifo]
+// El valor SIEMPRE termina en la misma columna; el glifo va después, fuera de esa columna.
+// (Antes se restaba el ancho del glifo a la etiqueta y eso desalineaba las filas con estado.)
+function fila(etiqueta, valor, glifo) {
+  const anchoValor = 14;
+  console.log('  ' + pad(c.dim(etiqueta), W - 6 - anchoValor) + padL(valor, anchoValor) + (glifo ? ' ' + glifo : ''));
+}
+function barra(pct, ancho) {
+  const n = ancho || 22;
+  const llenos = Math.round((pct / 100) * n);
+  const color = pct >= 99.5 ? c.ok : pct >= 90 ? c.warn : c.err;
+  return color('█'.repeat(llenos)) + c.dim('░'.repeat(n - llenos));
+}
+const num = n => Number(n).toLocaleString('es-VE');
+const dias = d => (d === null ? '—' : d === 0 ? 'hoy' : d === 1 ? 'ayer' : `hace ${d} días`);
+
+async function sb(q, extra) {
+  const r = await fetch(`${SB}/rest/v1/${q}`, { headers: Object.assign({}, H, extra || {}) });
   if (!r.ok) throw new Error(`${q} -> ${r.status} ${(await r.text()).slice(0, 120)}`);
   return r;
 }
-// cuenta sin traerse las filas
 async function contar(tabla, filtro, col) {
-  // la columna varia por tabla (catalogo_vocabulario no tiene codigo_interno): se parametriza
+  // la columna varía por tabla (catalogo_vocabulario no tiene codigo_interno): se parametriza
   const r = await sb(`${tabla}?select=${col || 'codigo_interno'}&limit=1${filtro ? '&' + filtro : ''}`, { Prefer: 'count=exact' });
-  const cr = r.headers.get('content-range') || '';
-  return Number(cr.split('/')[1] || 0);
+  return Number((r.headers.get('content-range') || '').split('/')[1] || 0);
 }
 async function traerTodo(tabla, select, orden) {
   const out = [];
   for (let off = 0; ; off += 1000) {
-    const r = await sb(`${tabla}?select=${select}&order=${orden}&offset=${off}&limit=1000`);
-    const d = await r.json();
+    const d = await (await sb(`${tabla}?select=${select}&order=${orden}&offset=${off}&limit=1000`)).json();
     out.push(...d);
     if (d.length < 1000) break;
   }
   return out;
 }
-
-// lanza un script hijo mostrando su salida tal cual
 function correr(script, args) {
-  const r = spawnSync(process.execPath, [path.join(ROOT, script), ...(args || [])], { stdio: 'inherit', cwd: ROOT });
-  return r.status === 0;
+  return spawnSync(process.execPath, [path.join(ROOT, script), ...(args || [])], { stdio: 'inherit', cwd: ROOT }).status === 0;
+}
+// corre capturando la salida, para poder resumirla
+function correrCapturando(script, args) {
+  const r = spawnSync(process.execPath, [path.join(ROOT, script), ...(args || [])], { encoding: 'utf8', cwd: ROOT });
+  return { salida: (r.stdout || '') + (r.stderr || ''), ok: r.status === 0 };
 }
 
-// ─────────────────────────────────────────────────────────────── estado
+// ───────────────────────────────────────────────────────────────────── estado
 async function estado() {
-  console.log(titulo('CATÁLOGO Y VECTORES'));
+  const t0 = Date.now();
+  cabecera('RAG · Perucho', 'Ferretería El Serrucho');
 
   const productos = (await traerTodo('productos', 'codigo_interno,descripcion', 'codigo_interno.asc'))
     .filter(p => p.descripcion && p.descripcion.trim());
   const emb = await traerTodo('productos_embedding', 'codigo_interno,descripcion,actualizado_en', 'codigo_interno.asc');
-  const porCodigo = new Map(emb.map(e => [e.codigo_interno, e]));
+  const porCodigo = new Map(emb.map(x => [x.codigo_interno, x]));
 
   const sinVector = productos.filter(p => !porCodigo.has(p.codigo_interno));
-  const descCambiada = productos.filter(p => {
-    const e = porCodigo.get(p.codigo_interno);
-    return e && String(e.descripcion || '').trim() !== p.descripcion.trim();
+  const movidas = productos.filter(p => {
+    const x = porCodigo.get(p.codigo_interno);
+    return x && String(x.descripcion || '').trim() !== p.descripcion.trim();
   });
-  let ultimoEmb = '';
-  for (const e of emb) if (e.actualizado_en > ultimoEmb) ultimoEmb = e.actualizado_en;
-  const diasEmb = ultimoEmb ? Math.floor((Date.now() - new Date(ultimoEmb).getTime()) / 86400000) : null;
+  let ultEmb = '';
+  for (const x of emb) if (x.actualizado_en > ultEmb) ultEmb = x.actualizado_en;
+  const dEmb = ultEmb ? Math.floor((Date.now() - new Date(ultEmb).getTime()) / 86400000) : null;
+  const cobertura = productos.length ? ((productos.length - sinVector.length) / productos.length) * 100 : 0;
 
-  console.log(`  productos          ${num(productos.length)}`);
-  console.log(`  embebidos          ${num(emb.length)}`);
-  console.log(`  ${sinVector.length ? mal(`sin vector         ${num(sinVector.length)}`) : ok(`sin vector         0`)}`);
-  console.log(`  ${descCambiada.length ? ojo(`descripción movida ${num(descCambiada.length)} (vector desactualizado)`) : ok('descripciones      al día')}`);
-  console.log(`  último embedding   hace ${diasEmb} día(s)`);
-  if (sinVector.length) console.log(C.d('    p.ej. ' + sinVector.slice(0, 3).map(p => p.codigo_interno + ' ' + p.descripcion.slice(0, 30)).join(' · ')));
+  seccion('CATÁLOGO Y VECTORES');
+  fila('productos en catálogo', c.num(num(productos.length)));
+  fila('con vector', c.num(num(emb.length)));
+  fila('cobertura vectorial', c.num(cobertura.toFixed(1) + '%'));
+  console.log('  ' + barra(cobertura, W - 6));
+  fila('sin vector', c.num(num(sinVector.length)), sinVector.length ? GL.err : GL.ok);
+  fila('descripción movida', c.num(num(movidas.length)), movidas.length ? GL.warn : GL.ok);
+  fila('último embedding', dias(dEmb));
+  if (sinVector.length) {
+    console.log('  ' + c.dim('└ p.ej. ' + sinVector.slice(0, 3).map(p => p.codigo_interno + ' ' + p.descripcion.slice(0, 26)).join('  ')));
+  }
 
-  // ── vocabulario
-  console.log(titulo('DICCIONARIO'));
+  seccion('DICCIONARIO COLOQUIAL');
   const terminos = await contar('catalogo_vocabulario', 'activo=eq.true', 'termino');
   const cats = await traerTodo('catalogo_vocab_categorias', 'categoria,procesado_en', 'procesado_en.desc');
-  const ultimoVocab = cats[0] ? cats[0].procesado_en : '';
-  console.log(`  términos activos   ${num(terminos)}`);
-  console.log(`  categorías         ${num(cats.length)}`);
-  console.log(`  última corrida     ${String(ultimoVocab).slice(0, 10) || '—'}`);
-  const vocabMasNuevo = Boolean(ultimoVocab && ultimoEmb && ultimoVocab > ultimoEmb);
-  if (vocabMasNuevo) console.log('  ' + ojo('el vocabulario es MÁS NUEVO que los vectores: el texto embebido cambió'));
+  const ultVocab = cats[0] ? cats[0].procesado_en : '';
+  const vocabNuevo = Boolean(ultVocab && ultEmb && ultVocab > ultEmb);
+  fila('términos activos', c.num(num(terminos)));
+  fila('categorías cubiertas', c.num(num(cats.length)));
+  fila('última generación', String(ultVocab).slice(0, 10) || '—', vocabNuevo ? GL.warn : GL.ok);
+  if (vocabNuevo) console.log('  ' + c.warn('└ es más nuevo que los vectores: el texto embebido cambió'));
 
-  // ── ventas
-  console.log(titulo('RANKING POR VENTAS'));
+  seccion('RANKING POR VENTAS');
   const pop = await contar('producto_popularidad');
-  const rp = await sb('producto_popularidad?select=actualizado_en&order=actualizado_en.desc&limit=1');
-  const ultimaPop = ((await rp.json())[0] || {}).actualizado_en || '';
-  const diasPop = ultimaPop ? Math.floor((Date.now() - new Date(ultimaPop).getTime()) / 86400000) : null;
+  const ultPop = ((await (await sb('producto_popularidad?select=actualizado_en&order=actualizado_en.desc&limit=1')).json())[0] || {}).actualizado_en || '';
+  const dPop = ultPop ? Math.floor((Date.now() - new Date(ultPop).getTime()) / 86400000) : null;
   const conStock = await contar('productos', 'existencia=gt.0');
-  console.log(`  con datos de venta ${num(pop)}`);
-  console.log(`  productos c/stock  ${num(conStock)}`);
-  console.log(`  ${diasPop !== null && diasPop > 3 ? ojo(`última actualización hace ${diasPop} día(s)`) : ok(`actualizado hace ${diasPop} día(s)`)}`);
+  const muerto = conStock - pop;
+  fila('con historial de venta', c.num(num(pop)));
+  fila('con existencia', c.num(num(conStock)));
+  if (muerto > 0) fila('stock sin ventas', c.num(num(muerto)), GL.warn);
+  fila('recalculado', dias(dPop), dPop !== null && dPop > 3 ? GL.warn : GL.ok);
 
   // ── veredicto
-  console.log(titulo('VEREDICTO'));
   const problemas = [];
-  if (sinVector.length) problemas.push(`${sinVector.length} producto(s) sin vector`);
-  if (descCambiada.length) problemas.push(`${descCambiada.length} con descripción movida`);
-  if (vocabMasNuevo) problemas.push('vocabulario más nuevo que los vectores');
-  if (diasPop !== null && diasPop > 3) problemas.push(`ranking de ventas de hace ${diasPop} días`);
+  if (sinVector.length) problemas.push([`${num(sinVector.length)} producto(s) sin vector`, 'embeddings']);
+  if (movidas.length) problemas.push([`${num(movidas.length)} con la descripción cambiada`, 'embeddings']);
+  if (vocabNuevo) problemas.push(['vocabulario más nuevo que los vectores', 'embeddings']);
+  if (dPop !== null && dPop > 3) problemas.push([`ranking de ventas de ${dias(dPop)}`, 'popularidad']);
 
+  console.log('');
   if (!problemas.length) {
-    console.log('  ' + ok('capa vectorial y ranking al día'));
+    console.log(' ' + c.ok('▎') + ' ' + c.bold('Todo al día') + c.dim(`  ·  ${((Date.now() - t0) / 1000).toFixed(1)}s`));
     return 0;
   }
-  for (const p of problemas) console.log('  ' + mal(p));
-  console.log('\n  ' + C.b('Para arreglarlo:'));
-  if (sinVector.length || descCambiada.length || vocabMasNuevo) {
-    console.log(C.d('    node rag.js embeddings        # avisa si conviene quitar el índice antes'));
-  }
-  if (diasPop !== null && diasPop > 3) console.log(C.d('    node rag.js popularidad'));
+  console.log(' ' + c.err('▎') + ' ' + c.bold('Requiere acción'));
+  for (const [p] of problemas) console.log('   ' + GL.err + ' ' + p);
+  const cmds = [...new Set(problemas.map(p => p[1]))];
+  console.log('\n   ' + c.dim('ejecuta:') + '  ' + cmds.map(x => c.cyan('node rag.js ' + x)).join(c.dim('  y  ')));
   return 1;
 }
 
-// ─────────────────────────────────────────────────────────────── buscar
+// ───────────────────────────────────────────────────────────────────── buscar
 async function buscar(consulta) {
-  if (!consulta) { console.log('uso: node rag.js buscar "cemento gris"'); return 1; }
+  if (!consulta) { console.log(' uso: ' + c.cyan('node rag.js buscar "cemento gris"')); return 1; }
   const body = fs.readFileSync(path.join(ROOT, 'scratch_live', 'live_buscar.js'), 'utf8');
-  const axiosShim = {
-    async get(u, c) { const r = await fetch(u, { headers: (c && c.headers) || {} }); return { data: await r.json() }; },
-    async post(u, b, c) { const r = await fetch(u, { method: 'POST', headers: (c && c.headers) || {}, body: JSON.stringify(b) }); let d = null; try { d = await r.json(); } catch (e) {} return { data: d }; },
+  const ax = {
+    async get(u, cfg) { const r = await fetch(u, { headers: (cfg && cfg.headers) || {} }); return { data: await r.json() }; },
+    async post(u, b, cfg) { const r = await fetch(u, { method: 'POST', headers: (cfg && cfg.headers) || {}, body: JSON.stringify(b) }); let d = null; try { d = await r.json(); } catch (x) {} return { data: d }; },
   };
   const fakeEnv = { OPENROUTER_API_KEY: pick('OPENROUTER_API_KEY'), OPENAI_API_KEY: pick('OPENAI_API_KEY') };
   const run = new Function('query', 'require', '$env', '"use strict"; return (async () => {\n' + body + '\n})();');
   const t0 = Date.now();
   let r;
-  try { r = JSON.parse(await run({ p_busqueda: consulta }, n => (n === 'axios' ? axiosShim : require(n)), fakeEnv)); }
-  catch (e) { console.log(mal('la búsqueda lanzó excepción: ' + e.message)); return 1; }
+  try { r = JSON.parse(await run({ p_busqueda: consulta }, n => (n === 'axios' ? ax : require(n)), fakeEnv)); }
+  catch (x) { console.log(' ' + GL.err + ' la búsqueda lanzó excepción: ' + x.message); return 1; }
   const ms = Date.now() - t0;
 
-  console.log(titulo(`"${consulta}"`));
-  console.log(C.d(`  ${ms} ms · ${r.encontrados || 0} resultado(s)`) +
-    (r.rescate ? C.a(`  · HIPÓTESIS (${r.rescate})`) : '') +
-    (r.parcial ? C.a('  · parcial') : '') +
-    (r.aclarar ? C.a('  · consulta vaga') : '') +
-    (r.no_vendido ? C.a('  · marcado como no vendido') : ''));
+  cabecera(`"${consulta}"`, `${ms} ms`);
+  const marcas = [];
+  if (r.rescate) marcas.push(c.warn('HIPÓTESIS → ' + r.rescate));
+  if (r.parcial) marcas.push(c.warn('parcial'));
+  if (r.aclarar) marcas.push(c.warn('consulta vaga'));
+  if (r.no_vendido) marcas.push(c.warn('no vendido'));
+  console.log(' ' + c.dim(`${r.encontrados || 0} resultado(s)`) + (marcas.length ? '   ' + marcas.join(c.dim(' · ')) : ''));
+  console.log('');
+
   for (const p of (r.productos || [])) {
-    console.log(`  ${p.disponible ? C.v('•') : C.r('•')} ${p.nombre}`);
-    console.log(C.d(`      ${p.precio_divisas_texto}   ${p.precio_bs_texto}`));
+    console.log('  ' + (p.disponible ? c.ok('●') : c.err('●')) + ' ' + p.nombre);
+    console.log('    ' + c.dim(pad(p.precio_divisas_texto, 10) + p.precio_bs_texto));
   }
-  if (!(r.productos || []).length) console.log(C.d('  (sin resultados)'));
-  if (r.instruccion) console.log('\n  ' + C.b('instrucción al bot:') + '\n' + C.d('  ' + String(r.instruccion).slice(0, 260)));
+  if (!(r.productos || []).length) console.log('  ' + c.dim('(sin resultados)'));
+
+  if (r.instruccion) {
+    console.log('\n ' + c.dim('instrucción al bot'));
+    console.log(' ' + c.dim('─'.repeat(W - 2)));
+    console.log(' ' + String(r.instruccion).slice(0, 300).replace(/\n/g, '\n '));
+  }
   return 0;
 }
 
-// ─────────────────────────────────────────────────────────────── popularidad
+// ───────────────────────────────────────────────────────────────────── suite
+// Corre TODOS los harness de una y resume. Es la foto completa de la calidad de búsqueda.
+async function suite(flags) {
+  const rapida = flags.includes('--rapida');
+  cabecera('SUITE DE BÚSQUEDA', rapida ? 'modo rápido' : 'completa');
+  if (!rapida) console.log(' ' + c.dim('el recall de 320 tarda ~15 min; usa --rapida para saltarlo'));
+
+  const pasos = [
+    { nombre: 'Regresión', script: 'scripts/_test_busqueda_50.js', args: [], parse: s => {
+      const m = s.match(/Total:\s*(\d+)[\s\S]*?FALSO-NEGATIVO sospechoso:\s*(\d+)[\s\S]*?excepciones:\s*(\d+)/);
+      if (!m) return null;
+      return { casos: +m[1], fallos: +m[2] + +m[3], detalle: `${m[2]} falsos negativos · ${m[3]} excepciones` };
+    } },
+    { nombre: 'Fallos reales', script: 'scripts/_test_fallos_reales.js', args: ['--prod'], parse: s => {
+      const m = s.match(/evaluadas:\s*(\d+)\s*\|\s*con resultados:\s*(\d+)[\s\S]*?sin nada:\s*(\d+)/);
+      if (!m) return null;
+      return { casos: +m[1], fallos: +m[3], detalle: `${m[2]} encuentran · ${m[3]} sin nada` };
+    } },
+    { nombre: 'Margen vectorial', script: 'scripts/_test_vector.js', args: [], parse: s => {
+      const m = s.match(/aciertos en el top-1:\s*(\d+)\/(\d+)[\s\S]*?MARGEN[^:]*:\s*([\d.]+)/);
+      if (!m) return null;
+      const margen = parseFloat(m[3]);
+      return { casos: +m[2], fallos: +m[2] - +m[1], detalle: `margen ${margen.toFixed(3)} ${margen > 0.05 ? '(umbral posible)' : '(INSERVIBLE)'}` };
+    } },
+  ];
+  if (!rapida) pasos.push({ nombre: 'Recall coloquial', script: 'scripts/_test_coloquial.js', args: [], parse: s => {
+    const m = s.match(/casos:\s*(\d+)[\s\S]*?producto exacto en resultados\s*:\s*(\d+)\s*\(([\d.]+)%\)[\s\S]*?fallo total\s*:\s*(\d+)/);
+    if (!m) return null;
+    return { casos: +m[1], fallos: +m[4], detalle: `${m[2]} exactos (${m[3]}%) · ${m[4]} fallos` };
+  } });
+
+  console.log('');
+  let totalCasos = 0, totalFallos = 0, rotos = 0;
+  for (const p of pasos) {
+    // el progreso en el sitio solo tiene sentido en terminal: por tubería el \r queda literal
+    if (TTY) process.stdout.write('  ' + c.dim('▸ ') + pad(p.nombre, 20) + c.dim('corriendo…'));
+    const t0 = Date.now();
+    const { salida } = correrCapturando(p.script, p.args);
+    const r = p.parse(salida);
+    const seg = ((Date.now() - t0) / 1000).toFixed(0) + 's';
+    if (TTY) process.stdout.write('\r' + ' '.repeat(W) + '\r');   // borrar el "corriendo…", no solo volver al inicio
+    if (!r) { console.log('  ' + GL.err + ' ' + pad(p.nombre, 20) + c.err('no pude leer el resultado') + c.dim('  ' + seg)); rotos++; continue; }
+    totalCasos += r.casos; totalFallos += r.fallos;
+    const g = r.fallos === 0 ? GL.ok : GL.warn;
+    console.log('  ' + g + ' ' + pad(p.nombre, 20) + pad(c.num(r.casos + ' casos'), 12) + c.dim(r.detalle) + c.dim('  ' + seg));
+  }
+
+  console.log('\n ' + c.dim('─'.repeat(W - 2)));
+  const sano = totalFallos === 0 && rotos === 0;
+  console.log(' ' + (sano ? c.ok('▎') : c.warn('▎')) + ' ' + c.bold(`${num(totalCasos)} casos`) +
+    c.dim('  ·  ') + (totalFallos ? c.warn(`${totalFallos} con problema`) : c.ok('sin fallos')));
+  return sano ? 0 : 1;
+}
+
+// ───────────────────────────────────────────────────────────────────── popularidad
 async function popularidad() {
   const r = await fetch(`${SB}/rest/v1/rpc/refrescar_popularidad_reciente`, { method: 'POST', headers: H, body: '{}' });
   const t = await r.text();
-  if (!r.ok) { console.log(mal('falló: ' + t.slice(0, 160))); return 1; }
-  console.log(ok(`ranking por ventas recalculado: ${num(t)} productos con historial`));
+  if (!r.ok) { console.log(' ' + GL.err + ' falló: ' + t.slice(0, 160)); return 1; }
+  console.log(' ' + GL.ok + ' ranking recalculado: ' + c.num(num(t)) + ' productos con historial de venta');
   return 0;
 }
 
-// ─────────────────────────────────────────────────────────────── ayuda
+// ───────────────────────────────────────────────────────────────────── ayuda
 function ayuda() {
-  console.log(`
-${C.b('rag')} — CLI de la capa de búsqueda de Perucho
-
-${C.b('Diagnóstico')}
-  ${C.b('estado')}                    salud de vectores, diccionario y ranking  ${C.d('(por defecto)')}
-  ${C.b('buscar')} "<consulta>"       ejecuta una búsqueda real y muestra qué devuelve
-  ${C.b('diag')} "<consulta>"         por qué la capa vectorial actuó o no en esa consulta
-
-${C.b('Métricas')}
-  ${C.b('medir')} [--sin-vector]      recall sobre 320 consultas coloquiales ${C.d('(~15 min)')}
-  ${C.b('regresion')}                 51 casos, exige 0 falsos negativos ${C.d('(~2 min)')}
-  ${C.b('vector')}                    margen señal/ruido del espacio vectorial
-  ${C.b('fallos')}                    las consultas que de verdad escalaron a un empleado
-  ${C.b('auditar')}                   audita el mapa SIN contra el catálogo real
-
-${C.b('Mantenimiento')}
-  ${C.b('embeddings')} [--dry]        genera los vectores que falten
-  ${C.b('vocabulario')} [--dry]       regenera el diccionario coloquial
-  ${C.b('descripciones')} [--piloto N] descripciones con Luna (solo lo vendido en 365 días)
-  ${C.b('popularidad')}               recalcula el ranking por ventas recientes
-  ${C.b('desplegar')} [--dry]         sube los dumps a n8n ${C.d('(corre npm test antes)')}
-
-${C.d('El código está repartido en scripts/; este CLI los orquesta. `medir` cachea sus')}
-${C.d('consultas a propósito: comparar dos corridas con preguntas distintas no mide nada.')}
-`);
+  cabecera('RAG · Perucho', 'CLI de la capa de búsqueda');
+  const g = (t, items) => {
+    console.log('\n ' + c.bold(t));
+    for (const [cmd, desc, nota] of items) {
+      console.log('   ' + c.cyan(pad(cmd, 26)) + desc + (nota ? ' ' + c.dim(nota) : ''));
+    }
+  };
+  g('Diagnóstico', [
+    ['estado', 'salud de vectores, diccionario y ventas', '(por defecto)'],
+    ['buscar "<consulta>"', 'ejecuta una búsqueda real y muestra qué devuelve'],
+    ['diag "<consulta>"', 'por qué la capa vectorial actuó o no'],
+  ]);
+  g('Métricas', [
+    ['suite [--rapida]', 'TODOS los harness de una vez', '(~18 min)'],
+    ['medir [--sin-vector]', 'recall sobre 320 consultas coloquiales', '(~15 min)'],
+    ['regresion', '86 casos, exige 0 falsos negativos', '(~2 min)'],
+    ['vector', 'margen señal/ruido del espacio vectorial'],
+    ['fallos', 'consultas que escalaron a un empleado'],
+    ['auditar', 'audita el mapa SIN contra el catálogo'],
+  ]);
+  g('Mantenimiento', [
+    ['embeddings [--dry]', 'genera los vectores que falten'],
+    ['vocabulario [--dry]', 'regenera el diccionario coloquial'],
+    ['descripciones [--piloto N]', 'descripciones con Luna (vendido en 365d)'],
+    ['popularidad', 'recalcula el ranking por ventas'],
+    ['desplegar [--dry]', 'sube los dumps a n8n', '(corre npm test antes)'],
+  ]);
+  console.log('\n ' + c.dim('`medir` cachea sus consultas a propósito: comparar dos corridas con'));
+  console.log(' ' + c.dim('preguntas distintas no mide nada.') + '\n');
   return 0;
 }
 
-// ─────────────────────────────────────────────────────────────── despacho
+// ───────────────────────────────────────────────────────────────────── despacho
 const [cmd, ...rest] = process.argv.slice(2);
 const resto = rest.filter(a => !a.startsWith('--'));
 const flags = rest.filter(a => a.startsWith('--'));
@@ -206,6 +310,7 @@ const flags = rest.filter(a => a.startsWith('--'));
     case 'estado': case 'status':        return await estado();
     case 'buscar': case 'search':        return await buscar(resto.join(' '));
     case 'diag':                         return correr('scripts/_diag_vector.js', resto.length ? [resto.join(' ')] : []) ? 0 : 1;
+    case 'suite':                        return await suite(flags);
     case 'medir': case 'bench':          return correr('scripts/_test_coloquial.js', flags) ? 0 : 1;
     case 'regresion': case 'regression': return correr('scripts/_test_busqueda_50.js') ? 0 : 1;
     case 'vector':                       return correr('scripts/_test_vector.js') ? 0 : 1;
@@ -218,9 +323,9 @@ const flags = rest.filter(a => a.startsWith('--'));
     case 'desplegar': case 'deploy':     return correr('scripts/deploy_nodos.js', flags) ? 0 : 1;
     case 'ayuda': case 'help': case '-h': case '--help': return ayuda();
     default:
-      console.log(mal(`comando desconocido: "${cmd}"`));
+      console.log(' ' + GL.err + ` comando desconocido: "${cmd}"`);
       ayuda();
       return 1;
   }
-})().then(c => process.exit(c || 0))
-  .catch(e => { console.error(mal('ERROR: ' + e.message)); process.exit(1); });
+})().then(x => process.exit(x || 0))
+  .catch(x => { console.error(' ' + GL.err + ' ERROR: ' + x.message); process.exit(1); });
