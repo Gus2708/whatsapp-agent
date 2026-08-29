@@ -240,61 +240,93 @@ Cuando el bot no basta, encola al cliente y un empleado lo atiende desde una app
 
 ---
 
-## 🧪 Desarrollo y pruebas
+## 🧪 `rag` — CLI de la capa de búsqueda
+
+Punto de entrada único para diagnosticar, medir y mantener la búsqueda.
 
 ```bash
-npm test                                   # guards de sincronía + unit tests de lib
-node scripts/_test_busqueda_50.js          # 51 búsquedas reales vs Supabase real (regresión)
-node scripts/_test_fallos_reales.js --prod # las consultas que de verdad hicieron fallar al bot
-node scripts/_test_coloquial.js            # recall sobre 320 consultas coloquiales (set cacheado)
-node scripts/_test_coloquial.js --sin-vector   # el mismo set sin capa vectorial, para comparar
-node scripts/_test_modelo.js               # end-to-end del agente: prompt real + tools reales
-node scripts/_test_vector.js               # margen señal/ruido del espacio vectorial
-node scripts/_audit_sin.js                 # audita el mapa SIN contra el catálogo real
-node scripts/_inspect_live.js              # re-dumpear el workflow vivo a scratch_live/
+node rag.js                       # estado del sistema
+node rag.js ayuda                 # todos los comandos
 ```
 
-> Los harnesses `_test_*.js` ejecutan el **cuerpo real** de las tools contra la base de datos de producción (solo lectura), para cazar fallas del algoritmo con mensajes fieles a los chats reales.
+```
+╭──────────────────────────────────────────────────────────────╮
+│ RAG · Perucho                         Ferretería El Serrucho │
+╰──────────────────────────────────────────────────────────────╯
+
+ CATÁLOGO Y VECTORES
+ ──────────────────────────────────────────────────────────────
+  productos en catálogo                                7.688
+  con vector                                           7.688
+  cobertura vectorial                                 100.0%
+  ██████████████████████████████████████████████████████████
+  sin vector                                               0 ✓
+```
+
+| Grupo | Comandos |
+| :--- | :--- |
+| **Diagnóstico** | `estado` · `buscar "<consulta>"` · `diag "<consulta>"` |
+| **Métricas** | `suite [--rapida]` · `medir [--sin-vector]` · `regresion` · `vector` · `fallos` · `auditar` |
+| **Mantenimiento** | `embeddings` · `vocabulario` · `descripciones` · `popularidad` · `desplegar` |
+
+- **`estado`** cruza catálogo, vectores, diccionario y ventas; detecta las tres formas de
+  desalineación (sin vector, descripción movida, vocabulario más nuevo que los embeddings),
+  da el comando exacto para cada una y **sale con código 1** si algo requiere acción.
+- **`buscar`** ejecuta el cuerpo **real** del nodo contra Supabase y muestra qué devolvería
+  el bot, con las marcas de hipótesis/parcial y la instrucción que recibe el modelo.
+- **`diag`** explica por qué la capa vectorial actuó o no en una consulta concreta:
+  si el gatillo disparó, latencia del embedding, similitudes crudas y qué decidió la adopción.
+- **`suite`** corre todos los harness de una y resume: 443 casos con el recall completo,
+  123 en `--rapida` (salta el recall de 320, que tarda ~15 min).
+
+El CLI **orquesta** los scripts de `scripts/`, no duplica su lógica. Cada uno sigue siendo
+ejecutable por separado.
+
+> Los harness ejecutan el **cuerpo real** de las tools contra la base de producción (solo
+> lectura), para cazar fallas del algoritmo con mensajes fieles a los chats reales.
 >
-> `_test_coloquial.js` cachea sus consultas en `scratch_live/_coloquial_set.json` **a propósito**:
-> comparar dos corridas con preguntas distintas no mide nada. Regenerar con `--generar N` solo
-> cuando quieras un set nuevo, y entonces re-medir la línea base.
+> El recall cachea sus consultas en `scratch_live/_coloquial_set.json` **a propósito**:
+> comparar dos corridas con preguntas distintas no mide nada. Regenerar con `--generar N`
+> solo cuando quieras un set nuevo, y entonces re-medir la línea base.
 
 ### Ciclo de despliegue
 
 ```bash
-node scripts/deploy_nodos.js               # dumps scratch_live/ -> nodos del n8n vivo
+node rag.js desplegar                      # dumps scratch_live/ -> nodos del n8n vivo
 node scripts/export_workflow.js            # n8n vivo -> n8n_workflow.json (snapshot fiel)
 node scripts/build_workflow.js             # normaliza el JSON desde los dumps
 ```
 
-> `deploy_nodos.js` corre **`npm test` antes del PUT** y aborta si falla: desplegar a n8n es
+> `desplegar` corre **`npm test` antes del PUT** y aborta si falla: desplegar a n8n es
 > publicar en producción, el bot atiende clientes reales en cuanto el PUT devuelve 200.
 > `--sin-test` lo salta, pero hay que escribirlo a propósito.
 
-### Mantenimiento del diccionario, los vectores y las ventas
+### Mantenimiento nocturno — y lo que NO es automático
 
-```bash
-node scripts/generar_vocabulario.js --dry  # qué términos generaría (sin escribir)
-node scripts/generar_vocabulario.js        # incremental: solo categorías nuevas/cambiadas
-node scripts/generar_embeddings.js         # incremental por hash del texto enriquecido
-node scripts/generar_descripciones.js      # descripciones con Luna (solo lo vendido en 365 días)
-```
-
-El workflow n8n **«Sync Vocabulario Catálogo»** (cron 3:00 AM) lo mantiene solo:
+El workflow n8n **«Sync Vocabulario Catálogo»** (cron 3:00 AM):
 
 ```
-Cada noche 3:00 → Sincronizar Vocabulario → Sync Embeddings → Refrescar Popularidad
+Cada noche 3:00 → Sincronizar Vocabulario → Monitor Embeddings → Refrescar Popularidad
 ```
 
-Todo incremental y por hash, así que un producto nuevo no obliga a regenerar las 710
-categorías ni los 7.5k vectores. Va en un workflow **aparte** del flujo de mensajes para no
-sumar latencia a ningún cliente.
+Vocabulario y ranking por ventas **sí se mantienen solos**, incrementales por hash. Va en un
+workflow **aparte** del flujo de mensajes para no sumar latencia a ningún cliente.
 
-> **Trampa de carga masiva:** el índice HNSW reconstruye el grafo en cada insert y revienta
-> el `statement_timeout` de Supabase (error `57014`) a mitad, ya pagados los embeddings.
-> Orden correcto: `drop index` → cargar → `create index`. El script avisa si hay >500 filas
-> pendientes; no puede automatizarlo porque la anon key no hace DDL.
+> **Los embeddings NO se generan solos.** El tercer nodo es un **monitor**: detecta y avisa,
+> no embebe. No puede hacerlo por dos límites reales — escribir vectores con el índice HNSW
+> presente revienta el `statement_timeout` (error `57014`) y la anon key no puede quitar el
+> índice, y además no puede recalcular el hash del texto enriquecido. Un job que no puede
+> hacer su trabajo debe decirlo, no fingirlo: **antes reportaba `ok:true` escribiendo cero y
+> estuvo 20 días así sin que nadie lo notara.**
+>
+> Cuando `node rag.js estado` avise, el ciclo manual es:
+> ```
+> drop index if exists idx_productos_embedding_hnsw;
+> node rag.js embeddings
+> create index idx_productos_embedding_hnsw on productos_embedding
+>   using hnsw (embedding extensions.vector_cosine_ops);
+> ```
+> El script avisa si hay más de 500 filas pendientes. **Hazle caso.**
 
 ---
 

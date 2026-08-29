@@ -71,11 +71,20 @@ sync desde HybridLite y se llevaría por delante vectores, descripciones y score
 ### Workflow nocturno (n8n, cron 3:00)
 
 ```
-Cada noche 3:00 → Sincronizar Vocabulario → Sync Embeddings → Refrescar Popularidad
+Cada noche 3:00 → Sincronizar Vocabulario → Monitor Embeddings → Refrescar Popularidad
 ```
 
 Va en un **workflow aparte** del flujo de mensajes para no sumar latencia a ningún cliente.
-Todo es incremental por hash: si el catálogo no cambió, no gasta nada.
+Vocabulario y ranking por ventas **sí se mantienen solos**, incrementales por hash.
+
+> **Los embeddings NO se generan solos.** El tercer nodo es un **monitor**: detecta y avisa.
+> No puede embeber por dos límites reales — escribir vectores con el índice HNSW presente
+> revienta el `statement_timeout` (`57014`) y la anon key no puede quitar el índice, y además
+> no puede recalcular el hash del texto enriquecido. Antes fingía trabajar: reportaba
+> `ok:true` escribiendo cero, y estuvo **20 días** así sin que nadie lo notara.
+>
+> Cuando `node rag.js estado` avise, el ciclo es manual:
+> `drop index` → `node rag.js embeddings` → `create index`.
 
 ### Scripts
 
@@ -88,8 +97,9 @@ Todo es incremental por hash: si el catálogo no cambió, no gasta nada.
 | `_test_coloquial.js` | **Recall sobre 320 consultas cacheadas** (`--sin-vector` para aislar) |
 | `_test_vector.js` | **Margen señal/ruido** del espacio vectorial |
 | `_test_fallos_reales.js` | Las consultas que de verdad escalaron |
-| `_test_busqueda_50.js` | Regresión, 51 casos |
+| `_test_busqueda_50.js` | Regresión, 86 casos |
 | `_audit_sin.js` | Audita el mapa `SIN` contra el catálogo real |
+| `../rag.js` | **CLI**: orquesta todo lo anterior. `node rag.js ayuda` |
 
 ---
 
