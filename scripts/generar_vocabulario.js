@@ -14,6 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const progreso = require('./_progreso.js');
 
 const ROOT = path.join(__dirname, '..');
 const L = require(path.join(ROOT, 'lib', 'serrucho-search.js'));
@@ -195,6 +196,7 @@ async function pedirLote(lote) {
   // falla, sus categorías quedan sin hash y la próxima corrida las reintenta.
   const okCategorias = new Set();
   let tIn = 0, tOut = 0, hechos = 0, lotesFallidos = 0;
+  const P = progreso(lotes.length, { etiqueta: `generando` });
 
   async function procesar(lote) {
     let datos;
@@ -232,13 +234,13 @@ async function pedirLote(lote) {
       }
     }
     hechos++;
-    process.stdout.write(`\r  lotes ${hechos}/${lotes.length} | términos aceptados: ${aceptados.length}   `);
+    P.avance(hechos, { extra: `${aceptados.length} términos` });
   }
 
   for (let i = 0; i < lotes.length; i += CONCURRENCIA) {
     await Promise.all(lotes.slice(i, i + CONCURRENCIA).map(procesar));
   }
-  console.log('');
+  P.fin(`${lotes.length} lote(s) procesados · ${aceptados.length.toLocaleString('es-VE')} términos aceptados`);
 
   console.log(`\nACEPTADOS: ${aceptados.length}`);
   console.log(`RECHAZADOS -> ya encontrable: ${rechazos.yaEncontrable} | canónico inexistente: ${rechazos.canonicoInexistente} | choca con SIN: ${rechazos.chocaSIN} | duplicado: ${rechazos.dup} | identidad: ${rechazos.identidad}`);

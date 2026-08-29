@@ -10,6 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const progreso = require('./_progreso.js');
 const norm = require(require('path').join(__dirname, '..', 'lib', 'serrucho-search.js')).norm;
 
 const ROOT = path.join(__dirname, '..');
@@ -144,6 +145,7 @@ async function embeber(textos) {
   if (DRY) { console.log('\n--dry: no se llamó a OpenAI ni se escribió nada.'); return; }
 
   let tokens = 0, escritos = 0;
+  const P = progreso(pendientes.length, { etiqueta: `embebiendo` });
   for (let i = 0; i < pendientes.length; i += LOTE) {
     const lote = pendientes.slice(i, i + LOTE);
     const { vectores, tokens: tk } = await embeber(lote.map(textoDe));
@@ -173,12 +175,11 @@ async function embeber(textos) {
         ultimo = `${r.status} ${(await r.text()).slice(0, 200)}`;
         await new Promise(res => setTimeout(res, 500 * intento));
       }
-      if (!ok) throw new Error(`UPSERT (tras 4 intentos) -> ${ultimo}`);
+      if (!ok) { P.fin(); throw new Error(`UPSERT (tras 4 intentos) -> ${ultimo}`); }
       escritos += trozo.length;
-      process.stdout.write(`\r  embebidos ${escritos}/${pendientes.length}`);
+      P.avance(escritos, { extra: `$${(tokens / 1e6 * PRECIO_M).toFixed(4)}` });
     }
   }
 
-  console.log(`\n\nOK — ${escritos} productos embebidos.`);
-  console.log(`tokens: ${tokens} | costo real: $${(tokens / 1e6 * PRECIO_M).toFixed(4)}`);
-})().catch(e => { console.error('ERROR', e.message); process.exit(1); });
+  P.fin(`${escritos.toLocaleString('es-VE')} productos embebidos · $${(tokens / 1e6 * PRECIO_M).toFixed(4)}`);
+})().catch(e => { console.error('\nERROR', e.message); process.exit(1); });

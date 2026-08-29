@@ -13,6 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const progreso = require('./_progreso.js');
 
 const ROOT = path.join(__dirname, '..');
 const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
@@ -135,6 +136,7 @@ async function pedir(lote) {
   for (let i = 0; i < objetivo.length; i += POR_LOTE) lotes.push(objetivo.slice(i, i + POR_LOTE));
 
   const filas = []; const vistos = new Set(); let tIn = 0, tOut = 0, fallos = 0, hechos = 0;
+  const P = progreso(objetivo.length, { etiqueta: `describiendo` });
   const porCodigo = new Map(objetivo.map(p => [p.codigo_interno, p.descripcion]));
 
   async function procesar(lote) {
@@ -169,7 +171,7 @@ async function pedir(lote) {
       } catch (e) { fallos++; }
     }
     hechos++;
-    process.stdout.write(`\r  lotes ${hechos}/${lotes.length} | descripciones ${filas.length}`);
+    P.avance(filas.length, { extra: `${hechos}/${lotes.length} lotes` });
   }
 
   for (let i = 0; i < lotes.length; i += CONCURRENCIA) {
@@ -179,7 +181,7 @@ async function pedir(lote) {
 
 
   const costo = tIn / 1e6 * 0.10 + tOut / 1e6 * 0.60;
-  console.log(`\nOK — ${filas.length} descripciones guardadas${fallos ? ` (${fallos} lote(s) fallaron)` : ''}.`);
+  P.fin(`${filas.length.toLocaleString('es-VE')} descripciones guardadas${fallos ? ` · ${fallos} lote(s) fallaron` : ''} · $${costo.toFixed(4)}`);
   console.log(`in ${tIn} / out ${tOut} | costo ${costo.toFixed(4)} USD`);
   if (PILOTO) console.log(`\nExtrapolado a los ${recientes.size} con venta reciente: ~$${(costo / filas.length * recientes.size).toFixed(2)}`);
   console.log('\nMuestra:');
