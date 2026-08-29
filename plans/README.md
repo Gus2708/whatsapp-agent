@@ -19,6 +19,7 @@ conditions, and update your row when done.
 | 007 | Guard employee-app dependencies in `supabase_schema.sql` | P1 | S | — | DONE |
 | 008 | Parallelize `hacer_presupuesto` item lookups with `Promise.all` | P2 | M | — | DONE |
 | 009 | Fix CRLF bug in `check_sources_sync.js` guard | P1 | S | — | DONE |
+| 010 | Medir el recall por antigüedad de venta (¿el ranking esconde el stock frío?) | P1 | M | — | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale)
 
