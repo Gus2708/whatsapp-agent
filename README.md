@@ -319,6 +319,40 @@ node rag.js ayuda                 # todos los comandos
 - **`suite`** corre todos los harness de una y resume: 443 casos con el recall completo,
   123 en `--rapida` (salta el recall de 320, que tarda ~15 min).
 
+`node rag.js coseno ["<consulta>"]` dibuja además los vectores, con el ángulo real de cada
+uno respecto a la consulta:
+
+```
+ |A| = 1.000  → OpenAI normaliza, así que cos(θ) = A · B directamente
+
+   ⡄      A = tapa para el baño
+   ⡇       ⢀
+   ⡇     ⠠⠒⡏⢣
+   ⡇      ⡸
+   ⡇     ⢰⠁
+   ⡇    ⢀⠇
+   ⡇    ⡜
+   ⡇   ⢰⠁                                 ⣀⣀⣀⣀⡀0.631 TAPA DE POCETA C
+   ⡇  ⢠⠃                              ⣀⣀⠤⠤⠒⠪⠛⠉
+   ⡇  ⡎                        ⣀⣀⠤⠔⠒⠊⠉
+   ⡇ ⡸       θ=51°      ⣀⡠⠤⠔⠒⠉⠉           ⣀⣀⣀⠤⠭⣭⠵⠖⠂0.450 umbral
+   ⡇⢠⠋⠉⠉⠙⠒⠤⣄⡀   ⢀⣀⡠⠤⠔⠒⠉⠉    ⢀⣀⣀⣀⠤⠤⠤⠒⠒⠒⠊⣉⣉⣉⣀⣀⠤⠤⠤⢭⡭⠷⠖⠂0.372 ruido
+   ⣇⠇    ⢀⣀⡠⠭⠒⠒⣉⣁⣀⡠⠤⣤⣔⣒⣒⣒⠭⠭⠭⠥⠔⠒⠒⠒⠒⠊⠉⠉⠉⠉
+   ⣟⣤⣤⣶⣮⣽⣷⣖⣚⣛⣛⣛⣉⣉⣉⣉⣉⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⡀
+```
+
+El dibujo **no es decorativo, son los ángulos medidos**. OpenAI entrega vectores unitarios
+(`|A| = 1.000`, comprobado en cada corrida), así que todos viven en la esfera unidad y
+`θ = arccos(similitud)` es un ángulo de verdad. Lo que la proyección a dos dimensiones **no**
+puede mostrar es el ángulo *entre dos productos*: eso se pierde al aplanar 1.536 dimensiones,
+y el texto bajo el diagrama lo dice en vez de dejar que se asuma.
+
+Dos detalles de implementación que se notan si faltan: el lienzo es **braille** (2×4
+subpíxeles por carácter, o las diagonales salen a escalones), y la `x` se estira por 2 porque
+una celda de carácter mide ~1×2 en pantalla — sin esa corrección un ángulo de 45° se dibuja
+como 27° y el diagrama mentiría justo en lo único que enseña. Por debajo de 70 columnas los
+rayos se solapan hasta ser ilegibles, así que no se dibuja y se avisa.
+
 El CLI **orquesta** los scripts de `scripts/`, no duplica su lógica. Cada uno sigue siendo
 ejecutable por separado.
 

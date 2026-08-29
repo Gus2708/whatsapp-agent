@@ -85,8 +85,8 @@ async function sonda(nombre, url, opts, esperado) {
   try {
     const r = await fetch(url, Object.assign({ signal: ctrl.signal }, opts));
     clearTimeout(to);
-    spin.fin();
-  const ms = Date.now() - t0;
+    // spin.fin(); // spin no está definido aquí
+    const ms = Date.now() - t0;
     if (r.ok) return { nombre, ok: true, ms };
     let codigo = '';
     try { const j = await r.json(); codigo = (j.error && (j.error.code || j.error.type)) || ''; } catch (x) {}
@@ -398,6 +398,133 @@ function barraSim(sim, ancho) {
 }
 const grados = sim => (Math.acos(Math.max(-1, Math.min(1, sim))) * 180 / Math.PI).toFixed(0) + '°';
 
+// ──────────────────────────────────────────────────── lienzo braille (2x4 por carácter)
+// Para dibujar los vectores de verdad hace falta más resolución que un carácter por punto.
+// Braille da 2x4 subpíxeles por celda, que es lo que permite que una diagonal se vea recta.
+const PUNTO = [[0x01, 0x02, 0x04, 0x40], [0x08, 0x10, 0x20, 0x80]];
+
+function lienzo(cols, filas) {
+  const PX = cols * 2, PY = filas * 4;
+  const celdas = new Uint8Array(cols * filas);
+  const tinte = new Array(cols * filas).fill(null);
+  const rotulos = [];
+  const dentro = (x, y) => x >= 0 && y >= 0 && x < PX && y < PY;
+  return {
+    PX, PY,
+    punto(x, y, color) {
+      x = Math.round(x); y = Math.round(y);
+      if (!dentro(x, y)) return;
+      const i = (y >> 2) * cols + (x >> 1);
+      celdas[i] |= PUNTO[x & 1][y & 3];
+      if (color) tinte[i] = color;
+    },
+    // Bresenham: sin él las diagonales quedan con escalones desiguales
+    linea(x0, y0, x1, y1, color) {
+      x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
+      const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0);
+      const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+      let err = dx + dy;
+      for (;;) {
+        this.punto(x0, y0, color);
+        if (x0 === x1 && y0 === y1) break;
+        const e2 = 2 * err;
+        if (e2 >= dy) { err += dy; x0 += sx; }
+        if (e2 <= dx) { err += dx; y0 += sy; }
+      }
+    },
+    arco(cx, cy, r, a0, a1, color) {
+      const paso = 1 / Math.max(r, 1);
+      const [ini, fin] = a0 < a1 ? [a0, a1] : [a1, a0];
+      for (let a = ini; a <= fin; a += paso) this.punto(cx + r * Math.cos(a), cy - r * Math.sin(a), color);
+    },
+    // el texto va por encima del braille, en coordenadas de carácter
+    texto(col, fila, s, color) { rotulos.push({ col, fila, s, color }); },
+    render() {
+      const filasTxt = [];
+      for (let f = 0; f < filas; f++) {
+        const celda = [];
+        for (let x = 0; x < cols; x++) {
+          const i = f * cols + x;
+          celda.push(celdas[i] ? (tinte[i] || (s => s))(String.fromCharCode(0x2800 + celdas[i])) : ' ');
+        }
+        filasTxt.push(celda);
+      }
+      // El rótulo entero se mete en su PRIMERA celda ya coloreado y las siguientes quedan
+      // vacías: así el ancho visible sigue siendo el del texto y no hay que abrir y cerrar
+      // el color celda a celda.
+      for (const r of rotulos) {
+        if (r.fila < 0 || r.fila >= filas || r.col >= cols) continue;
+        const s = r.s.slice(0, cols - Math.max(0, r.col));
+        const col = Math.max(0, r.col);
+        filasTxt[r.fila][col] = (r.color || (x => x))(s);
+        for (let k = 1; k < s.length; k++) if (col + k < cols) filasTxt[r.fila][col + k] = String();
+      }
+      return filasTxt.map(f => f.join('').replace(/\s+$/, ''));
+    },
+  };
+}
+
+// Dibuja los vectores como rayos desde el origen, cada uno a su ÁNGULO REAL respecto a la
+// consulta. Es exacto para cada par (consulta, producto), que es justo lo que mide el coseno;
+// lo que la proyección a 2D no puede mostrar es el ángulo ENTRE dos productos.
+//
+// SX=2 no es decorativo: un subpíxel braille ocupa media anchura de carácter pero una
+// anchura ENTERA de alto (celda 2x4 sobre un carácter que es ~1x2). Sin estirar la x por 2,
+// un ángulo de 45° se dibuja como 27° y el diagrama miente justo en lo único que enseña.
+const SX = 2;
+function diagramaCoseno(consulta, items, cols, filas) {
+  const L = lienzo(cols, filas);
+  const G = Math.PI / 180;
+  const ox = 4, oy = L.PY - 5;
+  const HUECO = 46;                          // px reservados a la derecha para los rótulos
+  const R = Math.max(12, Math.min((L.PX - ox - HUECO) / SX, oy - 6));
+  const BASE = 80 * G;                       // la consulta, separada del eje Y para que se distinga
+
+  L.linea(ox, oy, ox, oy - R * 1.08, c.dim);
+  L.linea(ox, oy, ox + SX * R * 1.08, oy, c.dim);
+
+  const punta = (ang, r) => ({ x: ox + SX * r * Math.cos(ang), y: oy - r * Math.sin(ang) });
+  const raya = (ang, color) => {
+    const p = punta(ang, R);
+    L.linea(ox, oy, p.x, p.y, color);
+    // La flecha son dos segmentos CORTOS desde la punta hacia atrás. Calcularlos como
+    // punta(ang ± 0.38, R*0.9) daba un arco de medio lienzo en vez de una flecha: a esa
+    // distancia del origen, 0.38 rad de diferencia es una cuerda enorme.
+    for (const d of [Math.PI - 0.42, Math.PI + 0.42]) {
+      const a2 = ang + d;
+      L.linea(p.x, p.y, p.x + SX * 4 * Math.cos(a2), p.y - 4 * Math.sin(a2), color);
+    }
+    return p;
+  };
+
+  const pa = raya(BASE, c.cyan);
+  L.texto(Math.max(0, (pa.x >> 1) - 1), Math.max(0, (pa.y >> 2) - 1), 'A = ' + consulta.slice(0, cols - 10), c.cyan);
+
+  const ocupadas = new Set();
+  for (const it of items) {
+    const th = Math.acos(Math.max(-1, Math.min(1, it.sim)));
+    const p = raya(BASE - th, it.color);
+    // dos vecinos con similitud parecida caen en la misma fila y los rótulos se pisan
+    let fila = p.y >> 2;
+    while (ocupadas.has(fila)) fila++;
+    ocupadas.add(fila);
+    L.texto((p.x >> 1) + 2, fila, it.etiqueta, it.color);
+  }
+
+  // el ángulo del vecino más cercano, marcado sobre el arco
+  if (items.length) {
+    const th = Math.acos(Math.max(-1, Math.min(1, items[0].sim)));
+    const r = R * 0.24, paso = 1 / (SX * r);
+    for (let a = BASE - th; a <= BASE; a += paso) { const p = punta(a, r); L.punto(p.x, p.y, c.warn); }
+    const pm = punta(BASE - th / 2, r * 1.5);
+    L.texto(pm.x >> 1, pm.y >> 2, 'θ=' + (th / G).toFixed(0) + '°', c.warn);
+  }
+  const dib = L.render();
+  while (dib.length && !dib[0].trim()) dib.shift();          // filas vacías según dónde caiga la punta
+  while (dib.length && !dib[dib.length - 1].trim()) dib.pop();
+  return dib;
+}
+
 async function coseno(consulta) {
   const q = consulta || DEMO;
   cabecera('CÓMO DECIDE EL VECTOR', 'similitud de coseno');
@@ -416,6 +543,30 @@ async function coseno(consulta) {
   spinC.fin();
   if (!top.length) { console.log('\n ' + GL.err + ' la RPC no devolvió nada'); return 1; }
 
+  // ── el dibujo. Los embeddings de OpenAI vienen normalizados, así que |A| = |B| = 1 y el
+  // coseno ES el producto punto: cada vector está en la esfera unidad y arccos(similitud) es
+  // un ángulo de verdad, no una licencia del dibujante.
+  const simRuido = ruido.length ? ruido[0].similitud : 0;
+  const norma = Math.sqrt(vecs[0].reduce((a, x) => a + x * x, 0));
+  console.log('\n ' + c.dim('|A| = ') + c.num(norma.toFixed(3)) +
+    c.dim('  → OpenAI normaliza, así que cos(θ) = A · B directamente'));
+  const anchoD = Math.min(COLS - 6, 74);
+  if (anchoD < 64) {
+    console.log('');
+    console.log(' ' + c.dim('(el diagrama necesita una terminal de 70 columnas o más)'));
+  } else {
+    const lineas = diagramaCoseno(q, [
+      { sim: top[0].similitud, etiqueta: top[0].similitud.toFixed(3) + ' ' + top[0].descripcion.slice(0, 16), color: c.ok },
+      { sim: UMBRAL_VECTOR, etiqueta: UMBRAL_VECTOR.toFixed(3) + ' umbral', color: c.warn },
+      { sim: simRuido, etiqueta: simRuido.toFixed(3) + ' ruido', color: c.err },
+    ], anchoD, 18);
+    console.log('');
+    for (const l of lineas) console.log(' ' + l);
+    console.log('');
+    console.log(' ' + c.dim('El ángulo de cada rayo CON A es el real. El ángulo entre dos rayos no:'));
+    console.log(' ' + c.dim('1.536 dimensiones no caben en dos, y esa parte se pierde al proyectar.'));
+  }
+
   console.log('\n ' + c.bold(`"${q}"`) + c.dim('  → los 5 vectores más cercanos del catálogo'));
   console.log(' ' + c.dim('─'.repeat(W - 2)));
   for (const f of top) {
@@ -426,7 +577,6 @@ async function coseno(consulta) {
   }
 
   // el umbral y el suelo de ruido, que es lo que de verdad explica la decisión
-  const simRuido = ruido.length ? ruido[0].similitud : 0;
   console.log(' ' + c.dim('─'.repeat(W - 2)));
   console.log('  ' + c.warn(UMBRAL_VECTOR.toFixed(3)) + c.dim('       ' + '╌'.repeat(24) + '  umbral: por debajo no se adopta'));
   console.log('  ' + c.err(simRuido.toFixed(3)) + ' ' + c.dim(padL(grados(simRuido), 4)) + '  ' + barraSim(simRuido) +
