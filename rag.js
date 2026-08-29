@@ -38,22 +38,22 @@ const GL = { ok: c.ok('✓'), err: c.err('✗'), warn: c.warn('▲'), dot: c.dim
 
 function cabecera(titulo, sub) {
   const linea = '─'.repeat(W - 2);
-  console.log('\n' + c.dim('╭' + linea + '╮'));
+  out('\n' + c.dim('╭' + linea + '╮'));
   const izq = ' ' + c.bold(c.cyan(titulo));
   const der = sub ? c.dim(sub) + ' ' : '';
-  console.log(c.dim('│') + pad(izq, W - 2 - vis(der)) + der + c.dim('│'));
-  console.log(c.dim('╰' + linea + '╯'));
+  out(c.dim('│') + pad(izq, W - 2 - vis(der)) + der + c.dim('│'));
+  out(c.dim('╰' + linea + '╯'));
 }
 function seccion(t) {
-  console.log('\n ' + c.bold(t));
-  console.log(' ' + c.dim('─'.repeat(W - 2)));
+  out('\n ' + c.bold(t));
+  out(' ' + c.dim('─'.repeat(W - 2)));
 }
 // fila etiqueta ......... valor  [glifo]
 // El valor SIEMPRE termina en la misma columna; el glifo va después, fuera de esa columna.
 // (Antes se restaba el ancho del glifo a la etiqueta y eso desalineaba las filas con estado.)
 function fila(etiqueta, valor, glifo) {
   const anchoValor = 14;
-  console.log('  ' + pad(c.dim(etiqueta), W - 6 - anchoValor) + padL(valor, anchoValor) + (glifo ? ' ' + glifo : ''));
+  out('  ' + pad(c.dim(etiqueta), W - 6 - anchoValor) + padL(valor, anchoValor) + (glifo ? ' ' + glifo : ''));
 }
 function barra(pct, ancho) {
   const n = ancho || 22;
@@ -85,7 +85,8 @@ async function sonda(nombre, url, opts, esperado) {
   try {
     const r = await fetch(url, Object.assign({ signal: ctrl.signal }, opts));
     clearTimeout(to);
-    const ms = Date.now() - t0;
+    spin.fin();
+  const ms = Date.now() - t0;
     if (r.ok) return { nombre, ok: true, ms };
     let codigo = '';
     try { const j = await r.json(); codigo = (j.error && (j.error.code || j.error.type)) || ''; } catch (x) {}
@@ -115,13 +116,102 @@ function correrCapturando(script, args) {
   return { salida: (r.stdout || '') + (r.stderr || ''), ok: r.status === 0 };
 }
 
+// ─────────────────────────────────────────────────────── salida en dos columnas
+// `estado` tarda ~14s y hasta ahora no imprimía NADA hasta el final: parecía colgado.
+// Ahora la salida se acumula en un buffer mientras un spinner dice en qué va, y al
+// terminar se pinta todo de una. Como efecto secundario, tener el texto en un buffer
+// permite montarlo en dos columnas: métricas a la izquierda, gráficas a la derecha.
+const SALTO = String.fromCharCode(10);   // escribirlo como escape se pierde al generar este archivo
+let CAP = null;
+const out = s => { if (!CAP) return console.log(s); for (const l of String(s).split(SALTO)) CAP.push(l); };
+
+const COLS = Number(process.env.RAG_COLS) || process.stdout.columns || 80;
+const AD = 46;                                  // ancho de la columna derecha
+const DOBLE = COLS >= W + AD + 4;               // si no cabe, se apilan
+
+function cargando() {
+  if (!TTY) return { paso() {}, fin() {} };
+  const marcos = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  let i = 0, txt = '';
+  const t = setInterval(() => {
+    process.stdout.write('\r\x1b[2K ' + c.cyan(marcos[i++ % marcos.length]) + ' ' + c.dim(txt));
+  }, 90);
+  t.unref();
+  return {
+    paso(s) { txt = s; },
+    fin() { clearInterval(t); process.stdout.write('\r\x1b[2K'); },
+  };
+}
+
+function dosColumnas(izq, derIn) {
+  if (!DOBLE) { for (const l of izq) console.log(l); for (const l of derIn) console.log(l); return; }
+  const der = ['', '', '', ...derIn];               // arranca bajo el marco del título
+  const n = Math.max(izq.length, der.length);
+  for (let i = 0; i < n; i++) {
+    const d = der[i] || '';
+    console.log(pad(izq[i] || '', W + 2) + c.dim('│') + (d ? ' ' + d : ''));
+  }
+}
+
+// ── piezas de gráfica para la columna derecha
+function tituloDer(t) { return ['', ' ' + c.bold(t), ' ' + c.dim('─'.repeat(AD - 2))]; }
+function barraH(valor, max, ancho, color) {
+  const n = max > 0 ? Math.round((valor / max) * ancho) : 0;
+  return (color || c.cyan)('█'.repeat(n)) + c.dim('░'.repeat(Math.max(0, ancho - n)));
+}
+
+// productos agrupados por el mes de su última venta: dice cuánto del catálogo sigue vivo
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+function panelActividad(popRows) {
+  const cubos = new Map();
+  let viejos = 0;
+  const hoy = new Date();
+  const limite = new Date(hoy.getFullYear(), hoy.getMonth() - 7, 1).toISOString().slice(0, 7);
+  for (const r of popRows) {
+    const ym = String(r.ultima_venta || '').slice(0, 7);
+    if (!ym) continue;
+    if (ym < limite) { viejos++; continue; }
+    cubos.set(ym, (cubos.get(ym) || 0) + 1);
+  }
+  const claves = [];
+  for (let k = 7; k >= 0; k--) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - k, 1);
+    claves.push(d.toISOString().slice(0, 7));
+  }
+  const max = Math.max(1, ...claves.map(k => cubos.get(k) || 0));
+  const L = tituloDer('ACTIVIDAD DEL CATÁLOGO');
+  L.push(' ' + c.dim('productos según el mes de su última venta'));
+  for (const k of claves) {
+    const v = cubos.get(k) || 0;
+    const et = MESES[Number(k.slice(5, 7)) - 1] + ' ' + k.slice(2, 4);
+    L.push('  ' + c.dim(et) + ' ' + barraH(v, max, 22) + ' ' + padL(c.num(num(v)), 6));
+  }
+  // 'antes' agrupa 8+ meses: dibujarle una barra al lado de un mes suelto engaña
+  L.push('  ' + c.dim(pad('antes', 29)) + padL(c.dim(num(viejos)), 6));
+  return L;
+}
+
+function panelStock(vivos, fantasma) {
+  const tot = vivos + fantasma;
+  const p = v => (tot ? (v / tot) * 100 : 0);
+  const L = tituloDer('COMPOSICIÓN DEL STOCK');
+  L.push(' ' + c.dim('los ' + num(tot) + ' productos con existencia'));
+  L.push('  ' + c.dim(pad('vendido en 1 año', 17)) + barraH(vivos, tot, 14, c.ok) + ' ' + padL(c.num(num(vivos)), 6) + c.dim(p(vivos).toFixed(0).padStart(4) + '%'));
+  L.push('  ' + c.dim(pad('sin venta', 17)) + barraH(fantasma, tot, 14, c.warn) + ' ' + padL(c.num(num(fantasma)), 6) + c.dim(p(fantasma).toFixed(0).padStart(4) + '%'));
+  return L;
+}
+
 // ───────────────────────────────────────────────────────────────────── estado
 async function estado() {
   const t0 = Date.now();
+  const spin = cargando();
+  CAP = [];                                     // a partir de aquí la salida se acumula
   cabecera('RAG · Perucho', 'Ferretería El Serrucho');
 
+  spin.paso('leyendo el catálogo…');
   const productos = (await traerTodo('productos', 'codigo_interno,descripcion,existencia', 'codigo_interno.asc'))
     .filter(p => p.descripcion && p.descripcion.trim());
+  spin.paso('leyendo los vectores…');
   const emb = await traerTodo('productos_embedding', 'codigo_interno,descripcion,actualizado_en', 'codigo_interno.asc');
   const porCodigo = new Map(emb.map(x => [x.codigo_interno, x]));
 
@@ -139,14 +229,15 @@ async function estado() {
   fila('productos en catálogo', c.num(num(productos.length)));
   fila('con vector', c.num(num(emb.length)));
   fila('cobertura vectorial', c.num(cobertura.toFixed(1) + '%'));
-  console.log('  ' + barra(cobertura, W - 6));
+  out('  ' + barra(cobertura, W - 6));
   fila('sin vector', c.num(num(sinVector.length)), sinVector.length ? GL.err : GL.ok);
   fila('descripción movida', c.num(num(movidas.length)), movidas.length ? GL.warn : GL.ok);
   fila('último embedding', dias(dEmb));
   if (sinVector.length) {
-    console.log('  ' + c.dim('└ p.ej. ' + sinVector.slice(0, 3).map(p => p.codigo_interno + ' ' + p.descripcion.slice(0, 26)).join('  ')));
+    out('  ' + c.dim('└ p.ej. ' + sinVector.slice(0, 3).map(p => p.codigo_interno + ' ' + p.descripcion.slice(0, 26)).join('  ')));
   }
 
+  spin.paso('diccionario coloquial…');
   seccion('DICCIONARIO COLOQUIAL');
   const terminos = await contar('catalogo_vocabulario', 'activo=eq.true', 'termino');
   const cats = await traerTodo('catalogo_vocab_categorias', 'categoria,procesado_en', 'procesado_en.desc');
@@ -155,8 +246,9 @@ async function estado() {
   fila('términos activos', c.num(num(terminos)));
   fila('categorías cubiertas', c.num(num(cats.length)));
   fila('última generación', String(ultVocab).slice(0, 10) || '—', vocabNuevo ? GL.warn : GL.ok);
-  if (vocabNuevo) console.log('  ' + c.warn('└ es más nuevo que los vectores: el texto embebido cambió'));
+  if (vocabNuevo) out('  ' + c.warn('└ es más nuevo que los vectores: el texto embebido cambió'));
 
+  spin.paso('ranking por ventas…');
   seccion('RANKING POR VENTAS');
   // OJO: el stock fantasma NO es (con existencia − filas de popularidad). Son conjuntos
   // que solo se solapan en parte: 1.602 productos con historial ya no tienen stock, y
@@ -180,9 +272,10 @@ async function estado() {
   fila('con existencia', c.num(num(conStockArr.length)));
   fila('stock sin venta en 1 año', c.num(num(fantasma.length)) + c.dim(` (${pctFantasma.toFixed(0)}%)`), pctFantasma > 30 ? GL.warn : GL.ok);
   fila('recalculado', dias(dPop), dPop !== null && dPop > 3 ? GL.warn : GL.ok);
-  if (pctFantasma > 30) console.log('  ' + c.dim('└ el ranking por ventas los hunde solos: score 0 o negativo'));
+  if (pctFantasma > 30) out('  ' + c.dim('└ el ranking por ventas los hunde solos: score 0 o negativo'));
 
   // ── conectividad: sin esto, las capas 4 y 5 se apagan sin avisar
+  spin.paso('probando OpenRouter y OpenAI…');
   seccion('CONECTIVIDAD');
   const OAI = pick('OPENAI_API_KEY');
   const OR = pick('OPENROUTER_API_KEY');
@@ -204,36 +297,45 @@ async function estado() {
     if (s.ok) { fila(s.nombre, c.num(s.ms + ' ms'), GL.ok); continue; }
     const detalle = s.faltaKey ? 'sin key' : s.geo ? 'bloqueo por país' : s.red ? s.motivo : `HTTP ${s.estado}`;
     fila(s.nombre, c.err(detalle), GL.err);
-    if (s.geo) console.log('  ' + c.warn('└ ¿VPN caída? OpenAI bloquea Venezuela: sin VPN no hay embeddings'));
+    if (s.geo) out('  ' + c.warn('└ ¿VPN caída? OpenAI bloquea Venezuela: sin VPN no hay embeddings'));
     caidos.push(s);
   }
 
   // ── el coseno en vivo: sin esto el margen señal/ruido puede derrumbarse sin que nadie
   // lo note. Un vector "funciona" siempre (devuelve vecinos); lo que decide si SIRVE es la
   // distancia entre una consulta legítima y texto sin sentido.
+  spin.paso('midiendo el coseno en vivo…');
   let margenVector = null;
-  if (sondas[1].ok) {
+  const panelCos = tituloDer('EL COSENO EN VIVO');
+  if (!sondas[1].ok) {
+    panelCos.push(' ' + c.dim('sin OpenAI no se puede medir'));
+  } else {
     const vecs = await embeder([DEMO, BASURA]);
-    if (vecs) {
-      const [top, ruido] = await Promise.all([vecinos(vecs[0], 3), vecinos(vecs[1], 1)]);
-      if (top.length) {
-        const simRuido = ruido.length ? ruido[0].similitud : 0;
-        margenVector = top[0].similitud - simRuido;
-        seccion('EL COSENO EN VIVO');
-        console.log('  ' + c.dim('cos(θ) = (A · B) / (|A| · |B|)  sobre 1.536 dimensiones'));
-        console.log('  ' + c.bold(`"${DEMO}"`) + c.dim('  → vecinos más cercanos'));
-        for (const f of top) {
-          console.log('   ' + (f.similitud >= UMBRAL_VECTOR ? c.ok(f.similitud.toFixed(3)) : c.dim(f.similitud.toFixed(3))) +
-            ' ' + barraSim(f.similitud, 20) + ' ' + c.dim(f.descripcion.slice(0, 28)));
-        }
-        console.log('   ' + c.err(simRuido.toFixed(3)) + ' ' + barraSim(simRuido, 20) + ' ' + c.dim('texto sin sentido (suelo)'));
-        const sano = margenVector > 0.05;
-        console.log('  ' + (sano ? GL.ok : GL.err) + ' ' + c.bold('margen ' + margenVector.toFixed(3)) + '  ' +
-          (sano ? c.dim(`el umbral ${UMBRAL_VECTOR} separa de verdad`) : c.err('sin separación: la capa no aporta')));
-        console.log('  ' + c.dim('└ detalle: ') + c.cyan('node rag.js coseno "lo que sea"'));
+    const [top, ruido] = vecs ? await Promise.all([vecinos(vecs[0], 4), vecinos(vecs[1], 1)]) : [[], []];
+    if (!top.length) {
+      panelCos.push(' ' + c.dim('la RPC no devolvió vecinos'));
+    } else {
+      const simRuido = ruido.length ? ruido[0].similitud : 0;
+      margenVector = top[0].similitud - simRuido;
+      panelCos.push(' ' + c.dim('cos(θ) sobre 1.536 dimensiones'));
+      panelCos.push(' ' + c.bold(`"${DEMO}"`) + c.dim(' → vecinos'));
+      for (const f of top) {
+        panelCos.push('  ' + (f.similitud >= UMBRAL_VECTOR ? c.ok(f.similitud.toFixed(3)) : c.dim(f.similitud.toFixed(3))) +
+          ' ' + barraSim(f.similitud, 14) + ' ' + c.dim(f.descripcion.slice(0, 20)));
       }
+      panelCos.push('  ' + c.warn(UMBRAL_VECTOR.toFixed(3)) + ' ' + c.dim('╌'.repeat(14)) + ' ' + c.dim('umbral'));
+      panelCos.push('  ' + c.err(simRuido.toFixed(3)) + ' ' + barraSim(simRuido, 14) + ' ' + c.dim('ruido (suelo)'));
+      const sano = margenVector > 0.05;
+      panelCos.push('  ' + (sano ? GL.ok : GL.err) + ' ' + c.bold('margen ' + margenVector.toFixed(3)) +
+        (sano ? c.dim('  separa de verdad') : c.err('  la capa no aporta')));
     }
   }
+  panelCos.push('  ' + c.dim('└ ') + c.cyan('rag.js coseno "..."'));
+
+  spin.fin();
+  const izq = CAP; CAP = null;
+  const der = [...panelCos, ...panelActividad(popRows), ...panelStock(conStockArr.length - fantasma.length, fantasma.length)];
+  dosColumnas(izq, der);
 
   // ── veredicto
   const problemas = [];
@@ -305,10 +407,13 @@ async function coseno(consulta) {
   console.log('');
   console.log('   ' + c.cyan('cos(θ) = (A · B) / (|A| · |B|)') + c.dim('     1 = mismo sentido · 0 = sin relación'));
 
+  const spinC = cargando();
+  spinC.paso('embebiendo la consulta y midiendo vecinos…');
   const vecs = await embeder([q, BASURA]);
-  if (!vecs) { console.log('\n ' + GL.err + ' no pude embeber (¿VPN caída? OpenAI bloquea Venezuela)'); return 1; }
+  if (!vecs) { spinC.fin(); console.log('\n ' + GL.err + ' no pude embeber (¿VPN caída? OpenAI bloquea Venezuela)'); return 1; }
 
   const [top, ruido] = await Promise.all([vecinos(vecs[0], 5), vecinos(vecs[1], 1)]);
+  spinC.fin();
   if (!top.length) { console.log('\n ' + GL.err + ' la RPC no devolvió nada'); return 1; }
 
   console.log('\n ' + c.bold(`"${q}"`) + c.dim('  → los 5 vectores más cercanos del catálogo'));
@@ -347,10 +452,12 @@ async function buscar(consulta) {
   };
   const fakeEnv = { OPENROUTER_API_KEY: pick('OPENROUTER_API_KEY'), OPENAI_API_KEY: pick('OPENAI_API_KEY') };
   const run = new Function('query', 'require', '$env', '"use strict"; return (async () => {\n' + body + '\n})();');
+  const spin = cargando();
+  spin.paso('ejecutando el cuerpo real del nodo…');
   const t0 = Date.now();
   let r;
   try { r = JSON.parse(await run({ p_busqueda: consulta }, n => (n === 'axios' ? ax : require(n)), fakeEnv)); }
-  catch (x) { console.log(' ' + GL.err + ' la búsqueda lanzó excepción: ' + x.message); return 1; }
+  catch (x) { spin.fin(); console.log(' ' + GL.err + ' la búsqueda lanzó excepción: ' + x.message); return 1; }
   const ms = Date.now() - t0;
 
   cabecera(`"${consulta}"`, `${ms} ms`);

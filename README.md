@@ -256,27 +256,42 @@ node rag.js ayuda                 # todos los comandos
 ```
 
 ```
-╭──────────────────────────────────────────────────────────────╮
-│ RAG · Perucho                         Ferretería El Serrucho │
-╰──────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────╮  │
+│ RAG · Perucho                         Ferretería El Serrucho │  │
+╰──────────────────────────────────────────────────────────────╯  │
+                                                                  │  EL COSENO EN VIVO
+ CATÁLOGO Y VECTORES                                              │  ────────────────────────────────────────────
+ ──────────────────────────────────────────────────────────────   │  cos(θ) sobre 1.536 dimensiones
+  productos en catálogo                                7.689      │  "tapa para el baño" → vecinos
+  con vector                                           7.689      │   0.631 █████████····· TAPA DE POCETA COLOR
+  cobertura vectorial                                 100.0%      │   0.619 █████████····· TAPA DE INODORO CIER
+  ██████████████████████████████████████████████████████████      │   0.610 █████████····· TAPA DE INODORO  CIE
+  sin vector                                               0 ✓    │   0.589 ████████······ TAPA 1/2 C/ROSCA
+  descripción movida                                       0 ✓    │   0.450 ╌╌╌╌╌╌╌╌╌╌╌╌╌╌ umbral
+  último embedding                                       hoy      │   0.372 █████········· ruido (suelo)
+                                                                  │   ✓ margen 0.260  separa de verdad
+ DICCIONARIO COLOQUIAL                                            │   └ rag.js coseno "..."
+ ──────────────────────────────────────────────────────────────   │
+  términos activos                                     3.687      │  ACTIVIDAD DEL CATÁLOGO
+  categorías cubiertas                                   718      │  ────────────────────────────────────────────
+  última generación                               2026-08-29 ✓    │  productos según el mes de su última venta
+                                                                  │   ene 26 ███░░░░░░░░░░░░░░░░░░░    146
+ RANKING POR VENTAS                                               │   feb 26 ████░░░░░░░░░░░░░░░░░░    191
+ ──────────────────────────────────────────────────────────────   │   mar 26 ██████░░░░░░░░░░░░░░░░    254
+  con historial de venta                               4.775      │   abr 26 ██████░░░░░░░░░░░░░░░░    264
+  con existencia                                       5.153      │   may 26 ████████░░░░░░░░░░░░░░    355
+  stock sin venta en 1 año                       2.643 (51%) ▲    │   jun 26 ███████░░░░░░░░░░░░░░░    322
+  recalculado                                            hoy ✓    │   jul 26 ███████████░░░░░░░░░░░    478
+  └ el ranking por ventas los hunde solos: score 0 o negativo     │   ago 26 ██████████████████████    966
+                                                                  │   antes                         1.799
+ CONECTIVIDAD                                                     │
+ ──────────────────────────────────────────────────────────────   │  COMPOSICIÓN DEL STOCK
+  OpenRouter · Luna                                  1042 ms ✓    │  ────────────────────────────────────────────
+  OpenAI · embeddings                                 852 ms ✓    │  los 5.153 productos con existencia
+                                                                  │   vendido en 1 año ███████░░░░░░░  2.510  49%
+                                                                  │   sin venta        ███████░░░░░░░  2.643  51%
 
- CATÁLOGO Y VECTORES
- ──────────────────────────────────────────────────────────────
-  productos en catálogo                                7.688
-  con vector                                           7.688
-  cobertura vectorial                                 100.0%
-  ██████████████████████████████████████████████████████████
-  sin vector                                               0 ✓
-
- EL COSENO EN VIVO
- ──────────────────────────────────────────────────────────────
-  cos(θ) = (A · B) / (|A| · |B|)  sobre 1.536 dimensiones
-  "tapa para el baño"  → vecinos más cercanos
-   0.631 █████████████······· TAPA DE POCETA COLORES
-   0.619 ████████████········ TAPA DE INODORO CIERRE SUAVE
-   0.610 ████████████········ TAPA DE INODORO  CIERRE SUAV
-   0.372 ███████············· texto sin sentido (suelo)
-  ✓ margen 0.260  el umbral 0.45 separa de verdad
+ ▎ Todo al día  ·  11.9s
 ```
 
 | Grupo | Comandos |
@@ -287,7 +302,10 @@ node rag.js ayuda                 # todos los comandos
 
 - **`estado`** cruza catálogo, vectores, diccionario y ventas; detecta las tres formas de
   desalineación (sin vector, descripción movida, vocabulario más nuevo que los embeddings),
-  da el comando exacto para cada una y **sale con código 1** si algo requiere acción.
+  da el comando exacto para cada una y **sale con código 1** si algo requiere acción. Se
+  dibuja en **dos columnas** cuando la terminal tiene ≥114 caracteres —métricas a la
+  izquierda, gráficas a la derecha—; si no, se apilan. Y como tarda ~12s, un spinner dice
+  en qué etapa va en vez de dejar la terminal muda.
 - **`buscar`** ejecuta el cuerpo **real** del nodo contra Supabase y muestra qué devolvería
   el bot, con las marcas de hipótesis/parcial y la instrucción que recibe el modelo.
 - **`diag`** explica por qué la capa vectorial actuó o no en una consulta concreta:
