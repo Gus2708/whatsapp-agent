@@ -97,7 +97,7 @@ async function estado() {
   const t0 = Date.now();
   cabecera('RAG · Perucho', 'Ferretería El Serrucho');
 
-  const productos = (await traerTodo('productos', 'codigo_interno,descripcion', 'codigo_interno.asc'))
+  const productos = (await traerTodo('productos', 'codigo_interno,descripcion,existencia', 'codigo_interno.asc'))
     .filter(p => p.descripcion && p.descripcion.trim());
   const emb = await traerTodo('productos_embedding', 'codigo_interno,descripcion,actualizado_en', 'codigo_interno.asc');
   const porCodigo = new Map(emb.map(x => [x.codigo_interno, x]));
@@ -135,15 +135,29 @@ async function estado() {
   if (vocabNuevo) console.log('  ' + c.warn('└ es más nuevo que los vectores: el texto embebido cambió'));
 
   seccion('RANKING POR VENTAS');
-  const pop = await contar('producto_popularidad');
+  // OJO: el stock fantasma NO es (con existencia − filas de popularidad). Son conjuntos
+  // que solo se solapan en parte: 1.602 productos con historial ya no tienen stock, y
+  // compensaban a los que tienen stock y nunca vendieron. Esa resta daba 379 cuando la
+  // cifra real son ~2.600. Hay que cruzar los códigos de verdad.
+  const popRows = await traerTodo('producto_popularidad', 'codigo_interno,ultima_venta', 'codigo_interno.asc');
+  const ventaPorCodigo = new Map(popRows.map(x => [x.codigo_interno, x.ultima_venta]));
+  const haceUnAno = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
+
+  const conStockArr = productos.filter(p => Number(p.existencia) > 0);
+  const fantasma = conStockArr.filter(p => {
+    const uv = ventaPorCodigo.get(p.codigo_interno);
+    return !uv || String(uv).slice(0, 10) < haceUnAno;
+  });
+  const pctFantasma = conStockArr.length ? (fantasma.length / conStockArr.length) * 100 : 0;
+
   const ultPop = ((await (await sb('producto_popularidad?select=actualizado_en&order=actualizado_en.desc&limit=1')).json())[0] || {}).actualizado_en || '';
   const dPop = ultPop ? Math.floor((Date.now() - new Date(ultPop).getTime()) / 86400000) : null;
-  const conStock = await contar('productos', 'existencia=gt.0');
-  const muerto = conStock - pop;
-  fila('con historial de venta', c.num(num(pop)));
-  fila('con existencia', c.num(num(conStock)));
-  if (muerto > 0) fila('stock sin ventas', c.num(num(muerto)), GL.warn);
+
+  fila('con historial de venta', c.num(num(popRows.length)));
+  fila('con existencia', c.num(num(conStockArr.length)));
+  fila('stock sin venta en 1 año', c.num(num(fantasma.length)) + c.dim(` (${pctFantasma.toFixed(0)}%)`), pctFantasma > 30 ? GL.warn : GL.ok);
   fila('recalculado', dias(dPop), dPop !== null && dPop > 3 ? GL.warn : GL.ok);
+  if (pctFantasma > 30) console.log('  ' + c.dim('└ el ranking por ventas los hunde solos: score 0 o negativo'));
 
   // ── veredicto
   const problemas = [];
