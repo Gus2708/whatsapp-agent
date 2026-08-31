@@ -1,5 +1,11 @@
 {
+  "updatedAt": "2026-08-31T21:21:40.593Z",
+  "createdAt": "2026-08-31T21:06:09.403Z",
+  "id": "KCG5nhBlq7nL5dV2",
   "name": "Auto-Mejora y Self-Healing de Búsqueda",
+  "description": null,
+  "active": true,
+  "isArchived": false,
   "nodes": [
     {
       "parameters": {
@@ -153,5 +159,231 @@
   },
   "settings": {
     "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": null,
+  "versionId": "2732e658-680e-4489-aba1-f0cf0c30ae6e",
+  "activeVersionId": "2732e658-680e-4489-aba1-f0cf0c30ae6e",
+  "versionCounter": 7,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "shared": [
+    {
+      "updatedAt": "2026-08-31T21:06:09.411Z",
+      "createdAt": "2026-08-31T21:06:09.411Z",
+      "role": "workflow:owner",
+      "workflowId": "KCG5nhBlq7nL5dV2",
+      "projectId": "o4UwjyJJrlfHWiFr",
+      "project": {
+        "updatedAt": "2026-08-31T21:31:48.976Z",
+        "createdAt": "2026-06-05T19:18:56.994Z",
+        "id": "o4UwjyJJrlfHWiFr",
+        "name": "Unnamed Project",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "a9174cb6-6525-426b-9005-30bde1cb175c"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-08-31T21:21:40.595Z",
+    "createdAt": "2026-08-31T21:21:40.595Z",
+    "versionId": "2732e658-680e-4489-aba1-f0cf0c30ae6e",
+    "workflowId": "KCG5nhBlq7nL5dV2",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "automejora-busqueda",
+          "responseMode": "onReceived",
+          "responseData": "allEntries",
+          "options": {}
+        },
+        "id": "webhook_automejora",
+        "name": "Webhook Trigger",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [
+          100,
+          300
+        ],
+        "webhookId": "automejora-busqueda-serrucho"
+      },
+      {
+        "parameters": {
+          "jsCode": "// 1. Gather Context & Candidate Products from Supabase\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\n\nconst body = $json.body || $json;\nconst busqueda = body.p_busqueda || body.busqueda || '';\nconst telefono = body.cliente_telefono || body.telefono || 'desconocido';\nconst contexto = body.contexto_conversacion || body.contexto || '';\nconst motivo = body.motivo || 'encontrados_cero';\n\n// Extraer palabras clave para buscar productos candidatos\nconst palabras = busqueda.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\\s+/).filter(w => w.length >= 3);\n\nlet candidatos = [];\ntry {\n  // Buscar productos con stock que coincidan con alguna palabra clave\n  if (palabras.length > 0) {\n    const orFilter = palabras.map(p => 'descripcion.ilike.*' + p + '*').join(',');\n    const res = await axios.get(SB + '/rest/v1/productos?or=(' + orFilter + ')&select=codigo_interno,descripcion,precio_venta,existencia&order=existencia.desc&limit=35', { headers: H });\n    candidatos = res.data || [];\n  }\n} catch (e) {\n  console.warn('Error trayendo candidatos:', e.message);\n}\n\n// Traer vocabulario existente\nlet vocabulario = [];\ntry {\n  const resVoc = await axios.get(SB + '/rest/v1/catalogo_vocabulario?select=termino,canonico,categoria&limit=100', { headers: H });\n  vocabulario = resVoc.data || [];\n} catch (e) {}\n\nreturn [{\n  json: {\n    busqueda,\n    telefono,\n    contexto,\n    motivo,\n    candidatos,\n    vocabulario_muestra: vocabulario.slice(0, 30)\n  }\n}];"
+        },
+        "id": "context_gatherer",
+        "name": "Context & Candidates Gatherer",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          320,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://openrouter.ai/api/v1/chat/completions",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "={{ 'Bearer ' + $env.OPENROUTER_API_KEY }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({\n  model: \"anthropic/claude-sonnet-5\",\n  temperature: 0.1,\n  messages: [\n    {\n      role: \"system\",\n      content: \"Eres el Ingeniero Principal de Inteligencia Artificial y Datos de Ferretería El Serrucho en Venezuela. Tu tarea es diagnosticar por qué falló la búsqueda de un cliente de WhatsApp y generar la auto-corrección exacta para el motor de búsqueda multicapa (Léxico, Diccionario de Vocabulario, Trigram, Embeddings Vectoriales).\\n\\nDebes devolver EXCLUSIVAMENTE un JSON válido con esta estructura:\\n{\\n  \\\"diagnostico\\\": \\\"Explicación técnica concisa de la causa de la falla\\\",\\n  \\\"producto_identificado\\\": {\\n    \\\"codigo_interno\\\": \\\"SKU más probable o null si no se vende\\\",\\n    \\\"descripcion\\\": \\\"Nombre del producto en catálogo\\\"\\n  },\\n  \\\"vocabulario_nuevo\\\": {\\n    \\\"termino\\\": \\\"como lo pidió el cliente (minúsculas, sin puntuación)\\\",\\n    \\\"canonico\\\": \\\"término canónico del catálogo\\\",\\n    \\\"categoria\\\": \\\"categoría\\\"\\n  },\\n  \\\"descripcion_enriquecida\\\": \\\"Descripción en lenguaje natural del producto para mejorar embeddings vectoriales\\\",\\n  \\\"tipo_ajuste\\\": \\\"vocabulario\\\" | \\\"embedding\\\" | \\\"no_vendido\\\"\\n}\"\n    },\n    {\n      role: \"user\",\n      content: \"Consulta fallida del cliente: \\\"\" + $json.busqueda + \"\\\"\\nContexto reciente: \" + JSON.stringify($json.contexto) + \"\\n\\nCandidatos en inventario (con stock y precio):\\n\" + JSON.stringify($json.candidatos)\n    }\n  ],\n  response_format: { type: \"json_object\" }\n}) }}",
+          "options": {}
+        },
+        "id": "sonnet_ai_engine",
+        "name": "Sonnet AI Diagnostic Engine",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          540,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// 3. Sandbox Simulation & Auto-Apply to Supabase + WAHA notification formatting\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\n\nconst ctx = $('Context & Candidates Gatherer').first().json;\nconst rawSonnet = $json.choices ? $json.choices[0].message.content : '{}';\nlet diagnostico = {};\ntry {\n  let clean = String(rawSonnet || '').trim();\n  const fb = clean.indexOf('{');\n  const lb = clean.lastIndexOf('}');\n  if (fb !== -1 && lb !== -1 && lb > fb) {\n    clean = clean.slice(fb, lb + 1);\n  }\n  diagnostico = JSON.parse(clean);\n} catch (e) {\n  diagnostico = { diagnostico: rawSonnet, tipo_ajuste: 'requiere_revision' };\n}\n\nconst busqueda = ctx.busqueda;\nconst telefono = ctx.telefono;\nlet simulacionExitosa = false;\nlet autoAplicado = false;\n\n// Sandbox Validation: si propone vocabulario, comprobar si tiene sentido\nif (diagnostico.vocabulario_nuevo && diagnostico.vocabulario_nuevo.termino && diagnostico.vocabulario_nuevo.canonico) {\n  const v = diagnostico.vocabulario_nuevo;\n  if (v.termino.length >= 3 && v.canonico.length >= 3) {\n    simulacionExitosa = true;\n    try {\n      // Auto-aplicar a catalogo_vocabulario\n      await axios.post(SB + '/rest/v1/catalogo_vocabulario?on_conflict=termino', [\n        {\n          termino: v.termino.toLowerCase().trim(),\n          canonico: v.canonico.toLowerCase().trim(),\n          categoria: v.categoria ? v.categoria.toLowerCase().trim() : 'general',\n          origen: 'automejora_sonnet',\n          confianza: 5,\n          activo: true\n        }\n      ], { headers: Object.assign({}, H, { Prefer: 'resolution=merge-duplicates,return=minimal' }) });\n      autoAplicado = true;\n    } catch (e) {\n      console.warn('Error guardando vocabulario:', e.message);\n    }\n  }\n}\n\n// Log en automejora_logs\ntry {\n  await axios.post(SB + '/rest/v1/automejora_logs', [\n    {\n      telefono_cliente: telefono,\n      busqueda_original: busqueda,\n      contexto_conversacion: ctx.contexto,\n      diagnostico_sonnet: diagnostico.diagnostico || '',\n      solucion_propuesta: diagnostico,\n      simulacion_exitosa: simulacionExitosa,\n      estado: autoAplicado ? 'auto_aplicado' : 'analizado'\n    }\n  ], { headers: H });\n} catch (e) {\n  console.warn('Error guardando automejora_logs:', e.message);\n}\n\n// Armar mensaje para el WhatsApp del Administrador\nconst prodInfo = diagnostico.producto_identificado ? ((diagnostico.producto_identificado.descripcion || 'No identificado') + (diagnostico.producto_identificado.codigo_interno ? (' (SKU: ' + diagnostico.producto_identificado.codigo_interno + ')') : '')) : 'No determinado';\nconst vocInfo = diagnostico.vocabulario_nuevo ? ('\"' + diagnostico.vocabulario_nuevo.termino + '\" ➔ \"' + diagnostico.vocabulario_nuevo.canonico + '\"') : 'Sin cambio de vocabulario';\n\nlet estadoTexto = '⚠️ Pendiente de revisión';\nif (autoAplicado) estadoTexto = '✅ Auto-Aplicado en Supabase (catalogo_vocabulario)';\nelse if (diagnostico.tipo_ajuste === 'no_vendido') estadoTexto = 'ℹ️ Producto no comercializado en inventario';\n\nconst adminMensaje = '🛠️ *[Auto-Mejora SerruchoBot]*\\n\\n' +\n  '🚨 *Falla Detectada en Búsqueda:*\\n' +\n  '• Cliente: ' + telefono + '\\n' +\n  '• Consulta: \"' + busqueda + '\"\\n\\n' +\n  '🧠 *Diagnóstico Sonnet:*\\n' +\n  (diagnostico.diagnostico || 'Búsqueda sin coincidencia exacta.') + '\\n\\n' +\n  '⚙️ *Acción Realizada:*\\n' +\n  '• Producto: ' + prodInfo + '\\n' +\n  '• Vocabulario: ' + vocInfo + '\\n' +\n  '• Estado: ' + estadoTexto + '\\n\\n' +\n  'ℹ️ _El motor de búsqueda aprenderá esta equivalencia para futuros clientes._';\n\nconst adminRaw = $env.ADMIN_PHONE_NUMBERS || '';\nconst adminPhones = adminRaw.split(',').map(s => s.trim()).filter(Boolean);\nif (!adminPhones.length && $env.ADMIN_PHONE_NUMBER) adminPhones.push($env.ADMIN_PHONE_NUMBER.trim());\n\nreturn (adminPhones.length ? adminPhones : ['default@c.us']).map(chatId => ({\n  json: {\n    admin_chat_id: chatId,\n    admin_mensaje: adminMensaje,\n    simulacionExitosa,\n    autoAplicado,\n    diagnostico\n  }\n}));"
+        },
+        "id": "sandbox_and_apply",
+        "name": "Sandbox & Auto-Apply",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          760,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://waha_serrucho:3000/api/sendText",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "X-API-Key",
+                "value": "={{ $env.WAHA_API_KEY }}"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({\n  session: \"default\",\n  chatId: $json.admin_chat_id,\n  text: $json.admin_mensaje\n}) }}",
+          "options": {}
+        },
+        "id": "waha_notify_admin",
+        "name": "Notify Admin via WhatsApp",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          980,
+          300
+        ],
+        "onError": "continueRegularOutput"
+      }
+    ],
+    "connections": {
+      "Webhook Trigger": {
+        "main": [
+          [
+            {
+              "node": "Context & Candidates Gatherer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Context & Candidates Gatherer": {
+        "main": [
+          [
+            {
+              "node": "Sonnet AI Diagnostic Engine",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sonnet AI Diagnostic Engine": {
+        "main": [
+          [
+            {
+              "node": "Sandbox & Auto-Apply",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sandbox & Auto-Apply": {
+        "main": [
+          [
+            {
+              "node": "Notify Admin via WhatsApp",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "Admin Serrucho",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-08-31T21:21:40.952Z",
+        "id": 394,
+        "workflowId": "KCG5nhBlq7nL5dV2",
+        "versionId": "2732e658-680e-4489-aba1-f0cf0c30ae6e",
+        "event": "activated",
+        "userId": "a9174cb6-6525-426b-9005-30bde1cb175c"
+      },
+      {
+        "createdAt": "2026-08-31T21:21:41.222Z",
+        "id": 396,
+        "workflowId": "KCG5nhBlq7nL5dV2",
+        "versionId": "2732e658-680e-4489-aba1-f0cf0c30ae6e",
+        "event": "activated",
+        "userId": "a9174cb6-6525-426b-9005-30bde1cb175c"
+      },
+      {
+        "createdAt": "2026-08-31T21:21:40.803Z",
+        "id": 393,
+        "workflowId": "KCG5nhBlq7nL5dV2",
+        "versionId": "2732e658-680e-4489-aba1-f0cf0c30ae6e",
+        "event": "deactivated",
+        "userId": "a9174cb6-6525-426b-9005-30bde1cb175c"
+      },
+      {
+        "createdAt": "2026-08-31T21:21:41.116Z",
+        "id": 395,
+        "workflowId": "KCG5nhBlq7nL5dV2",
+        "versionId": "2732e658-680e-4489-aba1-f0cf0c30ae6e",
+        "event": "deactivated",
+        "userId": "a9174cb6-6525-426b-9005-30bde1cb175c"
+      }
+    ]
   }
 }

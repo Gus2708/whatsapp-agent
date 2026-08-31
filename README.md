@@ -266,6 +266,44 @@ Los administradores autorizados en `ADMIN_PHONE_NUMBERS` pueden interactuar dire
 
 ---
 
+## 🌙 Workflow: Sync Vocabulario Catálogo (Mantenimiento Nocturno)
+
+* **Archivo:** [`workflows/workflow_vocabulario.json`](workflows/workflow_vocabulario.json)
+* **Trigger:** Cron diario a las **3:00 AM** (`0 3 * * *`).
+
+```mermaid
+flowchart LR
+    CRON["⏰ Cada noche 3:00"] --> SYNC["📚 Sincronizar Vocabulario<br/>(Detección hash MD5 + Luna)"]
+    SYNC --> EMB["🔍 Monitor Embeddings<br/>(Alerta productos sin vector)"]
+    EMB --> POP["⭐ Refrescar Popularidad<br/>(RPC popularidad_productos)"]
+```
+
+### Funciones del Workflow:
+1. **Sincronización Incremental de Vocabulario**: Agrupa los productos por categoría y calcula un hash MD5 de sus descripciones. Solo si una categoría cambió (productos nuevos o editados), le pide a **GPT-5.6 Luna** los modismos, regionalismos y errores ortográficos comunes, insertándolos en `catalogo_vocabulario`.
+2. **Monitor de Embeddings**: Comprueba qué productos con stock carecen de vector semántico en `productos_embedding` o tienen descripciones desfasadas, emitiendo una alerta en el log.
+3. **Refresco de Popularidad**: Ejecuta la función PostgreSQL `popularidad_productos()` para recalcular el orden de relevancia según las facturas y compras reales de los últimos meses.
+
+---
+
+## 👷 Workflow: Reenviar Ayuda (Despacho App de Empleados)
+
+* **Archivo:** [`workflows/workflow_reenviar_ayuda.json`](workflows/workflow_reenviar_ayuda.json)
+* **Trigger:** Polling cada **15 segundos** (`scheduleTrigger`).
+
+```mermaid
+flowchart LR
+    T15["⏱️ Cada 15s"] --> COMP["📝 Componer y Marcar<br/>(Lee solicitudes_ayuda resueltas)"]
+    COMP --> SEND["📱 Enviar WAHA<br/>(Mensaje con cotización al cliente)"]
+```
+
+### Funciones del Workflow:
+1. **Detección Atómica de Ayudas Resueltas**: Consulta en `solicitudes_ayuda` aquellas marcadas con `status = 'resuelto'` por los empleados en la tienda física.
+2. **Composición de Cotización con Recargo y Tasa**: Si el empleado seleccionó productos, extrae precios, calcula el recargo comercial y la conversión en Bolívares según la tasa BCV oficial. Si el empleado marcó *«no disponible»*, compone un mensaje amable explicando la falta de stock.
+3. **Reclamo y Despacho**: Marca atómicamente la solicitud como `status = 'enviado'` para evitar duplicidad y despacha el mensaje vía WAHA HTTP API directamente al chat de WhatsApp del cliente.
+4. **Auto-Aprendizaje**: Registra la asociación entre la consulta original del cliente y los productos elegidos por el empleado en `busqueda_aprendizaje`.
+
+---
+
 ## ⚙️ Configuración
 
 1. **Supabase** — en el SQL Editor ejecuta [`supabase_schema.sql`](supabase_schema.sql). Crea las **12 tablas** (productos, clientes, tazas, chat_sessions, ventas, ventas_detalle, ordenes_cambio[_items], atenciones_pendientes, solicitudes_ayuda[_items], push_subscriptions), índices GIN/trigram (`pg_trgm`) y funciones RPC de búsqueda/popularidad. RLS habilitado.

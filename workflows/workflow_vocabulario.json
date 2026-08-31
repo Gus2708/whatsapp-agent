@@ -1,0 +1,300 @@
+{
+  "updatedAt": "2026-08-29T15:13:14.804Z",
+  "createdAt": "2026-08-01T23:18:49.203Z",
+  "id": "mJkBIhVMmLzkmYkP",
+  "name": "Sync Vocabulario Catálogo",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "vocab_schedule",
+      "name": "Cada noche 3:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        260,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 3 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "vocab_sync",
+      "name": "Sincronizar Vocabulario",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Sync incremental del diccionario del catálogo.\n// Detecta por hash md5 qué CATEGORÍAS cambiaron (producto nuevo, descripción editada)\n// y le pide a Luna el vocabulario coloquial SOLO de esas. Tope por corrida para que\n// una noche mala no se coma el presupuesto ni el tiempo de ejecución: lo que no entra\n// se procesa en la corrida siguiente (y se reporta, no se descarta en silencio).\nconst axios = require('axios');\nconst crypto = require('crypto');\n\nconst SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';\nconst ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nconst OR_KEY = $env.OPENROUTER_API_KEY;\nconst MODELO = 'openai/gpt-5.6-luna';\nconst MAX_CATEGORIAS = 40;   // tope por corrida\nconst CATS_POR_LOTE = 8;\nconst MUESTRAS = 14;\n\nfunction norm(t){ return String(t).toLowerCase().replace(/(\\d)\\s*,\\s*(\\d)/g,'$1.$2').replace(/[×✕✖]/g,'x').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9 .\\/-]/g,' ').replace(/\\s+/g,' ').trim(); }\n\nconst INSTRUCCIONES = `Eres un ferretero veterano de Falcón/Zulia, Venezuela. Conoces cómo habla la gente del pueblo.\nTe doy CATEGORÍAS del catálogo real con ejemplos de descripciones tal como están en el sistema.\nLista TODAS las formas en que un cliente venezolano pediría ese producto por WhatsApp y que NO coincidan literalmente con la descripción: coloquialismos, regionalismos, errores de escritura, marcas usadas como genérico, nombres del oficio, y perífrasis de quien no sabe el nombre.\nREGLAS DURAS:\n1. \"canonico\" debe estar formado SOLO por palabras que aparecen LITERALMENTE en las descripciones dadas. Si no puedes, omite el término.\n2. NO generes un \"termino\" que ya aparezca literal en las descripciones: eso ya se encuentra solo.\n3. \"termino\" en minúsculas, sin acentos ni signos.\n4. Nada de medidas, calibres ni números.\n5. Calidad sobre cantidad. confianza 5 = segurísimo, 3 = plausible; no bajes de 3.\nResponde SOLO un JSON: {\"categorias\":[{\"categoria\":\"...\",\"terminos\":[{\"termino\":\"...\",\"canonico\":\"...\",\"confianza\":4}]}]}`;\n\n// ---- 1. catálogo completo\nlet productos = [];\nfor (let off = 0; ; off += 1000) {\n  const r = await axios.get(SB + '/rest/v1/productos?select=codigo_interno,descripcion&order=codigo_interno.asc&offset=' + off + '&limit=1000', { headers: H });\n  productos = productos.concat(r.data || []);\n  if (!r.data || r.data.length < 1000) break;\n}\nproductos = productos.filter(p => p.descripcion);\n\nconst palabrasCatalogo = new Set();\nfor (const p of productos) for (const w of norm(p.descripcion).split(' ')) if (w.length > 2) palabrasCatalogo.add(w);\n\n// ---- 2. agrupar y hashear por categoría\nconst porCat = new Map();\nfor (const p of productos) {\n  const c = norm(p.descripcion).split(' ')[0];\n  if (!c || c.length < 3) continue;\n  if (!porCat.has(c)) porCat.set(c, []);\n  porCat.get(c).push(p);\n}\nconst hashDe = ps => crypto.createHash('md5').update(ps.map(p => p.codigo_interno + '|' + p.descripcion).sort().join('\\n')).digest('hex');\n\nconst prevRes = await axios.get(SB + '/rest/v1/catalogo_vocab_categorias?select=categoria,hash_categoria&limit=5000', { headers: H });\nconst previos = new Map((prevRes.data || []).map(r => [r.categoria, r.hash_categoria]));\n\nlet pendientes = [];\nfor (const [categoria, ps] of porCat.entries()) {\n  const hash = hashDe(ps);\n  if (previos.get(categoria) === hash) continue;\n  pendientes.push({ categoria, hash, total: ps.length, muestras: ps.slice(0, MUESTRAS).map(p => p.descripcion) });\n}\npendientes.sort((a, b) => b.total - a.total);\n\nconst totalPendientes = pendientes.length;\nif (!totalPendientes) {\n  return [{ json: { ok: true, mensaje: 'catálogo sin cambios', categorias_pendientes: 0, terminos_nuevos: 0 } }];\n}\nconst diferidas = Math.max(0, totalPendientes - MAX_CATEGORIAS);\npendientes = pendientes.slice(0, MAX_CATEGORIAS);\n\n// ---- 3. pedirle el vocabulario a Luna, por lotes\nconst aceptados = [];\nconst okCats = new Set();\nconst vistos = new Set();\nlet tIn = 0, tOut = 0, fallos = 0;\n\nfor (let i = 0; i < pendientes.length; i += CATS_POR_LOTE) {\n  const lote = pendientes.slice(i, i + CATS_POR_LOTE);\n  const texto = lote.map(c => '### Categoría: ' + c.categoria + ' (' + c.total + ' productos)\\n' + c.muestras.map(d => '- ' + d).join('\\n')).join('\\n\\n');\n  let datos;\n  try {\n    const rr = await axios.post('https://openrouter.ai/api/v1/chat/completions', {\n      model: MODELO, temperature: 0.4,\n      messages: [{ role: 'system', content: INSTRUCCIONES }, { role: 'user', content: texto }],\n      response_format: { type: 'json_object' },\n    }, { headers: { Authorization: 'Bearer ' + OR_KEY, 'Content-Type': 'application/json' } });\n    if (rr.data.usage) { tIn += rr.data.usage.prompt_tokens || 0; tOut += rr.data.usage.completion_tokens || 0; }\n    datos = JSON.parse(rr.data.choices[0].message.content);\n  } catch (e) { fallos++; continue; }\n\n  for (const c of lote) okCats.add(c.categoria);\n\n  for (const cat of (datos.categorias || [])) {\n    const propia = lote.find(c => norm(c.categoria) === norm(cat.categoria));\n    const palabrasCat = new Set();\n    if (propia) for (const d of propia.muestras) for (const w of norm(d).split(' ')) if (w.length > 2) palabrasCat.add(w);\n    for (const t of (cat.terminos || [])) {\n      const termino = norm(t.termino || ''), canonico = norm(t.canonico || '');\n      if (!termino || !canonico || termino === canonico || vistos.has(termino)) continue;\n      // el término no debe ser ya encontrable por sí solo\n      if (termino.split(' ').every(w => palabrasCatalogo.has(w))) continue;\n      // el canónico sí debe existir, y en esta categoría\n      if (!canonico.split(' ').every(w => palabrasCatalogo.has(w))) continue;\n      if (!canonico.split(' ').some(w => palabrasCat.has(w))) continue;\n      vistos.add(termino);\n      aceptados.push({ termino, canonico, categoria: propia ? propia.categoria : norm(cat.categoria), origen: 'llm_catalogo', confianza: Math.min(5, Math.max(3, t.confianza || 3)) });\n    }\n  }\n}\n\n// ---- 4. guardar\nif (aceptados.length) {\n  await axios.post(SB + '/rest/v1/catalogo_vocabulario?on_conflict=termino', aceptados,\n    { headers: Object.assign({}, H, { Prefer: 'resolution=merge-duplicates,return=minimal' }) });\n}\nconst marcar = pendientes.filter(c => okCats.has(c.categoria)).map(c => ({\n  categoria: c.categoria, hash_categoria: c.hash, productos: c.total,\n  terminos: aceptados.filter(a => a.categoria === c.categoria).length,\n  procesado_en: new Date().toISOString(),\n}));\nif (marcar.length) {\n  await axios.post(SB + '/rest/v1/catalogo_vocab_categorias?on_conflict=categoria', marcar,\n    { headers: Object.assign({}, H, { Prefer: 'resolution=merge-duplicates,return=minimal' }) });\n}\nawait axios.patch(SB + '/rest/v1/catalogo_vocab_estado?id=eq.1', {\n  productos_contados: productos.length,\n  terminos_generados: aceptados.length,\n  ultima_corrida: new Date().toISOString(),\n  ultimo_error: fallos ? (fallos + ' lote(s) fallaron') : null,\n}, { headers: Object.assign({}, H, { Prefer: 'return=minimal' }) });\n\nreturn [{ json: {\n  ok: true,\n  productos: productos.length,\n  categorias_cambiadas: totalPendientes,\n  categorias_procesadas: okCats.size,\n  categorias_diferidas: diferidas,   // se toman en la próxima corrida\n  terminos_nuevos: aceptados.length,\n  lotes_fallidos: fallos,\n  costo_usd: Number((tIn / 1e6 * 0.10 + tOut / 1e6 * 0.60).toFixed(4)),\n} }];"
+      }
+    },
+    {
+      "id": "vocab_embeddings",
+      "name": "Monitor Embeddings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// MONITOR de la capa vectorial. Detecta desalineacion y avisa; NO embebe.\n// El embebido real lo hace scripts/generar_embeddings.js a mano, porque escribir vectores\n// con el indice HNSW presente revienta el statement_timeout y la anon key no puede quitarlo.\n//\n// Tres senales, todas calculables SIN replicar el enriquecimiento del texto:\n//   A. productos SIN fila de embedding             -> invisibles para la busqueda semantica\n//   B. descripcion cambiada desde que se embebio   -> vector desactualizado\n//   C. vocabulario mas nuevo que los embeddings    -> el texto enriquecido cambio para todos\nconst axios = require('axios');\nconst SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';\nconst ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\n\nasync function traerTodo(tabla, select, orden){\n  const out = [];\n  for (let off = 0; ; off += 1000){\n    const r = await axios.get(SB + '/rest/v1/' + tabla + '?select=' + select + '&order=' + orden + '&offset=' + off + '&limit=1000', { headers: H });\n    const d = r.data || [];\n    out.push.apply(out, d);\n    if (d.length < 1000) break;\n  }\n  return out;\n}\n\nconst productos = (await traerTodo('productos', 'codigo_interno,descripcion', 'codigo_interno.asc'))\n  .filter(p => p.descripcion && p.descripcion.trim());\nconst emb = await traerTodo('productos_embedding', 'codigo_interno,descripcion,actualizado_en', 'codigo_interno.asc');\nconst porCodigo = new Map(emb.map(e => [e.codigo_interno, e]));\n\n// A. sin vector: invisibles para la capa semantica\nconst sinVector = productos.filter(p => !porCodigo.has(p.codigo_interno));\n\n// B. la descripcion cambio despues de embeberse. productos_embedding guarda la descripcion\n//    con la que se genero el vector, asi que esto se detecta sin recalcular nada.\nconst descCambiada = productos.filter(p => {\n  const e = porCodigo.get(p.codigo_interno);\n  return e && String(e.descripcion || '').trim() !== p.descripcion.trim();\n});\n\n// C. el vocabulario se regenero despues del ultimo embedding: como el texto que se embebe\n//    incluye los sinonimos de la categoria, eso invalida los vectores de TODO el catalogo.\nlet ultimoEmb = '';\nfor (const e of emb) if (e.actualizado_en > ultimoEmb) ultimoEmb = e.actualizado_en;\nconst vocabRows = await axios.get(SB + '/rest/v1/catalogo_vocab_categorias?select=procesado_en&order=procesado_en.desc&limit=1', { headers: H });\nconst ultimoVocab = (vocabRows.data && vocabRows.data[0] && vocabRows.data[0].procesado_en) || '';\nconst vocabMasNuevo = Boolean(ultimoVocab && ultimoEmb && ultimoVocab > ultimoEmb);\n\nconst diasSinEmbeber = ultimoEmb ? Math.floor((Date.now() - new Date(ultimoEmb).getTime()) / 86400000) : null;\n\nconst avisos = [];\nif (sinVector.length) avisos.push(sinVector.length + ' producto(s) SIN vector: invisibles para la busqueda semantica');\nif (descCambiada.length) avisos.push(descCambiada.length + ' producto(s) con la descripcion cambiada desde que se embebieron');\nif (vocabMasNuevo) avisos.push('el vocabulario se actualizo DESPUES del ultimo embedding: el texto enriquecido cambio para todo el catalogo');\n\nconst sano = avisos.length === 0;\nreturn [{ json: {\n  ok: sano,\n  estado: sano ? 'capa vectorial al dia' : 'REQUIERE ACCION MANUAL',\n  avisos: avisos,\n  accion: sano ? null\n    : '1) drop index if exists idx_productos_embedding_hnsw;  ' +\n      '2) node scripts/generar_embeddings.js  ' +\n      '3) create index idx_productos_embedding_hnsw on productos_embedding using hnsw (embedding extensions.vector_cosine_ops);',\n  productos: productos.length,\n  embebidos: emb.length,\n  sin_vector: sinVector.length,\n  descripcion_cambiada: descCambiada.length,\n  vocabulario_mas_nuevo_que_embeddings: vocabMasNuevo,\n  dias_desde_ultimo_embedding: diasSinEmbeber,\n  ejemplos_sin_vector: sinVector.slice(0, 5).map(p => p.codigo_interno + ' ' + p.descripcion.slice(0, 40)),\n} }];"
+      }
+    },
+    {
+      "id": "vocab_popularidad",
+      "name": "Refrescar Popularidad",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Recalcula producto_popularidad: facturas de los ultimos 90/365 dias por producto,\n// con castigo por antiguedad de la ultima venta. Es lo que hace que \"disco de corte\"\n// devuelva el que de verdad se vende y no el que lleva 500 unidades muertas en estante.\n//\n// Barato: una sola llamada, la agregacion la hace Postgres. Verificado que la anon key\n// puede ejecutarla (la funcion es SECURITY DEFINER).\nconst axios = require('axios');\nconst SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';\nconst ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';\n\ntry {\n  const r = await axios.post(SB + '/rest/v1/rpc/refrescar_popularidad_reciente', {},\n    { headers: { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' }, timeout: 120000 });\n  return [{ json: { ok: true, productos_con_ventas: r.data } }];\n} catch (e) {\n  // No se traga el error: si esto falla el ranking se congela y nadie se entera.\n  return [{ json: { ok: false, error: String(e.message).slice(0, 300) } }];\n}"
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 🌙 Mantenimiento Nocturno del Catálogo (3:00 AM)\n1. **Sincronizar Vocabulario**: Detecta cambios por hash MD5 en categorías y genera sinónimos con Luna.\n2. **Monitor Embeddings**: Alerta sobre productos sin vector o desactualizados.\n3. **Refrescar Popularidad**: Recalcula el ranking de productos por ventas reales recientes.",
+        "height": 380,
+        "width": 860,
+        "color": 2
+      },
+      "id": "sticky_vocab",
+      "name": "Sticky Note - Vocabulario",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        200,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Cada noche 3:00": {
+      "main": [
+        [
+          {
+            "node": "Sincronizar Vocabulario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sincronizar Vocabulario": {
+      "main": [
+        [
+          {
+            "node": "Monitor Embeddings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Monitor Embeddings": {
+      "main": [
+        [
+          {
+            "node": "Refrescar Popularidad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "executionTimeout": 1800
+  },
+  "staticData": {
+    "node:Cada noche 3:00": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": null,
+  "versionId": "472b7baa-f49a-4976-9596-b6cd4eddeb55",
+  "activeVersionId": "472b7baa-f49a-4976-9596-b6cd4eddeb55",
+  "versionCounter": 5,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "shared": [
+    {
+      "updatedAt": "2026-08-01T23:18:49.207Z",
+      "createdAt": "2026-08-01T23:18:49.207Z",
+      "role": "workflow:owner",
+      "workflowId": "mJkBIhVMmLzkmYkP",
+      "projectId": "o4UwjyJJrlfHWiFr",
+      "project": {
+        "updatedAt": "2026-08-31T21:31:48.976Z",
+        "createdAt": "2026-06-05T19:18:56.994Z",
+        "id": "o4UwjyJJrlfHWiFr",
+        "name": "Unnamed Project",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "a9174cb6-6525-426b-9005-30bde1cb175c"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-08-29T15:13:14.809Z",
+    "createdAt": "2026-08-29T15:13:14.809Z",
+    "versionId": "472b7baa-f49a-4976-9596-b6cd4eddeb55",
+    "workflowId": "mJkBIhVMmLzkmYkP",
+    "nodes": [
+      {
+        "id": "vocab_schedule",
+        "name": "Cada noche 3:00",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          260,
+          300
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 3 * * *"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "vocab_sync",
+        "name": "Sincronizar Vocabulario",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          520,
+          300
+        ],
+        "parameters": {
+          "jsCode": "// Sync incremental del diccionario del catálogo.\n// Detecta por hash md5 qué CATEGORÍAS cambiaron (producto nuevo, descripción editada)\n// y le pide a Luna el vocabulario coloquial SOLO de esas. Tope por corrida para que\n// una noche mala no se coma el presupuesto ni el tiempo de ejecución: lo que no entra\n// se procesa en la corrida siguiente (y se reporta, no se descarta en silencio).\nconst axios = require('axios');\nconst crypto = require('crypto');\n\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nconst OR_KEY = $env.OPENROUTER_API_KEY;\nconst MODELO = 'openai/gpt-5.6-luna';\nconst MAX_CATEGORIAS = 40;   // tope por corrida\nconst CATS_POR_LOTE = 8;\nconst MUESTRAS = 14;\n\nfunction norm(t){ return String(t).toLowerCase().replace(/(\\d)\\s*,\\s*(\\d)/g,'$1.$2').replace(/[×✕✖]/g,'x').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9 .\\/-]/g,' ').replace(/\\s+/g,' ').trim(); }\n\nconst INSTRUCCIONES = `Eres un ferretero veterano de Falcón/Zulia, Venezuela. Conoces cómo habla la gente del pueblo.\nTe doy CATEGORÍAS del catálogo real con ejemplos de descripciones tal como están en el sistema.\nLista TODAS las formas en que un cliente venezolano pediría ese producto por WhatsApp y que NO coincidan literalmente con la descripción: coloquialismos, regionalismos, errores de escritura, marcas usadas como genérico, nombres del oficio, y perífrasis de quien no sabe el nombre.\nREGLAS DURAS:\n1. \"canonico\" debe estar formado SOLO por palabras que aparecen LITERALMENTE en las descripciones dadas. Si no puedes, omite el término.\n2. NO generes un \"termino\" que ya aparezca literal en las descripciones: eso ya se encuentra solo.\n3. \"termino\" en minúsculas, sin acentos ni signos.\n4. Nada de medidas, calibres ni números.\n5. Calidad sobre cantidad. confianza 5 = segurísimo, 3 = plausible; no bajes de 3.\nResponde SOLO un JSON: {\"categorias\":[{\"categoria\":\"...\",\"terminos\":[{\"termino\":\"...\",\"canonico\":\"...\",\"confianza\":4}]}]}`;\n\n// ---- 1. catálogo completo\nlet productos = [];\nfor (let off = 0; ; off += 1000) {\n  const r = await axios.get(SB + '/rest/v1/productos?select=codigo_interno,descripcion&order=codigo_interno.asc&offset=' + off + '&limit=1000', { headers: H });\n  productos = productos.concat(r.data || []);\n  if (!r.data || r.data.length < 1000) break;\n}\nproductos = productos.filter(p => p.descripcion);\n\nconst palabrasCatalogo = new Set();\nfor (const p of productos) for (const w of norm(p.descripcion).split(' ')) if (w.length > 2) palabrasCatalogo.add(w);\n\n// ---- 2. agrupar y hashear por categoría\nconst porCat = new Map();\nfor (const p of productos) {\n  const c = norm(p.descripcion).split(' ')[0];\n  if (!c || c.length < 3) continue;\n  if (!porCat.has(c)) porCat.set(c, []);\n  porCat.get(c).push(p);\n}\nconst hashDe = ps => crypto.createHash('md5').update(ps.map(p => p.codigo_interno + '|' + p.descripcion).sort().join('\\n')).digest('hex');\n\nconst prevRes = await axios.get(SB + '/rest/v1/catalogo_vocab_categorias?select=categoria,hash_categoria&limit=5000', { headers: H });\nconst previos = new Map((prevRes.data || []).map(r => [r.categoria, r.hash_categoria]));\n\nlet pendientes = [];\nfor (const [categoria, ps] of porCat.entries()) {\n  const hash = hashDe(ps);\n  if (previos.get(categoria) === hash) continue;\n  pendientes.push({ categoria, hash, total: ps.length, muestras: ps.slice(0, MUESTRAS).map(p => p.descripcion) });\n}\npendientes.sort((a, b) => b.total - a.total);\n\nconst totalPendientes = pendientes.length;\nif (!totalPendientes) {\n  return [{ json: { ok: true, mensaje: 'catálogo sin cambios', categorias_pendientes: 0, terminos_nuevos: 0 } }];\n}\nconst diferidas = Math.max(0, totalPendientes - MAX_CATEGORIAS);\npendientes = pendientes.slice(0, MAX_CATEGORIAS);\n\n// ---- 3. pedirle el vocabulario a Luna, por lotes\nconst aceptados = [];\nconst okCats = new Set();\nconst vistos = new Set();\nlet tIn = 0, tOut = 0, fallos = 0;\n\nfor (let i = 0; i < pendientes.length; i += CATS_POR_LOTE) {\n  const lote = pendientes.slice(i, i + CATS_POR_LOTE);\n  const texto = lote.map(c => '### Categoría: ' + c.categoria + ' (' + c.total + ' productos)\\n' + c.muestras.map(d => '- ' + d).join('\\n')).join('\\n\\n');\n  let datos;\n  try {\n    const rr = await axios.post('https://openrouter.ai/api/v1/chat/completions', {\n      model: MODELO, temperature: 0.4,\n      messages: [{ role: 'system', content: INSTRUCCIONES }, { role: 'user', content: texto }],\n      response_format: { type: 'json_object' },\n    }, { headers: { Authorization: 'Bearer ' + OR_KEY, 'Content-Type': 'application/json' } });\n    if (rr.data.usage) { tIn += rr.data.usage.prompt_tokens || 0; tOut += rr.data.usage.completion_tokens || 0; }\n    datos = JSON.parse(rr.data.choices[0].message.content);\n  } catch (e) { fallos++; continue; }\n\n  for (const c of lote) okCats.add(c.categoria);\n\n  for (const cat of (datos.categorias || [])) {\n    const propia = lote.find(c => norm(c.categoria) === norm(cat.categoria));\n    const palabrasCat = new Set();\n    if (propia) for (const d of propia.muestras) for (const w of norm(d).split(' ')) if (w.length > 2) palabrasCat.add(w);\n    for (const t of (cat.terminos || [])) {\n      const termino = norm(t.termino || ''), canonico = norm(t.canonico || '');\n      if (!termino || !canonico || termino === canonico || vistos.has(termino)) continue;\n      // el término no debe ser ya encontrable por sí solo\n      if (termino.split(' ').every(w => palabrasCatalogo.has(w))) continue;\n      // el canónico sí debe existir, y en esta categoría\n      if (!canonico.split(' ').every(w => palabrasCatalogo.has(w))) continue;\n      if (!canonico.split(' ').some(w => palabrasCat.has(w))) continue;\n      vistos.add(termino);\n      aceptados.push({ termino, canonico, categoria: propia ? propia.categoria : norm(cat.categoria), origen: 'llm_catalogo', confianza: Math.min(5, Math.max(3, t.confianza || 3)) });\n    }\n  }\n}\n\n// ---- 4. guardar\nif (aceptados.length) {\n  await axios.post(SB + '/rest/v1/catalogo_vocabulario?on_conflict=termino', aceptados,\n    { headers: Object.assign({}, H, { Prefer: 'resolution=merge-duplicates,return=minimal' }) });\n}\nconst marcar = pendientes.filter(c => okCats.has(c.categoria)).map(c => ({\n  categoria: c.categoria, hash_categoria: c.hash, productos: c.total,\n  terminos: aceptados.filter(a => a.categoria === c.categoria).length,\n  procesado_en: new Date().toISOString(),\n}));\nif (marcar.length) {\n  await axios.post(SB + '/rest/v1/catalogo_vocab_categorias?on_conflict=categoria', marcar,\n    { headers: Object.assign({}, H, { Prefer: 'resolution=merge-duplicates,return=minimal' }) });\n}\nawait axios.patch(SB + '/rest/v1/catalogo_vocab_estado?id=eq.1', {\n  productos_contados: productos.length,\n  terminos_generados: aceptados.length,\n  ultima_corrida: new Date().toISOString(),\n  ultimo_error: fallos ? (fallos + ' lote(s) fallaron') : null,\n}, { headers: Object.assign({}, H, { Prefer: 'return=minimal' }) });\n\nreturn [{ json: {\n  ok: true,\n  productos: productos.length,\n  categorias_cambiadas: totalPendientes,\n  categorias_procesadas: okCats.size,\n  categorias_diferidas: diferidas,   // se toman en la próxima corrida\n  terminos_nuevos: aceptados.length,\n  lotes_fallidos: fallos,\n  costo_usd: Number((tIn / 1e6 * 0.10 + tOut / 1e6 * 0.60).toFixed(4)),\n} }];"
+        }
+      },
+      {
+        "id": "vocab_embeddings",
+        "name": "Monitor Embeddings",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          780,
+          300
+        ],
+        "parameters": {
+          "jsCode": "// MONITOR de la capa vectorial. Detecta desalineacion y avisa; NO embebe.\n// El embebido real lo hace scripts/generar_embeddings.js a mano, porque escribir vectores\n// con el indice HNSW presente revienta el statement_timeout y la anon key no puede quitarlo.\n//\n// Tres senales, todas calculables SIN replicar el enriquecimiento del texto:\n//   A. productos SIN fila de embedding             -> invisibles para la busqueda semantica\n//   B. descripcion cambiada desde que se embebio   -> vector desactualizado\n//   C. vocabulario mas nuevo que los embeddings    -> el texto enriquecido cambio para todos\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\n\nasync function traerTodo(tabla, select, orden){\n  const out = [];\n  for (let off = 0; ; off += 1000){\n    const r = await axios.get(SB + '/rest/v1/' + tabla + '?select=' + select + '&order=' + orden + '&offset=' + off + '&limit=1000', { headers: H });\n    const d = r.data || [];\n    out.push.apply(out, d);\n    if (d.length < 1000) break;\n  }\n  return out;\n}\n\nconst productos = (await traerTodo('productos', 'codigo_interno,descripcion', 'codigo_interno.asc'))\n  .filter(p => p.descripcion && p.descripcion.trim());\nconst emb = await traerTodo('productos_embedding', 'codigo_interno,descripcion,actualizado_en', 'codigo_interno.asc');\nconst porCodigo = new Map(emb.map(e => [e.codigo_interno, e]));\n\n// A. sin vector: invisibles para la capa semantica\nconst sinVector = productos.filter(p => !porCodigo.has(p.codigo_interno));\n\n// B. la descripcion cambio despues de embeberse. productos_embedding guarda la descripcion\n//    con la que se genero el vector, asi que esto se detecta sin recalcular nada.\nconst descCambiada = productos.filter(p => {\n  const e = porCodigo.get(p.codigo_interno);\n  return e && String(e.descripcion || '').trim() !== p.descripcion.trim();\n});\n\n// C. el vocabulario se regenero despues del ultimo embedding: como el texto que se embebe\n//    incluye los sinonimos de la categoria, eso invalida los vectores de TODO el catalogo.\nlet ultimoEmb = '';\nfor (const e of emb) if (e.actualizado_en > ultimoEmb) ultimoEmb = e.actualizado_en;\nconst vocabRows = await axios.get(SB + '/rest/v1/catalogo_vocab_categorias?select=procesado_en&order=procesado_en.desc&limit=1', { headers: H });\nconst ultimoVocab = (vocabRows.data && vocabRows.data[0] && vocabRows.data[0].procesado_en) || '';\nconst vocabMasNuevo = Boolean(ultimoVocab && ultimoEmb && ultimoVocab > ultimoEmb);\n\nconst diasSinEmbeber = ultimoEmb ? Math.floor((Date.now() - new Date(ultimoEmb).getTime()) / 86400000) : null;\n\nconst avisos = [];\nif (sinVector.length) avisos.push(sinVector.length + ' producto(s) SIN vector: invisibles para la busqueda semantica');\nif (descCambiada.length) avisos.push(descCambiada.length + ' producto(s) con la descripcion cambiada desde que se embebieron');\nif (vocabMasNuevo) avisos.push('el vocabulario se actualizo DESPUES del ultimo embedding: el texto enriquecido cambio para todo el catalogo');\n\nconst sano = avisos.length === 0;\nreturn [{ json: {\n  ok: sano,\n  estado: sano ? 'capa vectorial al dia' : 'REQUIERE ACCION MANUAL',\n  avisos: avisos,\n  accion: sano ? null\n    : '1) drop index if exists idx_productos_embedding_hnsw;  ' +\n      '2) node scripts/generar_embeddings.js  ' +\n      '3) create index idx_productos_embedding_hnsw on productos_embedding using hnsw (embedding extensions.vector_cosine_ops);',\n  productos: productos.length,\n  embebidos: emb.length,\n  sin_vector: sinVector.length,\n  descripcion_cambiada: descCambiada.length,\n  vocabulario_mas_nuevo_que_embeddings: vocabMasNuevo,\n  dias_desde_ultimo_embedding: diasSinEmbeber,\n  ejemplos_sin_vector: sinVector.slice(0, 5).map(p => p.codigo_interno + ' ' + p.descripcion.slice(0, 40)),\n} }];"
+        }
+      },
+      {
+        "id": "vocab_popularidad",
+        "name": "Refrescar Popularidad",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1040,
+          300
+        ],
+        "parameters": {
+          "jsCode": "// Recalcula producto_popularidad: facturas de los ultimos 90/365 dias por producto,\n// con castigo por antiguedad de la ultima venta. Es lo que hace que \"disco de corte\"\n// devuelva el que de verdad se vende y no el que lleva 500 unidades muertas en estante.\n//\n// Barato: una sola llamada, la agregacion la hace Postgres. Verificado que la anon key\n// puede ejecutarla (la funcion es SECURITY DEFINER).\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\n\ntry {\n  const r = await axios.post(SB + '/rest/v1/rpc/refrescar_popularidad_reciente', {},\n    { headers: { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' }, timeout: 120000 });\n  return [{ json: { ok: true, productos_con_ventas: r.data } }];\n} catch (e) {\n  // No se traga el error: si esto falla el ranking se congela y nadie se entera.\n  return [{ json: { ok: false, error: String(e.message).slice(0, 300) } }];\n}"
+        }
+      }
+    ],
+    "connections": {
+      "Cada noche 3:00": {
+        "main": [
+          [
+            {
+              "node": "Sincronizar Vocabulario",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sincronizar Vocabulario": {
+        "main": [
+          [
+            {
+              "node": "Monitor Embeddings",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Monitor Embeddings": {
+        "main": [
+          [
+            {
+              "node": "Refrescar Popularidad",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "Admin Serrucho",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-08-29T15:13:15.087Z",
+        "id": 363,
+        "workflowId": "mJkBIhVMmLzkmYkP",
+        "versionId": "472b7baa-f49a-4976-9596-b6cd4eddeb55",
+        "event": "activated",
+        "userId": "a9174cb6-6525-426b-9005-30bde1cb175c"
+      },
+      {
+        "createdAt": "2026-08-29T15:13:15.317Z",
+        "id": 365,
+        "workflowId": "mJkBIhVMmLzkmYkP",
+        "versionId": "472b7baa-f49a-4976-9596-b6cd4eddeb55",
+        "event": "activated",
+        "userId": "a9174cb6-6525-426b-9005-30bde1cb175c"
+      },
+      {
+        "createdAt": "2026-08-29T15:13:14.978Z",
+        "id": 362,
+        "workflowId": "mJkBIhVMmLzkmYkP",
+        "versionId": "472b7baa-f49a-4976-9596-b6cd4eddeb55",
+        "event": "deactivated",
+        "userId": "a9174cb6-6525-426b-9005-30bde1cb175c"
+      },
+      {
+        "createdAt": "2026-08-29T15:13:15.226Z",
+        "id": 364,
+        "workflowId": "mJkBIhVMmLzkmYkP",
+        "versionId": "472b7baa-f49a-4976-9596-b6cd4eddeb55",
+        "event": "deactivated",
+        "userId": "a9174cb6-6525-426b-9005-30bde1cb175c"
+      }
+    ]
+  }
+}
