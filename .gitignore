@@ -44,3 +44,6 @@ Desktop.ini
 
 # estado de runtime del watchdog (cambia solo, no se versiona)
 waha_watchdog_state.json
+
+# Reportes de diagnóstico y suites generados en scratch_live
+scratch_live/*_resultado.json

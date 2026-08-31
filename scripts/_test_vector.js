@@ -78,4 +78,21 @@ async function buscar(v, n = 3) {
   console.log(`mejor texto basura     : ${maxBasura.toFixed(3)}`);
   const margen = minLegit - maxBasura;
   console.log(`MARGEN (legítimo - basura): ${margen.toFixed(3)}  ${margen > 0.05 ? '-> hay umbral posible' : '-> NO hay umbral que los separe'}`);
+
+  const rutaJson = path.join(ROOT, 'scratch_live', 'vector_margen_resultado.json');
+  fs.writeFileSync(rutaJson, JSON.stringify({
+    fecha: new Date().toISOString(),
+    aciertos_top1: aciertos,
+    total_casos: CASOS.length,
+    peor_consulta_legitima: Number(minLegit.toFixed(3)),
+    mejor_texto_basura: Number(maxBasura.toFixed(3)),
+    margen: Number(margen.toFixed(3)),
+    hay_umbral: margen > 0.05,
+    casos: CASOS.map(c => ({ consulta: c.q, nota: c.nota })),
+    basura: BASURA
+  }, null, 2), 'utf8');
+
+  if (process.argv.includes('--json')) {
+    console.log(fs.readFileSync(rutaJson, 'utf8'));
+  }
 })().catch(e => { console.error('ERROR', e.message); process.exit(1); });

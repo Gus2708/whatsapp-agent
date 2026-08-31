@@ -200,4 +200,31 @@ function classify(parsed, t) {
   if (fn.length) { console.log('\n-- FALSOS NEGATIVOS SOSPECHOSOS (producto debería existir) --'); fn.forEach(r => console.log('  #' + r.i, '"' + r.t.q.slice(0, 70) + '"')); }
   if (rank.length) { console.log('\n-- RANKING: el primero no es el producto correcto --'); rank.forEach(r => console.log('  #' + r.i, '"' + r.t.q.slice(0, 50) + '"', r.flags.filter(f => f.includes('TOP-')).join(' '))); }
   if (exc.length) { console.log('\n-- EXCEPCIONES --'); exc.forEach(r => console.log('  #' + r.i, r.flags.join(' '))); }
+
+  const rutaJson = path.join(__dirname, '..', 'scratch_live', 'regresion_resultado.json');
+  fs.writeFileSync(rutaJson, JSON.stringify({
+    fecha: new Date().toISOString(),
+    total: results.length,
+    falsos_negativos: fn.length,
+    debiles: debil.length,
+    top_agotado: agot.length,
+    ranking_malo: rank.length,
+    excepciones: exc.length,
+    conocidos_pendientes: conocidos.length,
+    fallos_detectados: results.filter(r => r.flags.length > 0).map(r => ({
+      numero: r.i,
+      consulta: r.t.q,
+      flags: r.flags,
+      conocido: r.t.conocido || null,
+      top_productos: (r.parsed.productos || []).map(p => ({
+        nombre: p.nombre,
+        disponible: p.disponible,
+        precio_usd: p.precio_divisas_texto,
+      }))
+    }))
+  }, null, 2), 'utf8');
+
+  if (process.argv.includes('--json')) {
+    console.log(fs.readFileSync(rutaJson, 'utf8'));
+  }
 })().catch(e => { console.error('FATAL', e); process.exit(1); });

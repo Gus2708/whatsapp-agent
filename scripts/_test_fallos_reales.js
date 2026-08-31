@@ -55,4 +55,18 @@ const NO_ES_PRODUCTO = /^(si|no|ok|gracias|buenas?|hola)\b|foto|precio[s]?$|^y (
   console.log(`evaluadas: ${casos.length} | con resultados: ${hallados} | no_vendido: ${noVendidos} | sin nada: ${vacios}`);
   console.log(`\nSiguen sin encontrar nada:`);
   for (const q of sigueFallando) console.log(`  · ${q.slice(0, 90)}`);
+
+  const rutaJson = path.join(ROOT, 'scratch_live', 'fallos_reales_resultado.json');
+  fs.writeFileSync(rutaJson, JSON.stringify({
+    fecha: new Date().toISOString(),
+    evaluadas: casos.length,
+    con_resultados: hallados,
+    no_vendido: noVendidos,
+    sin_nada: vacios,
+    consultas_fallidas: sigueFallando
+  }, null, 2), 'utf8');
+
+  if (process.argv.includes('--json')) {
+    console.log(fs.readFileSync(rutaJson, 'utf8'));
+  }
 })().catch(e => { console.error('ERROR', e.message); process.exit(1); });

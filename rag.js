@@ -646,8 +646,11 @@ async function coseno(consulta) {
 }
 
 // ───────────────────────────────────────────────────────────────────── diagnóstico vectorial nativo
-async function diagnostico(consulta) {
-  cabecera('DIAGNÓSTICO VECTORIAL', 'camino semántico');
+async function diagnostico(consulta, flags) {
+  const flagsList = flags || [];
+  const soloJson = flagsList.includes('--json');
+  if (!soloJson) cabecera('DIAGNÓSTICO VECTORIAL', 'camino semántico');
+
   const q = (consulta || '').trim();
   const casos = q ? [q] : [
     'tendran tapa para el bano',
@@ -664,58 +667,123 @@ async function diagnostico(consulta) {
   const runMatcher = new Function('query', 'require', '$env', '"use strict"; return (async () => {\n' + body + '\n})();');
   const fakeEnv = { OPENROUTER_API_KEY: pick('OPENROUTER_API_KEY'), OPENAI_API_KEY: pick('OPENAI_API_KEY') };
 
+  const reporte = [];
+
   for (const texto of casos) {
-    console.log('\n ' + c.claude('❯') + ' ' + c.bold(c.num(`"${texto}"`)));
-    console.log(' ' + c.darkGray('─'.repeat(W + 15)));
+    if (!soloJson) {
+      console.log('\n ' + c.claude('❯') + ' ' + c.bold(c.num(`"${texto}"`)));
+      console.log(' ' + c.darkGray('─'.repeat(W + 15)));
+    }
+
+    const casoRes = {
+      consulta: texto,
+      lexico: null,
+      gatillo: { dispara: false, faltan: [] },
+      embedding: { ok: false, ms: 0, error: null },
+      vecinos: [],
+      adopcion: { veredicto: 'NO_DISPARA', razon: '' },
+    };
 
     // 1. Léxico
     const lex = JSON.parse(await runMatcher({ p_busqueda: texto }, n => (n === 'axios' ? axiosShim : require(n)), { OPENROUTER_API_KEY: '', OPENAI_API_KEY: '' }));
     const topLex = (lex.productos || [])[0];
-    console.log(`  ${c.gray('1. Capa Léxica (Trigramas):')} ${topLex ? c.ok(topLex.nombre) : c.darkGray('(sin resultados)')}`);
+    casoRes.lexico = topLex || null;
+    if (!soloJson) {
+      console.log(`  ${c.gray('1. Capa Léxica (Trigramas):')} ${topLex ? c.ok(topLex.nombre) : c.darkGray('(sin resultados)')}`);
+    }
 
     // 2. Gatillo
     const qTok = L.expandir(texto).split(' ').filter(w => w.length > 2 && !/\d/.test(w));
     const d0 = topLex ? L.norm(topLex.nombre) : '';
     const faltan = qTok.filter(t => !L.aliasDe(t).some(a => d0.includes(a)));
     const dispara = faltan.length > 0;
-    console.log(`  ${c.gray('2. Gatillo de Disparo:')}     ${dispara ? c.warn('DISPARA') + c.darkGray(` (faltan tokens en top-1: ${faltan.join(', ')})`) : c.ok('NO DISPARA') + c.darkGray(' (top-1 cubre la consulta)')}`);
-    if (!dispara) continue;
+    casoRes.gatillo = { dispara, faltan };
+
+    if (!soloJson) {
+      console.log(`  ${c.gray('2. Gatillo de Disparo:')}     ${dispara ? c.warn('DISPARA') + c.darkGray(` (faltan tokens en top-1: ${faltan.join(', ')})`) : c.ok('NO DISPARA') + c.darkGray(' (top-1 cubre la consulta)')}`);
+    }
+
+    if (!dispara) {
+      casoRes.adopcion = { veredicto: 'NO_DISPARA', razon: 'El top-1 léxico ya contiene los términos principales de la consulta.' };
+      reporte.push(casoRes);
+      continue;
+    }
 
     // 3. Embedding OpenAI
     const t0 = Date.now();
     const vecs = await embeder([texto]);
     const ms = Date.now() - t0;
     if (!vecs || !vecs[0]) {
-      console.log(`  ${c.gray('3. Embedding OpenAI:')}       ${c.err('FALLÓ O TIMEOUT')} ${c.darkGray(`(${ms}ms)`)}`);
+      casoRes.embedding = { ok: false, ms, error: 'Fallo o timeout conectando a OpenAI' };
+      casoRes.adopcion = { veredicto: 'ERROR_EMBEDDING', razon: 'No se pudo generar el vector de consulta' };
+      if (!soloJson) {
+        console.log(`  ${c.gray('3. Embedding OpenAI:')}       ${c.err('FALLÓ O TIMEOUT')} ${c.darkGray(`(${ms}ms)`)}`);
+      }
+      reporte.push(casoRes);
       continue;
     }
-    console.log(`  ${c.gray('3. Embedding OpenAI:')}       ${c.ok('OK')} ${c.darkGray(`(${ms}ms · 1.536 dims)`)}`);
+    casoRes.embedding = { ok: true, ms, dims: 1536 };
+    if (!soloJson) {
+      console.log(`  ${c.gray('3. Embedding OpenAI:')}       ${c.ok('OK')} ${c.darkGray(`(${ms}ms · 1.536 dims)`)}`);
+    }
 
     // 4. Búsqueda semántica
-    const resVec = await vecinos(vecs[0], 4);
+    const resVec = await vecinos(vecs[0], 5);
+    casoRes.vecinos = resVec;
     if (!resVec.length) {
-      console.log(`  ${c.gray('4. Vecinos Semánticos:')}    ${c.err('(la RPC no devolvió vecinos)')}`);
+      casoRes.adopcion = { veredicto: 'SIN_VECINOS', razon: 'La función buscar_semantico no devolvió registros' };
+      if (!soloJson) {
+        console.log(`  ${c.gray('4. Vecinos Semánticos:')}    ${c.err('(la RPC no devolvió vecinos)')}`);
+      }
+      reporte.push(casoRes);
       continue;
     }
-    console.log(`  ${c.gray('4. Vecinos Semánticos:')}`);
-    for (const f of resVec) {
-      const pasa = f.similitud >= UMBRAL_VECTOR;
-      const simStr = f.similitud.toFixed(3);
-      console.log(`      ${pasa ? c.ok(simStr) : c.darkGray(simStr)}  ${barraSim(f.similitud, 14)}  ${c.num(pad(f.descripcion.slice(0, 36), 38))} ${pasa ? c.ok('pasa umbral') : c.err('bajo umbral')}`);
+    if (!soloJson) {
+      console.log(`  ${c.gray('4. Vecinos Semánticos:')}`);
+      for (const f of resVec) {
+        const pasa = f.similitud >= UMBRAL_VECTOR;
+        const simStr = f.similitud.toFixed(3);
+        console.log(`      ${pasa ? c.ok(simStr) : c.darkGray(simStr)}  ${barraSim(f.similitud, 14)}  ${c.num(pad(f.descripcion.slice(0, 36), 38))} ${pasa ? c.ok('pasa umbral') : c.err('bajo umbral')}`);
+      }
     }
 
     // 5. Adopción
     const sobreUmbral = resVec.filter(f => f.similitud >= UMBRAL_VECTOR);
     if (!sobreUmbral.length) {
-      console.log(`  ${c.gray('5. Veredicto Adopción:')}    ${c.err('DESCARTA')} ${c.darkGray('(ningún vector superó el umbral de 0.450)')}`);
+      casoRes.adopcion = { veredicto: 'DESCARTA_UMBRAL', razon: `Ningún vecino superó el umbral mínimo (${UMBRAL_VECTOR})` };
+      if (!soloJson) {
+        console.log(`  ${c.gray('5. Veredicto Adopción:')}    ${c.err('DESCARTA')} ${c.darkGray(`(ningún vector superó el umbral de ${UMBRAL_VECTOR.toFixed(3)})`)}`);
+      }
+      reporte.push(casoRes);
       continue;
     }
     const vcat = L.norm(sobreUmbral[0].descripcion).split(' ')[0];
     const lcat = d0.split(' ')[0];
     const adopta = vcat !== lcat;
-    console.log(`  ${c.gray('5. Veredicto Adopción:')}    ${adopta ? c.bold(c.ok('ADOPTA VECTOR')) : c.bold(c.warn('DESCARTA (misma categoría)'))} ${c.darkGray(`(cat vector="${vcat}" vs cat léxico="${lcat}")`)}`);
+    casoRes.adopcion = {
+      veredicto: adopta ? 'ADOPTA' : 'DESCARTA_CATEGORIA',
+      categoria_vector: vcat,
+      categoria_lexico: lcat,
+      vector_ganador: sobreUmbral[0],
+      razon: adopta ? 'Categorías distintas: el vector descubrió una intención no vista por el léxico.' : 'Misma categoría: se prefiere mantener la precisión de la capa léxica.',
+    };
+
+    if (!soloJson) {
+      console.log(`  ${c.gray('5. Veredicto Adopción:')}    ${adopta ? c.bold(c.ok('ADOPTA VECTOR')) : c.bold(c.warn('DESCARTA (misma categoría)'))} ${c.darkGray(`(cat vector="${vcat}" vs cat léxico="${lcat}")`)}`);
+    }
+    reporte.push(casoRes);
   }
-  console.log('');
+
+  // Guardar archivo JSON estructurado para auditoría y arreglo inmediato
+  const rutaJson = path.join(ROOT, 'scratch_live', 'diagnostico_resultado.json');
+  fs.writeFileSync(rutaJson, JSON.stringify({ fecha: new Date().toISOString(), total_casos: reporte.length, resultados: reporte }, null, 2), 'utf8');
+
+  if (soloJson) {
+    console.log(JSON.stringify(reporte, null, 2));
+  } else {
+    console.log('\n ' + c.ok('⏺') + ' ' + c.bold('Reporte JSON detallado guardado en:') + ' ' + c.cyan('scratch_live/diagnostico_resultado.json'));
+    console.log('');
+  }
   return 0;
 }
 
@@ -819,6 +887,10 @@ async function suite(flags) {
 
     const r = p.parse(salida);
     const seg = ((Date.now() - t0) / 1000).toFixed(1) + 's';
+    p.resultado = r;
+    p.seg = seg;
+    p.salidaRaw = salida;
+
     if (!r) {
       console.log('  ' + GL.err + ' ' + pad(c.num(p.nombre), 28) + c.err('error al parsear salida') + c.darkGray('  ' + seg));
       rotos++;
@@ -841,6 +913,32 @@ async function suite(flags) {
   console.log(' ' + (sano ? c.ok('▎') : c.warn('▎')) + ' ' + c.bold(c.num(`${num(totalCasos)} casos evaluados`)) +
     c.darkGray('  ·  ') + (totalFallos ? c.warn(`${totalFallos} incidentes reportados`) : c.ok('cero incidentes')) +
     c.darkGray('  ·  ') + c.bold(c.cyan(`${tasaTotal}% efectividad global`)));
+
+  // Guardar archivo JSON con el desglose detallado para análisis y corrección
+  const rutaSuiteJson = path.join(ROOT, 'scratch_live', 'suite_resultado.json');
+  const reporteSuite = {
+    fecha: new Date().toISOString(),
+    modo: rapida ? 'rapida' : 'completa',
+    efectividad_global_pct: Number(tasaTotal),
+    total_casos: totalCasos,
+    total_fallos: totalFallos,
+    arneses: pasos.map(p => ({
+      nombre: p.nombre,
+      script: p.script,
+      casos: p.resultado ? p.resultado.casos : 0,
+      fallos: p.resultado ? p.resultado.fallos : 0,
+      detalle: p.resultado ? p.resultado.detalle : '',
+      duracion_seg: p.seg || 0,
+      salida_raw: p.salidaRaw || '',
+    })),
+  };
+  fs.writeFileSync(rutaSuiteJson, JSON.stringify(reporteSuite, null, 2), 'utf8');
+
+  if (flags.includes('--json')) {
+    console.log(JSON.stringify(reporteSuite, null, 2));
+  } else {
+    console.log(' ' + c.ok('⏺') + ' ' + c.bold('Reporte JSON detallado guardado en:') + ' ' + c.cyan('scratch_live/suite_resultado.json'));
+  }
   console.log('');
   return sano ? 0 : 1;
 }
@@ -1071,7 +1169,9 @@ async function iniciarTUI() {
     } else if (primero === '2' || primero === '/coseno' || primero === 'coseno') {
       await coseno(argumento || null);
     } else if (primero === '3' || primero === '/diag' || primero === 'diag') {
-      await diagnostico(argumento || null);
+      const diagFlags = argumento && argumento.includes('--json') ? ['--json'] : [];
+      const diagArg = argumento ? argumento.replace('--json', '').trim() : null;
+      await diagnostico(diagArg, diagFlags);
     } else if (primero === '4' || primero === '/embeddings' || primero === 'embeddings') {
       await embeddingsCmd(argumento ? argumento.split(' ') : []);
     } else if (primero === '5' || primero === '/vocabulario' || primero === 'vocabulario') {
@@ -1083,7 +1183,8 @@ async function iniciarTUI() {
     } else if (primero === '6' || primero === '/popularidad' || primero === 'popularidad') {
       await popularidad();
     } else if (primero === '7' || primero === '/suite' || primero === 'suite') {
-      await suite(['--rapida']);
+      const suiteFlags = argumento ? argumento.split(' ') : ['--rapida'];
+      await suite(suiteFlags);
     } else if (primero === '/descripciones' || primero === 'descripciones') {
       correr('scripts/generar_descripciones.js', argumento ? [argumento] : []);
     } else if (primero === '/buscar' || primero === 'buscar') {
@@ -1118,7 +1219,7 @@ const flags = rest.filter(a => a.startsWith('--'));
     case 'estado': case 'status':        return await estado();
     case 'buscar': case 'search':        return await buscar(resto.join(' '));
     case 'coseno': case 'vectores':      return await coseno(resto.join(' '));
-    case 'diag':                         return await diagnostico(resto.join(' '));
+    case 'diag':                         return await diagnostico(resto.join(' '), flags);
     case 'suite':                        return await suite(flags);
     case 'medir': case 'bench':          return correr('scripts/_test_coloquial.js', flags) ? 0 : 1;
     case 'regresion': case 'regression': return correr('scripts/_test_busqueda_50.js') ? 0 : 1;
