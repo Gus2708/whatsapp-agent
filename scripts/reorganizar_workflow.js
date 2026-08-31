@@ -15,49 +15,52 @@ const wf = JSON.parse(fs.readFileSync(wfPath, 'utf8'));
 
 // 1. Mapeo de Posiciones Limpias y Alineadas en Grid
 const POSITIONS = {
-  // --- ZONA 1: Ingesta & Seguridad (x: -260 .. 580, y: 80 .. 640) ---
+  // --- ZONA 1: Ingesta, Seguridad & Comandos Admin (x: -240 .. 800) ---
   "Webhook Trigger": [ -200, 260 ],
-  "¿Mensaje Saliente?": [ 40, 260 ],
-  "Detectar Handoff Empleado": [ 260, 140 ],
-  "Descartar": [ 480, 140 ], // Descartar salientes
-  "Es Cliente Real?": [ 260, 380 ],
-  "Filtro Anti-Duplicado": [ 480, 380 ],
+  "¿Mensaje Saliente?": [ 20, 260 ],
+  "Detectar Handoff Empleado": [ 240, 140 ],
+  "Descartar": [ 460, 140 ],
+  "¿Es Comando Admin?": [ 240, 380 ],
+  "Procesar Comando Admin": [ 460, 520 ],
+  "Send Admin Reply": [ 680, 520 ],
+  "Es Cliente Real?": [ 460, 380 ],
+  "Filtro Anti-Duplicado": [ 680, 380 ],
 
-  // --- ZONA 2: Pre-Procesamiento, Transcripción & Sesión (x: 620 .. 1560, y: 80 .. 640) ---
-  "Debounce Ráfaga": [ 700, 380 ],
-  "Transcribir Nota de Voz": [ 920, 380 ],
-  "Is Text Message?": [ 1140, 380 ],
-  "Reply Non-Text": [ 1140, 160 ],
-  "Check Chat Session": [ 1360, 380 ],
-  "Rate Limited?": [ 1580, 380 ],
-  "Rate Limit Drop": [ 1580, 160 ],
-  "Is Manual Handover?": [ 1800, 380 ],
-  "Manual Handover Active": [ 1800, 160 ],
-  "Cliente Memoria": [ 2020, 380 ],
+  // --- ZONA 2: Pre-Procesamiento, Transcripción & Sesión (x: 840 .. 2320) ---
+  "Debounce Ráfaga": [ 900, 380 ],
+  "Transcribir Nota de Voz": [ 1120, 380 ],
+  "Is Text Message?": [ 1340, 380 ],
+  "Reply Non-Text": [ 1340, 160 ],
+  "Check Chat Session": [ 1560, 380 ],
+  "Rate Limited?": [ 1780, 380 ],
+  "Rate Limit Drop": [ 1780, 160 ],
+  "Is Manual Handover?": [ 2000, 380 ],
+  "Manual Handover Active": [ 2000, 160 ],
+  "Cliente Memoria": [ 2220, 380 ],
 
-  // --- ZONA 3: Agente de IA & Herramientas Especializadas (x: 2180 .. 3180, y: 80 .. 980) ---
-  "AI Agent": [ 2260, 380 ],
-  "Sanitize Agent Output": [ 2520, 380 ],
+  // --- ZONA 3: Agente de IA & Herramientas Especializadas (x: 2360 .. 3140) ---
+  "AI Agent": [ 2460, 380 ],
+  "Sanitize Agent Output": [ 2720, 380 ],
   // Sub-nodos del AI Agent
-  "OpenRouter Chat Model": [ 2040, 580 ],
-  "Simple Memory": [ 2180, 580 ],
-  "buscar_productos_tool": [ 2320, 580 ],
-  "hacer_presupuesto_tool": [ 2460, 580 ],
-  "obtener_tasa_bcv_tool": [ 2600, 580 ],
-  "buscar_memoria_engram_tool": [ 2320, 740 ],
-  "guardar_memoria_engram_tool": [ 2460, 740 ],
+  "OpenRouter Chat Model": [ 2240, 580 ],
+  "Simple Memory": [ 2380, 580 ],
+  "buscar_productos_tool": [ 2520, 580 ],
+  "hacer_presupuesto_tool": [ 2660, 580 ],
+  "obtener_tasa_bcv_tool": [ 2800, 580 ],
+  "buscar_memoria_engram_tool": [ 2520, 740 ],
+  "guardar_memoria_engram_tool": [ 2660, 740 ],
 
-  // --- ZONA 4: Enrutamiento de Salida & Despacho WAHA (x: 2700 .. 3600, y: 80 .. 760) ---
-  "Check Escalation": [ 2800, 380 ],
+  // --- ZONA 4: Enrutamiento de Salida & Despacho WAHA (x: 3180 .. 4060) ---
+  "Check Escalation": [ 3240, 380 ],
   // Rama Escalación
-  "Set Chat Manual": [ 3040, 200 ],
-  "Send Handover Message": [ 3280, 140 ],
-  "Registrar Atencion Pendiente": [ 3280, 260 ],
+  "Set Chat Manual": [ 3480, 200 ],
+  "Send Handover Message": [ 3720, 140 ],
+  "Registrar Atencion Pendiente": [ 3720, 260 ],
   // Rama Ayuda / Normal
-  "Check Pedir Ayuda": [ 3040, 480 ],
-  "Registrar Solicitud Ayuda": [ 3280, 420 ],
-  "Send Bridge Message": [ 3500, 420 ],
-  "Send Agent Response": [ 3280, 560 ]
+  "Check Pedir Ayuda": [ 3480, 480 ],
+  "Registrar Solicitud Ayuda": [ 3720, 420 ],
+  "Send Bridge Message": [ 3940, 420 ],
+  "Send Agent Response": [ 3720, 560 ]
 };
 
 // 2. Sanitizar credenciales en nodos de código
@@ -70,9 +73,7 @@ const cleanSupabaseVars = (code) => {
 };
 
 // 3. Aplicar posiciones y sanitización a los nodos existentes
-const existingNodeNames = new Set();
 wf.nodes.forEach(node => {
-  existingNodeNames.add(node.name);
   if (POSITIONS[node.name]) {
     node.position = POSITIONS[node.name];
   }
@@ -93,9 +94,9 @@ wf.nodes.forEach(node => {
 const stickyNotes = [
   {
     parameters: {
-      content: "## 🟣 ZONA 1: Ingesta & Seguridad\n**Propósito:** Recepción de Webhook desde WAHA.\n- Filtro de mensajes salientes (fromMe) para detectar handoff humano.\n- Detección de chats de clientes válidos (ignora grupos y estados).\n- Filtro anti-duplicados por ID de mensaje.",
-      height: 560,
-      width: 780,
+      content: "## 🟣 ZONA 1: Ingesta, Seguridad & Comandos Admin\n**Propósito:** Recepción de Webhook desde WAHA.\n- Filtro de mensajes salientes (fromMe) para detectar handoff humano.\n- 🛠️ **Comandos WhatsApp Admin:** `/feedback <SKU>`, `/corregir`, `/status`.\n- Detección de chats de clientes válidos (ignora grupos y estados).\n- Filtro anti-duplicados por ID de mensaje.",
+      height: 600,
+      width: 1040,
       color: 4
     },
     id: "sticky_zona_1",
@@ -107,7 +108,7 @@ const stickyNotes = [
   {
     parameters: {
       content: "## 🟡 ZONA 2: Pre-Procesamiento & Sesión\n**Propósito:** Preparación y normalización del mensaje.\n- Debounce de ráfagas rápidas de mensajes del cliente.\n- Transcripción de notas de voz con **Groq Whisper**.\n- Verificación de sesión de chat, control de tasa (10 msg/min) y reactivación tras 30 min.\n- Carga de memoria del cliente desde Supabase y Engram.",
-      height: 560,
+      height: 600,
       width: 1480,
       color: 2
     },
@@ -115,7 +116,7 @@ const stickyNotes = [
     name: "Sticky Note - Preprocesamiento",
     type: "n8n-nodes-base.stickyNote",
     typeVersion: 1,
-    position: [ 640, 60 ]
+    position: [ 840, 60 ]
   },
   {
     parameters: {
@@ -128,7 +129,7 @@ const stickyNotes = [
     name: "Sticky Note - Agente IA",
     type: "n8n-nodes-base.stickyNote",
     typeVersion: 1,
-    position: [ 1980, 60 ]
+    position: [ 2360, 60 ]
   },
   {
     parameters: {
@@ -141,7 +142,7 @@ const stickyNotes = [
     name: "Sticky Note - Despacho",
     type: "n8n-nodes-base.stickyNote",
     typeVersion: 1,
-    position: [ 2740, 60 ]
+    position: [ 3180, 60 ]
   }
 ];
 

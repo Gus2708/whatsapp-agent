@@ -51,7 +51,7 @@
       "id": "filter_text_node",
       "name": "Is Text Message?",
       "position": [
-        1140,
+        1340,
         380
       ],
       "type": "n8n-nodes-base.if",
@@ -79,7 +79,7 @@
       "id": "reply_non_text_node",
       "name": "Reply Non-Text",
       "position": [
-        1140,
+        1340,
         160
       ],
       "type": "n8n-nodes-base.httpRequest",
@@ -92,7 +92,7 @@
       "id": "postgres_session_node",
       "name": "Check Chat Session",
       "position": [
-        1360,
+        1560,
         380
       ],
       "type": "n8n-nodes-base.code",
@@ -126,7 +126,7 @@
       "id": "rate_limit_node",
       "name": "Rate Limited?",
       "position": [
-        1580,
+        1780,
         380
       ],
       "type": "n8n-nodes-base.if",
@@ -137,7 +137,7 @@
       "id": "rate_limit_noop",
       "name": "Rate Limit Drop",
       "position": [
-        1580,
+        1780,
         160
       ],
       "type": "n8n-nodes-base.noOp",
@@ -179,7 +179,7 @@
       "id": "if_manual_node",
       "name": "Is Manual Handover?",
       "position": [
-        1800,
+        2000,
         380
       ],
       "type": "n8n-nodes-base.if",
@@ -196,7 +196,7 @@
       "id": "ai_agent_node",
       "name": "AI Agent",
       "position": [
-        2260,
+        2460,
         380
       ],
       "type": "@n8n/n8n-nodes-langchain.agent",
@@ -212,7 +212,7 @@
       "id": "openrouter_model_node",
       "name": "OpenRouter Chat Model",
       "position": [
-        2040,
+        2240,
         580
       ],
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
@@ -230,7 +230,7 @@
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
       "typeVersion": 1.3,
       "position": [
-        2180,
+        2380,
         580
       ],
       "parameters": {
@@ -266,7 +266,7 @@
       "id": "if_escalar_node",
       "name": "Check Escalation",
       "position": [
-        2800,
+        3240,
         380
       ],
       "type": "n8n-nodes-base.if",
@@ -279,7 +279,7 @@
       "id": "postgres_set_manual_node",
       "name": "Set Chat Manual",
       "position": [
-        3040,
+        3480,
         200
       ],
       "type": "n8n-nodes-base.code",
@@ -308,7 +308,7 @@
       "id": "waha_handover_node",
       "name": "Send Handover Message",
       "position": [
-        3280,
+        3720,
         140
       ],
       "type": "n8n-nodes-base.httpRequest",
@@ -335,7 +335,7 @@
       "id": "waha_agent_node",
       "name": "Send Agent Response",
       "position": [
-        3280,
+        3720,
         560
       ],
       "type": "n8n-nodes-base.httpRequest",
@@ -347,7 +347,7 @@
       "id": "manual_handover_noop",
       "name": "Manual Handover Active",
       "position": [
-        1800,
+        2000,
         160
       ],
       "type": "n8n-nodes-base.noOp",
@@ -359,7 +359,7 @@
       "type": "@n8n/n8n-nodes-langchain.toolCode",
       "typeVersion": 1.3,
       "position": [
-        2320,
+        2520,
         580
       ],
       "parameters": {
@@ -379,7 +379,7 @@
       "type": "@n8n/n8n-nodes-langchain.toolCode",
       "typeVersion": 1.3,
       "position": [
-        2600,
+        2800,
         580
       ],
       "parameters": {
@@ -399,7 +399,7 @@
       "type": "@n8n/n8n-nodes-langchain.toolCode",
       "typeVersion": 1.3,
       "position": [
-        2320,
+        2520,
         740
       ],
       "parameters": {
@@ -419,7 +419,7 @@
       "type": "@n8n/n8n-nodes-langchain.toolCode",
       "typeVersion": 1.3,
       "position": [
-        2460,
+        2660,
         740
       ],
       "parameters": {
@@ -439,7 +439,7 @@
       "type": "@n8n/n8n-nodes-langchain.toolCode",
       "typeVersion": 1.3,
       "position": [
-        2460,
+        2660,
         580
       ],
       "parameters": {
@@ -460,7 +460,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2020,
+        2220,
         380
       ],
       "onError": "continueRegularOutput"
@@ -472,7 +472,7 @@
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        480,
+        460,
         140
       ]
     },
@@ -532,7 +532,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        260,
+        460,
         380
       ]
     },
@@ -545,7 +545,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        480,
+        680,
         380
       ],
       "onError": "continueRegularOutput"
@@ -557,7 +557,7 @@
       "id": "code_registrar_atencion_node",
       "name": "Registrar Atencion Pendiente",
       "position": [
-        3280,
+        3720,
         260
       ],
       "type": "n8n-nodes-base.code",
@@ -591,7 +591,7 @@
       "id": "if_pedir_ayuda_node",
       "name": "Check Pedir Ayuda",
       "position": [
-        3040,
+        3480,
         480
       ],
       "type": "n8n-nodes-base.if",
@@ -604,7 +604,7 @@
       "id": "code_registrar_solicitud_node",
       "name": "Registrar Solicitud Ayuda",
       "position": [
-        3280,
+        3720,
         420
       ],
       "type": "n8n-nodes-base.code",
@@ -633,7 +633,7 @@
       "id": "waha_bridge_node",
       "name": "Send Bridge Message",
       "position": [
-        3500,
+        3940,
         420
       ],
       "type": "n8n-nodes-base.httpRequest",
@@ -645,7 +645,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        920,
+        1120,
         380
       ],
       "parameters": {
@@ -659,7 +659,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2520,
+        2720,
         380
       ],
       "parameters": {
@@ -695,7 +695,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        40,
+        20,
         260
       ]
     },
@@ -706,7 +706,7 @@
       "id": "detector_handoff_node",
       "name": "Detectar Handoff Empleado",
       "position": [
-        260,
+        240,
         140
       ],
       "type": "n8n-nodes-base.code",
@@ -719,7 +719,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        700,
+        900,
         380
       ],
       "parameters": {
@@ -728,9 +728,84 @@
     },
     {
       "parameters": {
-        "content": "## 🟣 ZONA 1: Ingesta & Seguridad\n**Propósito:** Recepción de Webhook desde WAHA.\n- Filtro de mensajes salientes (fromMe) para detectar handoff humano.\n- Detección de chats de clientes válidos (ignora grupos y estados).\n- Filtro anti-duplicados por ID de mensaje.",
-        "height": 560,
-        "width": 780,
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "is_admin_check",
+              "leftValue": "={{ ((typeof $env !== 'undefined' && $env.ADMIN_PHONE_NUMBERS) || '').split(',').map(n => n.trim().replace(/[^0-9]/g, '')).filter(Boolean).some(adm => (($json.body.payload ? $json.body.payload.from : $json.body.from) || '').replace(/[^0-9]/g, '').endsWith(adm)) && (($json.body.payload ? ($json.body.payload.body || '') : ($json.body.body || '')).trim().startsWith('/')) }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "id": "if_admin_node",
+      "name": "¿Es Comando Admin?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        240,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Procesador de Comandos de Administrador (/feedback, /corregir, /status)\nconst axios = require('axios');\nconst SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || (typeof process !== 'undefined' && process.env.SUPABASE_URL) || '';\nconst ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || (typeof process !== 'undefined' && process.env.SUPABASE_ANON_KEY) || '';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\n\nconst sender = ($json.body.payload ? $json.body.payload.from : $json.body.from) || '';\nconst text = ($json.body.payload ? ($json.body.payload.body || $json.body.payload.caption || '') : ($json.body.body || '')) || '';\nconst trimmed = text.trim();\n\nlet reply = '';\n\ntry {\n  const isStatus = /^\\/(status|estado|tasa|ayuda|help)\\b/i.test(trimmed);\n  const match = trimmed.match(/^\\/(?:feedback|corregir|aprender)\\s+([a-zA-Z0-9_\\-]+)(?:\\s+(.+))?$/i);\n\n  if (isStatus) {\n    let tasa = 'N/A';\n    try {\n      const resT = await axios.get(SB + '/rest/v1/tazas?id=eq.1&select=monto', { headers: H });\n      if (resT.data && resT.data[0]) tasa = resT.data[0].monto;\n    } catch (e) {}\n\n    let ultimosFallos = [];\n    try {\n      const resF = await axios.get(SB + '/rest/v1/automejora_logs?order=creado_en.desc&limit=3&select=consulta,estado', { headers: H });\n      ultimosFallos = resF.data || [];\n    } catch (e) {}\n\n    reply = '📊 *[Estado del Sistema - SerruchoBot]*\\n\\n' +\n      '💵 *Tasa BCV:* ' + tasa + ' Bs/$\\n' +\n      '🤖 *Motor:* GPT-5.6 Luna / Claude Sonnet 5\\n\\n' +\n      '🚨 *Últimas Búsquedas con Falla:*\\n' +\n      (ultimosFallos.length > 0\n        ? ultimosFallos.map((f, i) => (i + 1) + '. \"' + f.consulta + '\" (' + (f.estado || 'sin_resolver') + ')').join('\\n')\n        : '• Ninguna falla reciente registrada.') +\n      '\\n\\n💡 *Comandos disponibles:*\\n' +\n      '• `/feedback <SKU> <consulta>` ➔ Vincula un producto a una búsqueda.\\n' +\n      '• `/feedback <SKU>` ➔ Vincula al último cliente con falla.';\n  } else if (match) {\n    const sku = match[1].trim();\n    let consulta = (match[2] || '').trim();\n    let logId = null;\n\n    if (!consulta) {\n      try {\n        const resLog = await axios.get(SB + '/rest/v1/automejora_logs?order=creado_en.desc&limit=1', { headers: H });\n        if (resLog.data && resLog.data[0]) {\n          consulta = resLog.data[0].consulta || '';\n          logId = resLog.data[0].id;\n        }\n      } catch (e) {}\n    }\n\n    if (!consulta) {\n      reply = '⚠️ No se encontró una búsqueda reciente para asociar al SKU *' + sku + '*. Indica la consulta completa:\\n\\nEjemplo:\\n`/feedback ' + sku + ' nombre del producto que pidio el cliente`';\n    } else {\n      let prod = null;\n      try {\n        const resP = await axios.get(SB + '/rest/v1/productos?or=(codigo_interno.eq.' + encodeURIComponent(sku) + ',codigo_barras.eq.' + encodeURIComponent(sku) + ')&select=*', { headers: H });\n        if (resP.data && resP.data[0]) prod = resP.data[0];\n      } catch (e) {}\n\n      if (!prod) {\n        reply = '❌ No se encontró ningún producto con SKU *' + sku + '* en Supabase. Verifica el código e intenta nuevamente.';\n      } else {\n        // Upsert en catalogo_vocabulario con maxima confianza (10)\n        try {\n          const payloadVoc = {\n            termino: consulta.toLowerCase().trim(),\n            canonico: prod.descripcion.toLowerCase().trim(),\n            categoria: 'feedback_admin_whatsapp',\n            origen: 'admin_whatsapp',\n            confianza: 10,\n            activo: true\n          };\n          await axios.post(SB + '/rest/v1/catalogo_vocabulario', payloadVoc, {\n            headers: { ...H, Prefer: 'resolution=merge-duplicates' }\n          });\n        } catch (eVoc) {}\n\n        // Actualizar automejora_logs\n        if (logId) {\n          try {\n            await axios.patch(SB + '/rest/v1/automejora_logs?id=eq.' + logId, {\n              estado: 'corregido_por_admin',\n              solucion_propuesta: {\n                sku_corregido: prod.codigo_interno,\n                descripcion: prod.descripcion,\n                origen: 'admin_whatsapp_command'\n              }\n            }, { headers: H });\n          } catch (eLog) {}\n        }\n\n        reply = '🛠️ *[Feedback Aplicado por Admin]*\\n\\n' +\n          '✅ *Producto Vinculado:*\\n' +\n          '• SKU: *' + prod.codigo_interno + '*\\n' +\n          '• Descripción: ' + prod.descripcion + '\\n' +\n          '• Precio: $' + prod.precio_venta + ' | Stock: ' + prod.existencia + ' unid.\\n\\n' +\n          '📝 *Regla de Búsqueda Aprendida:*\\n' +\n          '• Consulta: \"' + consulta + '\"\\n' +\n          '• Equivalencia: \"' + prod.descripcion.toLowerCase() + '\"\\n' +\n          '• Confianza: 10/10 ⭐ (Prioridad Máxima Admin)\\n\\n' +\n          'El motor de búsqueda ya responderá automáticamente con este producto. 🪚';\n      }\n    }\n  } else {\n    reply = '⚠️ Comando no reconocido. Usa `/feedback <SKU> [consulta]` o `/status`.';\n  }\n} catch (err) {\n  reply = '❌ Error procesando feedback: ' + err.message;\n}\n\nreturn [{\n  json: {\n    sender,\n    reply,\n    session: 'default'\n  }\n}];"
+      },
+      "id": "process_admin_command_node",
+      "name": "Procesar Comando Admin",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        520
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha_serrucho:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{ $env.WAHA_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ session: 'default', chatId: $json.sender, text: $json.reply }) }}",
+        "options": {}
+      },
+      "id": "send_admin_reply_node",
+      "name": "Send Admin Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        680,
+        520
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "## 🟣 ZONA 1: Ingesta, Seguridad & Comandos Admin\n**Propósito:** Recepción de Webhook desde WAHA.\n- Filtro de mensajes salientes (fromMe) para detectar handoff humano.\n- 🛠️ **Comandos WhatsApp Admin:** `/feedback <SKU>`, `/corregir`, `/status`.\n- Detección de chats de clientes válidos (ignora grupos y estados).\n- Filtro anti-duplicados por ID de mensaje.",
+        "height": 600,
+        "width": 1040,
         "color": 4
       },
       "id": "sticky_zona_1",
@@ -745,7 +820,7 @@
     {
       "parameters": {
         "content": "## 🟡 ZONA 2: Pre-Procesamiento & Sesión\n**Propósito:** Preparación y normalización del mensaje.\n- Debounce de ráfagas rápidas de mensajes del cliente.\n- Transcripción de notas de voz con **Groq Whisper**.\n- Verificación de sesión de chat, control de tasa (10 msg/min) y reactivación tras 30 min.\n- Carga de memoria del cliente desde Supabase y Engram.",
-        "height": 560,
+        "height": 600,
         "width": 1480,
         "color": 2
       },
@@ -754,7 +829,7 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        640,
+        840,
         60
       ]
     },
@@ -770,7 +845,7 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        1980,
+        2360,
         60
       ]
     },
@@ -786,7 +861,7 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        2740,
+        3180,
         60
       ]
     }
@@ -1092,7 +1167,7 @@
         ],
         [
           {
-            "node": "Es Cliente Real?",
+            "node": "¿Es Comando Admin?",
             "type": "main",
             "index": 0
           }
@@ -1115,6 +1190,35 @@
         [
           {
             "node": "Transcribir Nota de Voz",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Es Comando Admin?": {
+      "main": [
+        [
+          {
+            "node": "Procesar Comando Admin",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Es Cliente Real?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Procesar Comando Admin": {
+      "main": [
+        [
+          {
+            "node": "Send Admin Reply",
             "type": "main",
             "index": 0
           }

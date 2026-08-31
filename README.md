@@ -251,6 +251,19 @@ Para desplegar o actualizar el workflow de automejora en tu instancia de n8n:
 node scripts/crear_workflow_automejora.js
 ```
 
+### 📱 Comandos de Feedback y Control por WhatsApp para Administradores
+
+Los administradores autorizados en `ADMIN_PHONE_NUMBERS` pueden interactuar directamente con el bot por WhatsApp para corregir búsquedas fallidas y consultar métricas:
+
+| Comando WhatsApp | Descripción | Ejemplo |
+| :--- | :--- | :--- |
+| `/feedback <SKU> <consulta>` | Vincula una búsqueda coloquial directamente a un SKU con confianza máxima (10/10). | `/feedback 01726 disco diamantado para concreto 7` |
+| `/feedback <SKU>` | Vincula el SKU especificado a la **última búsqueda fallida** de forma automática. | `/feedback 01726` |
+| `/corregir <SKU>` | Alias de `/feedback`. | `/corregir 01726` |
+| `/status` o `/estado` | Muestra el estado del sistema, tasa BCV actual y las últimas 3 fallas registradas. | `/status` |
+
+> 🔒 **Seguridad**: Solo los números incluidos en la variable `ADMIN_PHONE_NUMBERS` pueden ejecutar comandos `/`; los clientes normales que envíen texto que empiece con `/` son procesados de forma habitual.
+
 ---
 
 ## ⚙️ Configuración
