@@ -316,6 +316,18 @@ async function getTasa(){ try { const r = await axios.get(SB+'/rest/v1/tazas?nom
 
 const { p_busqueda } = query;
 
+function triggerAutomejora(motivo, extra){
+  try {
+    axios.post('http://127.0.0.1:5678/webhook/automejora-busqueda', {
+      p_busqueda,
+      query_normalizada: typeof _pb !== 'undefined' ? _pb : p_busqueda,
+      motivo,
+      extra: extra || null,
+      timestamp: new Date().toISOString()
+    }, { timeout: 2000 }).catch(() => {});
+  } catch (e) {}
+}
+
 const IGNORED = new Set([
   'de', 'y', 'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'o', 'que', 'es', 'son', 'me', 'te', 'se', 'le', 'les', 'lo', 'mi', 'tu', 'su', 'ya', 'si', 'no', 'en', 'pero', 'aunque', 'entonces',
   'bs', 'bolivares', 'bolivar', 'dolar', 'dolares', 'divisas', 'usd',
@@ -623,7 +635,10 @@ if (res.length===0){
       }
     }
   }
-  if (res.length===0) return JSON.stringify({ encontrados:0, instruccion:'NO encontre este producto. Tu UNICA respuesta valida ahora es el token [PEDIR_AYUDA] (escribelo solo, exactamente asi, sin saludo ni nada mas). PROHIBIDO sugerir alternativas, pedir que reformule o decir que no lo tenemos: un empleado lo elegira y se lo enviara al cliente.', mensaje:'No encontre "' + p_busqueda + '" en el catalogo.' });
+  if (res.length===0) {
+    triggerAutomejora('encontrados_cero');
+    return JSON.stringify({ encontrados:0, instruccion:'NO encontre este producto. Tu UNICA respuesta valida ahora es el token [PEDIR_AYUDA] (escribelo solo, exactamente asi, sin saludo ni nada mas). PROHIBIDO sugerir alternativas, pedir que reformule o decir que no lo tenemos: un empleado lo elegira y se lo enviara al cliente.', mensaje:'No encontre "' + p_busqueda + '" en el catalogo.' });
+  }
 }
 
 // PERIFRASIS: el cliente describe PARA QUE sirve en vez de nombrarlo ("lo que se usa para
@@ -1004,6 +1019,7 @@ if (_rescate){
   _out.rescate = _rescate.categoria;
   _out.instruccion = 'OJO: el cliente NO uso las palabras del catalogo, asi que INTERPRETE que se refiere a "' + _rescate.categoria + '". Es una HIPOTESIS, no una certeza. Muestrale estas opciones PREGUNTANDOLE primero si a eso se referia (ej. "¿te refieres a ...?"). NO lo des por confirmado ni le cotices como si lo hubiera pedido asi. Si te dice que no es eso, responde SOLO con el token [PEDIR_AYUDA].';
 } else if (_weak){
+  triggerAutomejora('weak_match_otra_categoria', { unicos_top: unicos.slice(0, 3).map(u => u.descripcion) });
   if (await esNoVendido()) return NO_VENDIDO_JSON();
   _out.instruccion = 'Lo que encontré NO coincide con lo que pidió el cliente (es de OTRA categoría o medida; coincidió de casualidad). NO lo ofrezcas como si fuera lo que pidió ni sugieras otra cosa: responde SOLO con el token [PEDIR_AYUDA].';
 } else if (medMismatch){
