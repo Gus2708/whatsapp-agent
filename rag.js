@@ -758,10 +758,84 @@ async function suite(flags) {
 
 // ───────────────────────────────────────────────────────────────────── popularidad
 async function popularidad() {
+  cabecera('RANKING POR VENTAS', 'popularidad en vivo');
+  const spin = cargando();
+  spin.paso('recalculando ranking en base de datos…');
+
   const r = await fetch(`${SB}/rest/v1/rpc/refrescar_popularidad_reciente`, { method: 'POST', headers: H, body: '{}' });
   const t = await r.text();
-  if (!r.ok) { console.log(' ' + GL.err + ' falló: ' + t.slice(0, 160)); return 1; }
-  console.log(' ' + GL.ok + ' ' + c.bold('Ranking recalculado:') + ' ' + c.num(num(t)) + c.gray(' productos con historial de venta'));
+  if (!r.ok) {
+    spin.fin();
+    console.log(' ' + GL.err + ' falló recálculo: ' + t.slice(0, 160));
+    return 1;
+  }
+
+  spin.paso('consultando productos líderes en ventas…');
+  // Consultar el top 10 productos con mayor score
+  const rPop = await (await fetch(`${SB}/rest/v1/producto_popularidad?select=codigo_interno,score,facturas_90d,facturas_365d,ultima_venta&order=score.desc&limit=10`, { headers: H })).json();
+  const codigos = rPop.map(p => p.codigo_interno);
+  const rProd = await (await fetch(`${SB}/rest/v1/productos?select=codigo_interno,descripcion,existencia&codigo_interno=in.(${encodeURIComponent(codigos.join(','))})`, { headers: H })).json();
+  spin.fin();
+
+  const mapProd = new Map(rProd.map(p => [p.codigo_interno, p]));
+
+  console.log(' ' + GL.ok + ' ' + c.bold('Ranking recalculado:') + ' ' + c.cyan(num(t)) + c.gray(' productos activos con historial de venta'));
+  console.log(' ' + c.darkGray('Fórmula: score pondera facturas recientes (90d) sobre anuales (365d) para hundir stock fantasma.'));
+
+  console.log('\n ' + c.claude('◆') + ' ' + c.bold(c.num('Top 10 Productos Más Vendidos (Líderes de Popularidad):')));
+  console.log(' ' + c.darkGray('─'.repeat(W + 20)));
+
+  for (let i = 0; i < rPop.length; i++) {
+    const pop = rPop[i];
+    const prod = mapProd.get(pop.codigo_interno) || { descripcion: '—', existencia: 0 };
+    const stockNum = Number(prod.existencia) || 0;
+    const stockBadge = stockNum > 0 ? c.ok(`[STOCK: ${stockNum}]`) : c.err(`[STOCK: ${stockNum}]`);
+    const numFmt = padL(String(i + 1), 2);
+
+    console.log(`  ${c.cyan(numFmt + '.')} ${c.bold(c.num(pad((prod.descripcion || '').slice(0, 38), 40)))} ${stockBadge}`);
+    console.log(`      ${c.darkGray('⎿')} ${c.gray('Score:')} ${c.claude(pop.score.toFixed(2))}  ${c.darkGray('│')}  ${c.gray('Facturas 90d:')} ${c.num(num(pop.facturas_90d))}  ${c.darkGray('│')}  ${c.gray('Facturas 365d:')} ${c.num(num(pop.facturas_365d))}  ${c.darkGray('│')}  ${c.darkGray('Código:')} ${pop.codigo_interno}`);
+  }
+  console.log('');
+  return 0;
+}
+
+// ───────────────────────────────────────────────────────────────────── vocabulario (vista y explorador en vivo)
+async function vocabulario(filtro) {
+  cabecera('DICCIONARIO COLOQUIAL', 'términos y categorías');
+  const spin = cargando();
+  spin.paso('consultando catálogo de vocabulario…');
+
+  const [rTotal, rCats, rMuestras] = await Promise.all([
+    fetch(`${SB}/rest/v1/catalogo_vocabulario?select=categoria`, { headers: { ...H, Prefer: 'count=exact' } }),
+    fetch(`${SB}/rest/v1/catalogo_vocab_categorias?select=categoria,productos,terminos&order=terminos.desc&limit=10`, { headers: H }),
+    fetch(`${SB}/rest/v1/catalogo_vocabulario?select=termino,canonico,categoria,confianza${filtro ? `&categoria=ilike.*${filtro}*` : ''}&order=confianza.desc&limit=12`, { headers: H }),
+  ]);
+
+  const totalTerminos = (rTotal.headers.get('content-range') || '').split('/')[1] || '0';
+  const categoriasTop = await rCats.json();
+  const muestras = await rMuestras.json();
+  spin.fin();
+
+  console.log(' ' + GL.ok + ' ' + c.bold('Términos activos en Supabase:') + ' ' + c.cyan(num(totalTerminos)) + c.gray(' modismos, marcas y sinónimos coloquiales'));
+  console.log(' ' + c.darkGray('Resuelve cómo habla el cliente (ej: "chapa", "perica", "foco") hacia palabras del catálogo.'));
+
+  console.log('\n ' + c.claude('◆') + ' ' + c.bold(c.num('Categorías con mayor cobertura de modismos:')));
+  console.log(' ' + c.darkGray('─'.repeat(W + 20)));
+
+  for (const cat of (categoriasTop || []).slice(0, 6)) {
+    console.log(`  ${c.cyan('›')} ${c.bold(c.num(pad(cat.categoria, 18)))} ${c.gray(pad(`${cat.terminos} términos coloquiales`, 28))} ${c.darkGray(`(${cat.productos} productos en catálogo)`)}`);
+  }
+
+  console.log('\n ' + c.claude('◆') + ' ' + c.bold(c.num(filtro ? `Muestras encontradas para "${filtro}":` : 'Ejemplos de Mapeo Coloquial en Vivo (Cliente → Catálogo):')));
+  console.log(' ' + c.darkGray('─'.repeat(W + 20)));
+
+  for (const m of (muestras || [])) {
+    const estrellas = '★'.repeat(m.confianza || 5);
+    console.log(`  ${c.gray('Cliente:')} ${c.bold(c.claude(pad(`"${m.termino}"`, 24)))} ${c.darkGray('→')}  ${c.gray('Catálogo:')} ${c.bold(c.num(pad(`"${m.canonico}"`, 22)))} ${c.darkGray(`[${m.categoria}]`)} ${c.warn(estrellas)}`);
+  }
+
+  console.log('\n ' + c.darkGray('Para regenerar nuevos términos con IA usa: ') + c.cyan('node rag.js vocabulario --full') + c.darkGray(' o ') + c.cyan('--dry'));
+  console.log('');
   return 0;
 }
 
@@ -867,7 +941,11 @@ async function iniciarTUI() {
     } else if (primero === '4' || primero === '/embeddings' || primero === 'embeddings') {
       correr('scripts/generar_embeddings.js', argumento ? [argumento] : []);
     } else if (primero === '5' || primero === '/vocabulario' || primero === 'vocabulario') {
-      correr('scripts/generar_vocabulario.js', argumento ? [argumento] : []);
+      if (argumento && (argumento.includes('--') || argumento.includes('generar'))) {
+        correr('scripts/generar_vocabulario.js', argumento ? argumento.split(' ') : []);
+      } else {
+        await vocabulario(argumento || null);
+      }
     } else if (primero === '6' || primero === '/popularidad' || primero === 'popularidad') {
       await popularidad();
     } else if (primero === '7' || primero === '/suite' || primero === 'suite') {
@@ -914,7 +992,7 @@ const flags = rest.filter(a => a.startsWith('--'));
     case 'fallos':                       return correr('scripts/_test_fallos_reales.js', ['--prod']) ? 0 : 1;
     case 'auditar': case 'audit':        return correr('scripts/_audit_sin.js', flags) ? 0 : 1;
     case 'embeddings':                   return correr('scripts/generar_embeddings.js', flags) ? 0 : 1;
-    case 'vocabulario':                  return correr('scripts/generar_vocabulario.js', flags) ? 0 : 1;
+    case 'vocabulario':                  return flags.length || resto.length ? (correr('scripts/generar_vocabulario.js', rest) ? 0 : 1) : await vocabulario();
     case 'descripciones':                return correr('scripts/generar_descripciones.js', rest) ? 0 : 1;
     case 'popularidad':                  return await popularidad();
     case 'desplegar': case 'deploy':     return correr('scripts/deploy_nodos.js', flags) ? 0 : 1;
