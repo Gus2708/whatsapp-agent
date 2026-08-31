@@ -17,7 +17,7 @@ const ROOT = path.join(__dirname, '..');
 const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
 const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || '').trim();
 
-const SB = pick('SUPABASE_URL') || 'https://rgniqjfooifchyctnbzu.supabase.co';
+const SB = pick('SUPABASE_URL') || pick('SUPABASE_URL');
 const ANON = pick('SUPABASE_ANON_KEY');
 // .env manda, pero se acepta la variable de entorno para probar sin tocar el archivo
 const OAI = pick('OPENAI_API_KEY') || (process.env.OPENAI_API_KEY || '').trim();

@@ -1,3 +1,9 @@
+const fs = require('fs');
+const path = require('path');
+const envPath = path.join(__dirname, '..', '.env');
+const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
+
 /**
  * Búsqueda de PRECISIÓN — relevancia primero, ventas solo como desempate.
  *  - scoreMatch(): +10 por palabra exacta, +5 por substring, +50 si coincide TODO
@@ -7,15 +13,15 @@
  *  - Prompt: conservar términos exactos del cliente (marcas/medidas/modelos)
  */
 const http = require('http');
-const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhOTE3NGNiNi02NTI1LTQyNmItOTAwNS0zMGJkZTFjYjE3NWMiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiNDc2YTBkOWItYzc3Ny00NjdlLWFkNDItM2RhMmU2NDUxZGZjIiwiaWF0IjoxNzgwNjg4NjcxfQ.r_Yu3KrJGTO6mSWVFZYihxFUbqnLzGJp7c0J5rOiSP0';
+const KEY = pick('N8N_API_KEY');
 const WF_ID = 'ugHOTQv3Vb6cuTct';
 function get(){return new Promise((res,rej)=>{http.get({hostname:'localhost',port:5678,path:`/api/v1/workflows/${WF_ID}`,headers:{'X-N8N-API-KEY':KEY}},r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>res(JSON.parse(d)));}).on('error',rej);});}
 function put(p){return new Promise((res,rej)=>{const b=JSON.stringify(p);const r=http.request({hostname:'localhost',port:5678,path:`/api/v1/workflows/${WF_ID}`,method:'PUT',headers:{'X-N8N-API-KEY':KEY,'Content-Type':'application/json','Content-Length':Buffer.byteLength(b)}},resp=>{let d='';resp.on('data',c=>d+=c);resp.on('end',()=>res({status:resp.statusCode,body:d}));});r.on('error',rej);r.write(b);r.end();});}
 function post(path){return new Promise((res,rej)=>{const b='{}';const r=http.request({hostname:'localhost',port:5678,path,method:'POST',headers:{'X-N8N-API-KEY':KEY,'Content-Type':'application/json','Content-Length':2}},resp=>{let d='';resp.on('data',c=>d+=c);resp.on('end',()=>res(resp.statusCode));});r.on('error',rej);r.write(b);r.end();});}
 
 const BLOQUE_COMUN = `
-const SB = 'https://rgniqjfooifchyctnbzu.supabase.co';
-const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';
+const SB = pick('SUPABASE_URL');
+const ANON = pick('SUPABASE_ANON_KEY');
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
 const RECARGO = 1.40;
 function nUSD(n){ const r = Math.round(Number(n)*100)/100; return Number.isInteger(r) ? String(r) : r.toFixed(2); }

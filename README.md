@@ -169,13 +169,31 @@ El instalador (`setup.js`) verifica Node/Git/Docker (instala con `winget` en Win
 | :--- | :--- |
 | `WAHA_DASHBOARD_USERNAME` / `WAHA_DASHBOARD_PASSWORD` | Login del panel de WAHA. |
 | `WAHA_API_KEY` | Clave que usan n8n ↔ WAHA para enviar mensajes. |
-| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | Base de datos en la nube. |
-| `OPENROUTER_API_KEY` | Inferencia del modelo (`openai/gpt-5.6-luna`). |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Base de datos en la nube (PostgreSQL + pgvector). |
+| `OPENROUTER_API_KEY` | Inferencia del modelo principal (`openai/gpt-5.6-luna`) y del motor de automejora (`anthropic/claude-sonnet-5`). |
+| `OPENAI_API_KEY` | Generación de embeddings vectoriales (`text-embedding-3-small`). |
 | `GROQ_API_KEY` | Transcripción de notas de voz (Whisper). |
 | `ENGRAM_HOST` | Servidor de memorias (por defecto `host.docker.internal:7437`). |
 | `N8N_API_KEY` | Solo para los scripts de desarrollo/despliegue (`scripts/patch_*.js`). |
+| `ADMIN_PHONE_NUMBERS` | Teléfonos de los administradores para recibir alertas y diagnósticos de automejora (separados por coma, ej. `584XXXXXXXXX@c.us,584YYYYYYYYY@c.us`). |
 
-> ⚠️ **Nunca subas el archivo `.env` al repositorio.** Ya está en `.gitignore`.
+> ⚠️ **Nunca subas el archivo `.env` al repositorio.** Ya está en `.gitignore`. Utiliza [`.env.example`](.env.example) como plantilla.
+
+---
+
+## 🧠 Auto-Mejora y Self-Healing Continuo (Sonnet 5)
+
+El sistema cuenta con un workflow autónomo e independiente en n8n (**`Auto-Mejora y Self-Healing de Búsqueda`**, [workflows/workflow_automejora.json](workflows/workflow_automejora.json)):
+
+1. **Disparo Asíncrono**: Cuando una búsqueda de producto en WhatsApp resulta en 0 coincidencias o desvío a otra categoría (`_weak`), el agente despacha un webhook *fire-and-forget* sin demorar la respuesta al cliente.
+2. **Diagnóstico con Sonnet 5**: [Claude Sonnet 5](https://openrouter.ai/anthropic/claude-sonnet-5) (vía OpenRouter) analiza la causa raíz del fallo en las 5 capas de búsqueda contra los candidatos reales con stock en Supabase.
+3. **Sandbox y Auto-Aplicación**: Valida en memoria la equivalencia de vocabulario propuesta, la inserta de inmediato en `catalogo_vocabulario` (Supabase) con `origen: 'automejora_sonnet'` y genera la auditoría en `automejora_logs`.
+4. **Notificación al Administrador**: Envía un reporte por WhatsApp a los números configurados en `ADMIN_PHONE_NUMBERS` con la causa diagnosticada, el SKU identificado y la acción tomada.
+
+Para desplegar o actualizar el workflow de automejora en tu instancia de n8n:
+```bash
+node scripts/crear_workflow_automejora.js
+```
 
 ---
 

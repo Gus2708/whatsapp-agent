@@ -1,3 +1,9 @@
+const fs = require('fs');
+const path = require('path');
+const envPath = path.join(__dirname, '..', '.env');
+const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
+
 // patch_registrar_texto_entrante.js
 // Registra el TEXTO de los mensajes entrantes del cliente en mensajes_procesados.
 //
@@ -50,8 +56,8 @@ const T_NUEVO = `// Completar el registro del entrante: al pasar por "Filtro Ant
 try {
   const _id = payload.id || wBody.id || null;
   if (_id && resultText) {
-    const _SB = 'https://rgniqjfooifchyctnbzu.supabase.co';
-    const _ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';
+    const _SB = pick('SUPABASE_URL');
+    const _ANON = pick('SUPABASE_ANON_KEY');
     await axios.patch(
       _SB + '/rest/v1/mensajes_procesados?message_id=eq.' + encodeURIComponent(String(_id)),
       { texto: String(resultText).slice(0, 4000), tipo: isImage ? 'image' : 'ptt' },

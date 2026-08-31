@@ -1,3 +1,9 @@
+const fs = require('fs');
+const path = require('path');
+const envPath = path.join(__dirname, '..', '.env');
+const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
+
 // patch_solicitud_contexto.js
 // Al empleado le llegaba SOLO el ultimo mensaje del cliente, que casi siempre es una anafora
 // ("De este", "Y el saco de cemento", "De la de 3.60", "No me importa la marca solo el
@@ -35,8 +41,8 @@ const CODIGO = String.raw`// Registra una solicitud de ayuda (el bot no encontro
 // consulta_limpia -> lo que APRENDE EL BUSCADOR (fn_aprender_item). Solo el mensaje.
 // No mezclar los dos: con el contexto dentro, el motor aprenderia la respuesta del bot.
 const axios = require('axios');
-const SB = 'https://rgniqjfooifchyctnbzu.supabase.co';
-const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';
+const SB = pick('SUPABASE_URL');
+const ANON = pick('SUPABASE_ANON_KEY');
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
 const DEDUP_HORAS = 3;
 const MARCADORES = ['[pedir_ayuda]', '[escalar_humano]'];

@@ -1,3 +1,9 @@
+const fs = require('fs');
+const path = require('path');
+const envPath = path.join(__dirname, '..', '.env');
+const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
+
 // patch_captura_nombre.js
 // El bot preguntaba "¿con quien tengo el gusto?" en 180 de 621 mensajes (29% de todo lo que
 // dice) y solo capturaba 6 nombres en 115 chats (5%). Peor caso medido: 15 preguntas en 19
@@ -27,8 +33,8 @@ const NUEVO_CODIGO = String.raw`// Nodo de codigo "Cliente Memoria": recall dete
 // las veces, porque el regex de abajo exige preambulo ("me llamo X") y a "¿con quien tengo el
 // gusto?" la gente responde "Pedro". Sin nombre guardado, el prompt lo volvia a pedir, sin fin.
 const axios = require('axios');
-const SB = 'https://rgniqjfooifchyctnbzu.supabase.co';
-const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';
+const SB = pick('SUPABASE_URL');
+const ANON = pick('SUPABASE_ANON_KEY');
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };
 const PREGUNTA = 'con quién tengo el gusto';
 const MAX_PREGUNTAS = 2;

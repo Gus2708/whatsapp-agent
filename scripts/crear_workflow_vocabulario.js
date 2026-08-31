@@ -1,3 +1,9 @@
+const fs = require('fs');
+const path = require('path');
+const envPath = path.join(__dirname, '..', '.env');
+const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
+
 // Crea (o actualiza) el workflow "Sync Vocabulario Catálogo" en n8n: un Schedule
 // Trigger nocturno + un Code node que detecta por HASH qué categorías del catálogo
 // cambiaron y regenera SOLO el vocabulario de esas, escribiéndolo en Supabase.
@@ -14,7 +20,7 @@ const BASE = process.env.N8N_API_URL_LOCAL || 'http://localhost:5678/api/v1';
 const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
 const key = (env.match(/^N8N_API_KEY=(.+)$/m) || [])[1].trim();
 const ANON = (env.match(/^SUPABASE_ANON_KEY=(.+)$/m) || [])[1].trim();
-const SBURL = ((env.match(/^SUPABASE_URL=(.+)$/m) || [])[1] || 'https://rgniqjfooifchyctnbzu.supabase.co').trim();
+const SBURL = ((env.match(/^SUPABASE_URL=(.+)$/m) || [])[1] || pick('SUPABASE_URL')).trim();
 const H = { 'X-N8N-API-KEY': key, 'Content-Type': 'application/json', accept: 'application/json' };
 
 const NOMBRE = 'Sync Vocabulario Catálogo';

@@ -20,13 +20,18 @@ const axios = {
   }
 };
 
+const envPath = path.join(__dirname, '..', '.env');
+const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
+const envMap = { SUPABASE_URL: pick('SUPABASE_URL'), SUPABASE_ANON_KEY: pick('SUPABASE_ANON_KEY') };
+
 async function buscarLive(p_busqueda) {
   const query = { p_busqueda };
   const rawCode = fs.readFileSync(path.join(__dirname, '..', 'scratch_live', 'live_buscar.js'), 'utf8');
   const code = rawCode.replace("const axios = require('axios');", '');
   const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-  const fn = new AsyncFunction('query', 'axios', code);
-  const resultStr = await fn(query, axios);
+  const fn = new AsyncFunction('query', 'axios', '$env', code);
+  const resultStr = await fn(query, axios, envMap);
   return JSON.parse(resultStr);
 }
 

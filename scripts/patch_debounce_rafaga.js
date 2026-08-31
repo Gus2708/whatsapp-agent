@@ -1,3 +1,9 @@
+const fs = require('fs');
+const path = require('path');
+const envPath = path.join(__dirname, '..', '.env');
+const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
+
 // patch_debounce_rafaga.js
 // El cliente manda 2-3 mensajes seguidos ("hola" / "tienen cemento?" / "gris"). Cada uno
 // abre su propia ejecucion en paralelo, ninguna ve a las otras, y el cliente recibe varias
@@ -34,8 +40,8 @@ const CODIGO = String.raw`// "Debounce Ráfaga": el cliente suele escribir en va
 // responder como contexto. Ante cualquier error deja pasar el mensaje tal cual: nunca
 // puede callar al bot por su cuenta.
 const axios = require('axios');
-const SB = 'https://rgniqjfooifchyctnbzu.supabase.co';
-const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';
+const SB = pick('SUPABASE_URL');
+const ANON = pick('SUPABASE_ANON_KEY');
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
 const ESPERA_MS = 7000;   // cubre 7 de los 8 huecos observados (1,1,1,3,3,4,5 y 13 s)
 const MAX_PREVIOS = 5;
