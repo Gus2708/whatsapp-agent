@@ -12,7 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
-const { spawnSync } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 
 const ROOT = __dirname;
 const L = require(path.join(ROOT, 'lib', 'serrucho-search.js'));
@@ -147,13 +147,30 @@ async function traerTodo(tabla, select, orden) {
   }
   return out;
 }
-function correr(script, args) {
-  return spawnSync(process.execPath, [path.join(ROOT, script), ...(args || [])], { stdio: 'inherit', cwd: ROOT }).status === 0;
+function correr(script, args, textoSpin) {
+  let spin = null;
+  if (textoSpin && TTY) {
+    spin = cargando();
+    spin.paso(textoSpin);
+  }
+  const r = spawnSync(process.execPath, [path.join(ROOT, script), ...(args || [])], { stdio: 'inherit', cwd: ROOT });
+  if (spin) spin.fin();
+  return r.status === 0;
 }
-// corre capturando la salida, para poder resumirla
+// corre capturando la salida de forma asíncrona, permitiendo que el spinner de animación siga girando
 function correrCapturando(script, args) {
-  const r = spawnSync(process.execPath, [path.join(ROOT, script), ...(args || [])], { encoding: 'utf8', cwd: ROOT });
-  return { salida: (r.stdout || '') + (r.stderr || ''), ok: r.status === 0 };
+  return new Promise(resolve => {
+    const p = spawn(process.execPath, [path.join(ROOT, script), ...(args || [])], { cwd: ROOT });
+    let salida = '';
+    p.stdout.on('data', d => { salida += d.toString(); });
+    p.stderr.on('data', d => { salida += d.toString(); });
+    p.on('close', code => {
+      resolve({ salida, ok: code === 0 });
+    });
+    p.on('error', err => {
+      resolve({ salida: salida + '\n' + err.message, ok: false });
+    });
+  });
 }
 
 // ─────────────────────────────────────────────────────── salida en dos columnas
@@ -670,9 +687,10 @@ async function diagnostico(consulta, flags) {
   const reporte = [];
 
   for (const texto of casos) {
+    let spinD = null;
     if (!soloJson) {
-      console.log('\n ' + c.claude('❯') + ' ' + c.bold(c.num(`"${texto}"`)));
-      console.log(' ' + c.darkGray('─'.repeat(W + 15)));
+      spinD = cargando();
+      spinD.paso(`diagnosticando "${texto}"…`);
     }
 
     const casoRes = {
@@ -689,6 +707,9 @@ async function diagnostico(consulta, flags) {
     const topLex = (lex.productos || [])[0];
     casoRes.lexico = topLex || null;
     if (!soloJson) {
+      if (spinD) spinD.fin();
+      console.log('\n ' + c.claude('❯') + ' ' + c.bold(c.num(`"${texto}"`)));
+      console.log(' ' + c.darkGray('─'.repeat(W + 15)));
       console.log(`  ${c.gray('1. Capa Léxica (Trigramas):')} ${topLex ? c.ok(topLex.nombre) : c.darkGray('(sin resultados)')}`);
     }
 
@@ -882,7 +903,7 @@ async function suite(flags) {
     const spin = cargando();
     spin.paso(`evaluando ${p.nombre.toLowerCase()}…`);
     const t0 = Date.now();
-    const { salida } = correrCapturando(p.script, p.args);
+    const { salida } = await correrCapturando(p.script, p.args);
     spin.fin();
 
     const r = p.parse(salida);
