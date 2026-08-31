@@ -15,6 +15,7 @@ const readline = require('readline');
 const { spawnSync } = require('child_process');
 
 const ROOT = __dirname;
+const L = require(path.join(ROOT, 'lib', 'serrucho-search.js'));
 const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
 const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || '').trim();
 const SB = pick('SUPABASE_URL') || 'https://rgniqjfooifchyctnbzu.supabase.co';
@@ -633,7 +634,6 @@ async function coseno(consulta) {
 
   // el umbral y el suelo de ruido, que es lo que de verdad explica la decisión
   console.log(' ' + c.darkGray('─'.repeat(W - 2)));
-  console.log('  ' + c.warn(UMBRAL_VECTOR.toFixed(3)) + c.darkGray('       ' + '╌'.repeat(24) + '  umbral: por debajo no se adopta'));
   console.log('  ' + c.err(simRuido.toFixed(3)) + ' ' + c.darkGray(padL(grados(simRuido), 4)) + '  ' + barraSim(simRuido) +
     '  ' + c.darkGray(`"${BASURA}" (sin sentido)`));
 
@@ -642,8 +642,80 @@ async function coseno(consulta) {
   const sano = margen > 0.05;
   console.log(' ' + (sano ? c.ok('▎') : c.err('▎')) + ' ' + c.bold(c.num('margen señal/ruido ' + margen.toFixed(3))) + '  ' +
     (sano ? c.darkGray('hay separación: el umbral distingue de verdad') : c.err('NO hay umbral posible: la capa es inservible')));
-  console.log(' ' + c.darkGray('  Con los embeddings v1 este margen era 0.012 y la capa aportaba cero.'));
-  console.log(' ' + c.darkGray('  Enriquecer el texto (categoría + coloquialismos) lo llevó a ~0.12.'));
+  return 0;
+}
+
+// ───────────────────────────────────────────────────────────────────── diagnóstico vectorial nativo
+async function diagnostico(consulta) {
+  cabecera('DIAGNÓSTICO VECTORIAL', 'camino semántico');
+  const q = (consulta || '').trim();
+  const casos = q ? [q] : [
+    'tendran tapa para el bano',
+    'disco de corte',
+    'algo para cortar cabilla',
+    'cemento gris',
+  ];
+
+  const body = fs.readFileSync(path.join(ROOT, 'scratch_live', 'live_buscar.js'), 'utf8');
+  const axiosShim = {
+    async get(u, cf) { const r = await fetch(u, { headers: (cf && cf.headers) || {} }); return { data: await r.json() }; },
+    async post(u, b, cf) { const r = await fetch(u, { method: 'POST', headers: (cf && cf.headers) || {}, body: JSON.stringify(b) }); let d = null; try { d = await r.json(); } catch (e) {} return { data: d }; },
+  };
+  const runMatcher = new Function('query', 'require', '$env', '"use strict"; return (async () => {\n' + body + '\n})();');
+  const fakeEnv = { OPENROUTER_API_KEY: pick('OPENROUTER_API_KEY'), OPENAI_API_KEY: pick('OPENAI_API_KEY') };
+
+  for (const texto of casos) {
+    console.log('\n ' + c.claude('❯') + ' ' + c.bold(c.num(`"${texto}"`)));
+    console.log(' ' + c.darkGray('─'.repeat(W + 15)));
+
+    // 1. Léxico
+    const lex = JSON.parse(await runMatcher({ p_busqueda: texto }, n => (n === 'axios' ? axiosShim : require(n)), { OPENROUTER_API_KEY: '', OPENAI_API_KEY: '' }));
+    const topLex = (lex.productos || [])[0];
+    console.log(`  ${c.gray('1. Capa Léxica (Trigramas):')} ${topLex ? c.ok(topLex.nombre) : c.darkGray('(sin resultados)')}`);
+
+    // 2. Gatillo
+    const qTok = L.expandir(texto).split(' ').filter(w => w.length > 2 && !/\d/.test(w));
+    const d0 = topLex ? L.norm(topLex.nombre) : '';
+    const faltan = qTok.filter(t => !L.aliasDe(t).some(a => d0.includes(a)));
+    const dispara = faltan.length > 0;
+    console.log(`  ${c.gray('2. Gatillo de Disparo:')}     ${dispara ? c.warn('DISPARA') + c.darkGray(` (faltan tokens en top-1: ${faltan.join(', ')})`) : c.ok('NO DISPARA') + c.darkGray(' (top-1 cubre la consulta)')}`);
+    if (!dispara) continue;
+
+    // 3. Embedding OpenAI
+    const t0 = Date.now();
+    const vecs = await embeder([texto]);
+    const ms = Date.now() - t0;
+    if (!vecs || !vecs[0]) {
+      console.log(`  ${c.gray('3. Embedding OpenAI:')}       ${c.err('FALLÓ O TIMEOUT')} ${c.darkGray(`(${ms}ms)`)}`);
+      continue;
+    }
+    console.log(`  ${c.gray('3. Embedding OpenAI:')}       ${c.ok('OK')} ${c.darkGray(`(${ms}ms · 1.536 dims)`)}`);
+
+    // 4. Búsqueda semántica
+    const resVec = await vecinos(vecs[0], 4);
+    if (!resVec.length) {
+      console.log(`  ${c.gray('4. Vecinos Semánticos:')}    ${c.err('(la RPC no devolvió vecinos)')}`);
+      continue;
+    }
+    console.log(`  ${c.gray('4. Vecinos Semánticos:')}`);
+    for (const f of resVec) {
+      const pasa = f.similitud >= UMBRAL_VECTOR;
+      const simStr = f.similitud.toFixed(3);
+      console.log(`      ${pasa ? c.ok(simStr) : c.darkGray(simStr)}  ${barraSim(f.similitud, 14)}  ${c.num(pad(f.descripcion.slice(0, 36), 38))} ${pasa ? c.ok('pasa umbral') : c.err('bajo umbral')}`);
+    }
+
+    // 5. Adopción
+    const sobreUmbral = resVec.filter(f => f.similitud >= UMBRAL_VECTOR);
+    if (!sobreUmbral.length) {
+      console.log(`  ${c.gray('5. Veredicto Adopción:')}    ${c.err('DESCARTA')} ${c.darkGray('(ningún vector superó el umbral de 0.450)')}`);
+      continue;
+    }
+    const vcat = L.norm(sobreUmbral[0].descripcion).split(' ')[0];
+    const lcat = d0.split(' ')[0];
+    const adopta = vcat !== lcat;
+    console.log(`  ${c.gray('5. Veredicto Adopción:')}    ${adopta ? c.bold(c.ok('ADOPTA VECTOR')) : c.bold(c.warn('DESCARTA (misma categoría)'))} ${c.darkGray(`(cat vector="${vcat}" vs cat léxico="${lcat}")`)}`);
+  }
+  console.log('');
   return 0;
 }
 
@@ -707,52 +779,69 @@ async function buscar(consulta) {
 // Corre TODOS los harness de una y resume. Es la foto completa de la calidad de búsqueda.
 async function suite(flags) {
   const rapida = flags.includes('--rapida');
-  cabecera('SUITE DE BÚSQUEDA', rapida ? 'modo rápido' : 'completa');
+  cabecera('SUITE DE TESTS Y REPRESIÓN', rapida ? 'modo rápido' : 'batería completa');
   if (!rapida) console.log(' ' + c.darkGray('el recall de 320 tarda ~15 min; usa --rapida para saltarlo'));
 
   const pasos = [
-    { nombre: 'Regresión', script: 'scripts/_test_busqueda_50.js', args: [], parse: s => {
+    { nombre: 'Regresión de Búsqueda', script: 'scripts/_test_busqueda_50.js', args: [], parse: s => {
       const m = s.match(/Total:\s*(\d+)[\s\S]*?FALSO-NEGATIVO sospechoso:\s*(\d+)[\s\S]*?excepciones:\s*(\d+)/);
       if (!m) return null;
       return { casos: +m[1], fallos: +m[2] + +m[3], detalle: `${m[2]} falsos negativos · ${m[3]} excepciones` };
     } },
-    { nombre: 'Fallos reales', script: 'scripts/_test_fallos_reales.js', args: ['--prod'], parse: s => {
+    { nombre: 'Casos Reales Escalados', script: 'scripts/_test_fallos_reales.js', args: ['--prod'], parse: s => {
       const m = s.match(/evaluadas:\s*(\d+)\s*\|\s*con resultados:\s*(\d+)[\s\S]*?sin nada:\s*(\d+)/);
       if (!m) return null;
       return { casos: +m[1], fallos: +m[3], detalle: `${m[2]} encuentran · ${m[3]} sin nada` };
     } },
-    { nombre: 'Margen vectorial', script: 'scripts/_test_vector.js', args: [], parse: s => {
+    { nombre: 'Margen Señal / Ruido', script: 'scripts/_test_vector.js', args: [], parse: s => {
       const m = s.match(/aciertos en el top-1:\s*(\d+)\/(\d+)[\s\S]*?MARGEN[^:]*:\s*([\d.]+)/);
       if (!m) return null;
       const margen = parseFloat(m[3]);
-      return { casos: +m[2], fallos: +m[2] - +m[1], detalle: `margen ${margen.toFixed(3)} ${margen > 0.05 ? '(umbral posible)' : '(INSERVIBLE)'}` };
+      return { casos: +m[2], fallos: +m[2] - +m[1], detalle: `margen ${margen.toFixed(3)} ${margen > 0.05 ? '(umbral óptimo)' : '(INSERVIBLE)'}` };
     } },
   ];
-  if (!rapida) pasos.push({ nombre: 'Recall coloquial', script: 'scripts/_test_coloquial.js', args: [], parse: s => {
+  if (!rapida) pasos.push({ nombre: 'Recall Coloquial (320)', script: 'scripts/_test_coloquial.js', args: [], parse: s => {
     const m = s.match(/casos:\s*(\d+)[\s\S]*?producto exacto en resultados\s*:\s*(\d+)\s*\(([\d.]+)%\)[\s\S]*?fallo total\s*:\s*(\d+)/);
     if (!m) return null;
     return { casos: +m[1], fallos: +m[4], detalle: `${m[2]} exactos (${m[3]}%) · ${m[4]} fallos` };
   } });
 
-  console.log('');
+  console.log('\n ' + c.claude('◆') + ' ' + c.bold(c.num('Ejecutando Arneses de Búsqueda:')));
+  console.log(' ' + c.darkGray('─'.repeat(W + 15)));
+
   let totalCasos = 0, totalFallos = 0, rotos = 0;
   for (const p of pasos) {
-    if (TTY) process.stdout.write('  ' + c.darkGray('▸ ') + pad(c.gray(p.nombre), 20) + c.darkGray('corriendo…'));
+    const spin = cargando();
+    spin.paso(`evaluando ${p.nombre.toLowerCase()}…`);
     const t0 = Date.now();
     const { salida } = correrCapturando(p.script, p.args);
+    spin.fin();
+
     const r = p.parse(salida);
-    const seg = ((Date.now() - t0) / 1000).toFixed(0) + 's';
-    if (TTY) process.stdout.write('\r' + ' '.repeat(W) + '\r');
-    if (!r) { console.log('  ' + GL.err + ' ' + pad(p.nombre, 20) + c.err('no pude leer el resultado') + c.darkGray('  ' + seg)); rotos++; continue; }
-    totalCasos += r.casos; totalFallos += r.fallos;
+    const seg = ((Date.now() - t0) / 1000).toFixed(1) + 's';
+    if (!r) {
+      console.log('  ' + GL.err + ' ' + pad(c.num(p.nombre), 28) + c.err('error al parsear salida') + c.darkGray('  ' + seg));
+      rotos++;
+      continue;
+    }
+
+    totalCasos += r.casos;
+    totalFallos += r.fallos;
+    const porcentaje = r.casos ? (((r.casos - r.fallos) / r.casos) * 100).toFixed(1) : '100';
     const g = r.fallos === 0 ? GL.ok : GL.warn;
-    console.log('  ' + g + ' ' + pad(c.num(p.nombre), 20) + pad(c.gray(r.casos + ' casos'), 12) + c.darkGray(r.detalle) + c.darkGray('  ' + seg));
+    const tasaColor = r.fallos === 0 ? c.ok : c.warn;
+
+    console.log(`  ${g} ${c.bold(c.num(pad(p.nombre, 26)))} ${padL(c.gray(r.casos + ' casos'), 10)}  ${c.darkGray('│')}  ${tasaColor(padL(porcentaje + '%', 6))}  ${c.darkGray('│')}  ${c.darkGray(r.detalle)}  ${c.darkGray('(' + seg + ')')}`);
   }
 
-  console.log('\n ' + c.darkGray('─'.repeat(W - 2)));
+  console.log('\n ' + c.darkGray('─'.repeat(W + 15)));
   const sano = totalFallos === 0 && rotos === 0;
-  console.log(' ' + (sano ? c.ok('▎') : c.warn('▎')) + ' ' + c.bold(c.num(`${num(totalCasos)} casos`)) +
-    c.darkGray('  ·  ') + (totalFallos ? c.warn(`${totalFallos} con problema`) : c.ok('sin fallos')));
+  const tasaTotal = totalCasos ? (((totalCasos - totalFallos) / totalCasos) * 100).toFixed(1) : '100';
+
+  console.log(' ' + (sano ? c.ok('▎') : c.warn('▎')) + ' ' + c.bold(c.num(`${num(totalCasos)} casos evaluados`)) +
+    c.darkGray('  ·  ') + (totalFallos ? c.warn(`${totalFallos} incidentes reportados`) : c.ok('cero incidentes')) +
+    c.darkGray('  ·  ') + c.bold(c.cyan(`${tasaTotal}% efectividad global`)));
+  console.log('');
   return sano ? 0 : 1;
 }
 
@@ -839,7 +928,52 @@ async function vocabulario(filtro) {
   return 0;
 }
 
-// ───────────────────────────────────────────────────────────────────── ayuda
+// ───────────────────────────────────────────────────────────────────── embeddings (estado y generador enriquecido)
+async function embeddingsCmd(flags) {
+  cabecera('ESPACIO VECTORIAL', 'OpenAI text-embedding-3-small');
+  const spin = cargando();
+  spin.paso('consultando estado de vectores…');
+
+  const [rProds, rEmb, rVocab, rDesc] = await Promise.all([
+    traerTodo('productos', 'codigo_interno,descripcion', 'codigo_interno.asc'),
+    traerTodo('productos_embedding', 'codigo_interno,descripcion,actualizado_en', 'codigo_interno.asc'),
+    traerTodo('catalogo_vocabulario', 'termino,categoria&activo=eq.true', 'categoria.asc'),
+    sb('producto_descripcion?select=codigo_interno&limit=1', { Prefer: 'count=exact' }),
+  ]);
+
+  const prodsValidos = rProds.filter(p => p.descripcion && p.descripcion.trim());
+  const porCodigo = new Map(rEmb.map(x => [x.codigo_interno, x]));
+  const sinVector = prodsValidos.filter(p => !porCodigo.has(p.codigo_interno));
+  const descsIA = Number((rDesc.headers.get('content-range') || '').split('/')[1] || 0);
+
+  const cobertura = prodsValidos.length ? (((prodsValidos.length - sinVector.length) / prodsValidos.length) * 100).toFixed(1) : '0';
+  spin.fin();
+
+  console.log(' ' + GL.ok + ' ' + c.bold('Cobertura del Catálogo:') + ' ' + c.cyan(`${cobertura}%`) + c.gray(` (${num(rEmb.length)} de ${num(prodsValidos.length)} productos embebidos)`));
+  console.log(' ' + c.darkGray('Modelo: text-embedding-3-small · 1.536 dimensiones · $0.02 USD por millón de tokens.'));
+
+  console.log('\n ' + c.claude('◆') + ' ' + c.bold(c.num('Capas de Enriquecimiento Semántico:')));
+  console.log(' ' + c.darkGray('─'.repeat(W + 20)));
+  console.log(`  ${c.cyan('›')} ${c.bold(c.num(pad('Términos coloquiales:', 24)))} ${c.num(num(rVocab.length))} ${c.darkGray('modismos integrados en el vector')}`);
+  console.log(`  ${c.cyan('›')} ${c.bold(c.num(pad('Descripciones IA (Luna):', 24)))} ${c.num(num(descsIA))} ${c.darkGray('enriquecen productos con ventas recientes')}`);
+  console.log(`  ${c.cyan('›')} ${c.bold(c.num(pad('Productos pendientes:', 24)))} ${sinVector.length ? c.warn(num(sinVector.length)) : c.ok('0')} ${c.darkGray(sinVector.length ? 'requieren generar vector' : 'al día')}`);
+
+  if (sinVector.length > 0) {
+    const tokensEst = Math.ceil(sinVector.length * 90);
+    const costoEst = ((tokensEst / 1e6) * 0.02).toFixed(4);
+    console.log('\n ' + c.warn('▲') + ' ' + c.bold(c.warn('Pendientes de vectorización:')) + c.gray(` ~${num(tokensEst)} tokens estimados ≈ $${costoEst} USD`));
+    console.log(' ' + c.darkGray('Ejecutando generador en lote…'));
+    correr('scripts/generar_embeddings.js', flags || []);
+  } else if (flags && (flags.includes('--full') || flags.includes('--dry'))) {
+    console.log('\n ' + c.darkGray('Lanzando generador con banderas: ' + flags.join(' ')));
+    correr('scripts/generar_embeddings.js', flags);
+  } else {
+    console.log('\n ' + c.ok('▎') + ' ' + c.bold(c.ok('Todos los productos del catálogo cuentan con vector en pgvector.')));
+    console.log(' ' + c.darkGray('Si deseas forzar la re-vectorización completa usa: ') + c.cyan('node rag.js embeddings --full') + c.darkGray(' o ') + c.cyan('--dry'));
+  }
+  console.log('');
+  return 0;
+}
 function ayuda() {
   cabecera('RAG · Perucho', 'CLI de la capa de búsqueda');
   const g = (t, items) => {
@@ -937,9 +1071,9 @@ async function iniciarTUI() {
     } else if (primero === '2' || primero === '/coseno' || primero === 'coseno') {
       await coseno(argumento || null);
     } else if (primero === '3' || primero === '/diag' || primero === 'diag') {
-      correr('scripts/_diag_vector.js', argumento ? [argumento] : []);
+      await diagnostico(argumento || null);
     } else if (primero === '4' || primero === '/embeddings' || primero === 'embeddings') {
-      correr('scripts/generar_embeddings.js', argumento ? [argumento] : []);
+      await embeddingsCmd(argumento ? argumento.split(' ') : []);
     } else if (primero === '5' || primero === '/vocabulario' || primero === 'vocabulario') {
       if (argumento && (argumento.includes('--') || argumento.includes('generar'))) {
         correr('scripts/generar_vocabulario.js', argumento ? argumento.split(' ') : []);
@@ -984,14 +1118,14 @@ const flags = rest.filter(a => a.startsWith('--'));
     case 'estado': case 'status':        return await estado();
     case 'buscar': case 'search':        return await buscar(resto.join(' '));
     case 'coseno': case 'vectores':      return await coseno(resto.join(' '));
-    case 'diag':                         return correr('scripts/_diag_vector.js', resto.length ? [resto.join(' ')] : []) ? 0 : 1;
+    case 'diag':                         return await diagnostico(resto.join(' '));
     case 'suite':                        return await suite(flags);
     case 'medir': case 'bench':          return correr('scripts/_test_coloquial.js', flags) ? 0 : 1;
     case 'regresion': case 'regression': return correr('scripts/_test_busqueda_50.js') ? 0 : 1;
     case 'vector':                       return correr('scripts/_test_vector.js') ? 0 : 1;
     case 'fallos':                       return correr('scripts/_test_fallos_reales.js', ['--prod']) ? 0 : 1;
     case 'auditar': case 'audit':        return correr('scripts/_audit_sin.js', flags) ? 0 : 1;
-    case 'embeddings':                   return correr('scripts/generar_embeddings.js', flags) ? 0 : 1;
+    case 'embeddings':                   return await embeddingsCmd(flags);
     case 'vocabulario':                  return flags.length || resto.length ? (correr('scripts/generar_vocabulario.js', rest) ? 0 : 1) : await vocabulario();
     case 'descripciones':                return correr('scripts/generar_descripciones.js', rest) ? 0 : 1;
     case 'popularidad':                  return await popularidad();
