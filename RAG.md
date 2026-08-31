@@ -99,7 +99,7 @@ Vocabulario y ranking por ventas **sí se mantienen solos**, incrementales por h
 | `_test_fallos_reales.js` | Las consultas que de verdad escalaron |
 | `_test_busqueda_50.js` | Regresión, 86 casos |
 | `_audit_sin.js` | Audita el mapa `SIN` contra el catálogo real |
-| `../rag.js` | **CLI**: orquesta todo lo anterior. `node rag.js ayuda` |
+| `../rag.js` | **CLI / TUI Interactiva**: orquesta todo con REPL en vivo, búsqueda inteligente, diagnóstico y diagramas vectoriales Braille. `node rag.js` |
 
 ---
 
