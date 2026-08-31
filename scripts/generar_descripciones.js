@@ -121,16 +121,32 @@ async function pedir(lote) {
     for (const r of p) frescos.add(r.codigo_interno);
     if (p.length < 1000) break;
   }
-  console.log(`  vendidos en ${DIAS} días: ${frescos.size}`);
+  const c = {
+    dim: s => `\x1b[2m${s}\x1b[0m`,
+    bold: s => `\x1b[1m${s}\x1b[0m`,
+    claude: s => `\x1b[38;2;205;105;74m${s}\x1b[0m`,
+    cyan: s => `\x1b[38;2;125;207;255m${s}\x1b[0m`,
+    ok: s => `\x1b[38;2;78;169;111m${s}\x1b[0m`,
+    err: s => `\x1b[38;2;247;118;142m${s}\x1b[0m`,
+    warn: s => `\x1b[38;2;224;175;104m${s}\x1b[0m`,
+    gray: s => `\x1b[38;2;139;143;163m${s}\x1b[0m`,
+    darkGray: s => `\x1b[38;2;86;95;137m${s}\x1b[0m`,
+    num: s => `\x1b[38;2;192;202;245m${s}\x1b[0m`,
+  };
+
+  console.log('\n ' + c.claude('◆') + ' ' + c.bold(c.num('GENERADOR DE DESCRIPCIONES')) + c.darkGray(' · ') + c.gray('Luna (OpenRouter)'));
+  console.log(' ' + c.darkGray('─'.repeat(60)));
+  console.log('  ' + c.ok('⏺') + ' ' + c.bold(c.num(todos.length.toLocaleString('es-VE'))) + c.gray(' productos en catálogo'));
+  console.log('  ' + c.ok('⏺') + ' ' + c.bold(c.num(frescos.size.toLocaleString('es-VE'))) + c.gray(` vendidos en ${DIAS} días`));
 
   let objetivo = todos
     .filter(p => p.descripcion && frescos.has(p.codigo_interno))
     .filter(p => previas.get(p.codigo_interno) !== hashDe(p.descripcion.trim()))
     .sort((a, b) => (recientes.get(b.codigo_interno) || 0) - (recientes.get(a.codigo_interno) || 0));
 
-  console.log(`catálogo ${todos.length} | con venta reciente ${recientes.size} | pendientes ${objetivo.length}`);
-  if (PILOTO) { objetivo = objetivo.slice(0, PILOTO); console.log(`PILOTO: solo los ${objetivo.length} más vendidos`); }
-  if (!objetivo.length) { console.log('Nada que hacer.'); return; }
+  console.log('  ' + c.claude('❯') + ' ' + c.bold(c.cyan(`${objetivo.length.toLocaleString('es-VE')}`)) + c.gray(' productos pendientes por describir'));
+  if (PILOTO) { objetivo = objetivo.slice(0, PILOTO); console.log('    ' + c.darkGray('⎿') + ' ' + c.warn(`PILOTO: limitando a los ${objetivo.length} más vendidos`)); }
+  if (!objetivo.length) { console.log('\n ' + c.ok('▎') + ' ' + c.bold(c.ok('Nada que hacer: todas las descripciones están al día.')) + '\n'); return; }
 
   const lotes = [];
   for (let i = 0; i < objetivo.length; i += POR_LOTE) lotes.push(objetivo.slice(i, i + POR_LOTE));

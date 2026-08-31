@@ -95,10 +95,25 @@ async function embeber(textos) {
   if (!OAI) throw new Error('falta OPENAI_API_KEY en .env — créala en platform.openai.com/api-keys');
   if (!ANON) throw new Error('falta SUPABASE_ANON_KEY en .env');
 
-  console.log('Leyendo catálogo…');
+  const c = {
+    dim: s => `\x1b[2m${s}\x1b[0m`,
+    bold: s => `\x1b[1m${s}\x1b[0m`,
+    claude: s => `\x1b[38;2;205;105;74m${s}\x1b[0m`,
+    cyan: s => `\x1b[38;2;125;207;255m${s}\x1b[0m`,
+    ok: s => `\x1b[38;2;78;169;111m${s}\x1b[0m`,
+    err: s => `\x1b[38;2;247;118;142m${s}\x1b[0m`,
+    warn: s => `\x1b[38;2;224;175;104m${s}\x1b[0m`,
+    gray: s => `\x1b[38;2;139;143;163m${s}\x1b[0m`,
+    darkGray: s => `\x1b[38;2;86;95;137m${s}\x1b[0m`,
+    num: s => `\x1b[38;2;192;202;245m${s}\x1b[0m`,
+  };
+
+  console.log('\n ' + c.claude('◆') + ' ' + c.bold(c.num('GENERADOR DE EMBEDDINGS')) + c.darkGray(' · ') + c.gray('text-embedding-3-small'));
+  console.log(' ' + c.darkGray('─'.repeat(60)));
+  process.stdout.write('  ' + c.darkGray('▸ ') + c.gray('Leyendo catálogo…\r'));
   const productos = (await traerTodo('productos', 'codigo_interno,descripcion', 'codigo_interno.asc'))
     .filter(p => p.descripcion && p.descripcion.trim());
-  console.log(`  ${productos.length} productos`);
+  console.log('  ' + c.ok('⏺') + ' ' + c.bold(c.num(productos.length.toLocaleString('es-VE'))) + c.gray(' productos en catálogo'));
 
   // diccionario coloquial agrupado por categoría, para enriquecer el texto a embeber
   const vocab = await traerTodo('catalogo_vocabulario', 'termino,categoria&activo=eq.true', 'categoria.asc');
@@ -107,7 +122,7 @@ async function embeber(textos) {
     if (!VOCAB_POR_CAT.has(v.categoria)) VOCAB_POR_CAT.set(v.categoria, []);
     VOCAB_POR_CAT.get(v.categoria).push(v.termino);
   }
-  console.log(`  ${vocab.length} términos coloquiales en ${VOCAB_POR_CAT.size} categorías`);
+  console.log('  ' + c.ok('⏺') + ' ' + c.bold(c.num(vocab.length.toLocaleString('es-VE'))) + c.gray(` términos coloquiales en ${VOCAB_POR_CAT.size} categorías`));
 
   // descripciones generadas por Luna (paginado: PostgREST corta a 1000)
   for (let off = 0; ; off += 1000) {
@@ -115,34 +130,30 @@ async function embeber(textos) {
     for (const x of d) DESC_IA.set(x.codigo_interno, x.descripcion_ia);
     if (d.length < 1000) break;
   }
-  console.log(`  ${DESC_IA.size} descripciones en lenguaje natural`);
+  console.log('  ' + c.ok('⏺') + ' ' + c.bold(c.num(DESC_IA.size.toLocaleString('es-VE'))) + c.gray(' descripciones en lenguaje natural'));
 
   const previos = new Map(
     (await traerTodo('productos_embedding', 'codigo_interno,hash_desc', 'codigo_interno.asc'))
       .map(r => [r.codigo_interno, r.hash_desc])
   );
-  console.log(`  ${previos.size} ya embebidos`);
+  console.log('  ' + c.ok('⏺') + ' ' + c.bold(c.num(previos.size.toLocaleString('es-VE'))) + c.gray(' ya embebidos'));
 
   const pendientes = productos.filter(p => FULL || previos.get(p.codigo_interno) !== hashDe(textoDe(p)));
-  console.log(`  a embeber: ${pendientes.length}${FULL ? ' (--full)' : ' (nuevos o con descripción cambiada)'}`);
-  if (!pendientes.length) { console.log('Nada que hacer: el catálogo no cambió.'); return; }
+  console.log('  ' + c.claude('❯') + ' ' + c.bold(c.cyan(`${pendientes.length.toLocaleString('es-VE')}`)) + c.gray(` a embeber${FULL ? ' (--full)' : ' (nuevos o con descripción cambiada)'}`));
+  if (!pendientes.length) { console.log('\n ' + c.ok('▎') + ' ' + c.bold(c.ok('Nada que hacer: el catálogo no cambió.')) + '\n'); return; }
 
   const tokensEst = Math.ceil(pendientes.reduce((a, p) => a + textoDe(p).length, 0) / 4);
-  console.log(`  ~${tokensEst} tokens ≈ $${(tokensEst / 1e6 * PRECIO_M).toFixed(4)}`);
+  console.log('    ' + c.darkGray('⎿') + ' ' + c.darkGray(`~${tokensEst.toLocaleString('es-VE')} tokens ≈ $${(tokensEst / 1e6 * PRECIO_M).toFixed(4)} USD`));
 
-  // El índice HNSW reconstruye el grafo en CADA insert. Con pocas filas da igual, pero en
-  // una carga grande revienta el statement_timeout de Supabase (error 57014) a mitad de
-  // camino, después de haberle pagado los embeddings a OpenAI. La anon key no puede hacer
-  // DDL, así que no se puede automatizar: se avisa para no perder la corrida.
   if (pendientes.length > 500) {
-    console.log(`\n  ⚠  ${pendientes.length} filas es una carga grande. Si existe el índice HNSW`);
-    console.log('     esto va a fallar con "statement timeout" (57014) a mitad. Antes de seguir:');
-    console.log('       drop index if exists idx_productos_embedding_hnsw;');
-    console.log('     y al terminar recrearlo:');
-    console.log('       create index idx_productos_embedding_hnsw on productos_embedding');
-    console.log('         using hnsw (embedding extensions.vector_cosine_ops);\n');
+    console.log('\n  ' + c.warn('▲') + ' ' + c.bold(c.warn(`${pendientes.length.toLocaleString('es-VE')} filas es una carga grande.`)) + c.gray(' Si existe el índice HNSW'));
+    console.log('    ' + c.darkGray('esto va a fallar con "statement timeout" (57014) a mitad. Antes de seguir:'));
+    console.log('      ' + c.cyan('drop index if exists idx_productos_embedding_hnsw;'));
+    console.log('    ' + c.darkGray('y al terminar recrearlo:'));
+    console.log('      ' + c.cyan('create index idx_productos_embedding_hnsw on productos_embedding'));
+    console.log('      ' + c.cyan('  using hnsw (embedding extensions.vector_cosine_ops);\n'));
   }
-  if (DRY) { console.log('\n--dry: no se llamó a OpenAI ni se escribió nada.'); return; }
+  if (DRY) { console.log('\n ' + c.darkGray('--dry: no se llamó a OpenAI ni se escribió nada.') + '\n'); return; }
 
   let tokens = 0, escritos = 0;
   const P = progreso(pendientes.length, { etiqueta: `embebiendo` });

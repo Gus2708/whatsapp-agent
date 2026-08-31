@@ -146,15 +146,30 @@ async function pedirLote(lote) {
 (async () => {
   if (!ANON || !OR_KEY) throw new Error('faltan SUPABASE_ANON_KEY u OPENROUTER_API_KEY en .env');
 
-  console.log('Leyendo catálogo…');
+  const c = {
+    dim: s => `\x1b[2m${s}\x1b[0m`,
+    bold: s => `\x1b[1m${s}\x1b[0m`,
+    claude: s => `\x1b[38;2;205;105;74m${s}\x1b[0m`,
+    cyan: s => `\x1b[38;2;125;207;255m${s}\x1b[0m`,
+    ok: s => `\x1b[38;2;78;169;111m${s}\x1b[0m`,
+    err: s => `\x1b[38;2;247;118;142m${s}\x1b[0m`,
+    warn: s => `\x1b[38;2;224;175;104m${s}\x1b[0m`,
+    gray: s => `\x1b[38;2;139;143;163m${s}\x1b[0m`,
+    darkGray: s => `\x1b[38;2;86;95;137m${s}\x1b[0m`,
+    num: s => `\x1b[38;2;192;202;245m${s}\x1b[0m`,
+  };
+
+  console.log('\n ' + c.claude('◆') + ' ' + c.bold(c.num('GENERADOR DE VOCABULARIO COLOQUIAL')) + c.darkGray(' · ') + c.gray('Luna (OpenRouter)'));
+  console.log(' ' + c.darkGray('─'.repeat(60)));
+  process.stdout.write('  ' + c.darkGray('▸ ') + c.gray('Leyendo catálogo…\r'));
   const productos = await traerProductos();
-  console.log(`  ${productos.length} productos`);
+  console.log('  ' + c.ok('⏺') + ' ' + c.bold(c.num(productos.length.toLocaleString('es-VE'))) + c.gray(' productos en catálogo'));
 
   // Vocabulario del catálogo: TODA palabra que aparece en alguna descripción.
   // Es la vara con la que validamos: canonico debe existir aquí, termino NO.
   const palabrasCatalogo = new Set();
   for (const p of productos) for (const w of norm(p.descripcion).split(' ')) if (w.length > 2) palabrasCatalogo.add(w);
-  console.log(`  ${palabrasCatalogo.size} palabras distintas en descripciones`);
+  console.log('  ' + c.ok('⏺') + ' ' + c.bold(c.num(palabrasCatalogo.size.toLocaleString('es-VE'))) + c.gray(' palabras distintas en descripciones'));
 
   // Agrupar por categoría = primera palabra de la descripción
   const porCat = new Map();
@@ -183,8 +198,8 @@ async function pedirLote(lote) {
   if (SOLO.length) categorias = categorias.filter(c => SOLO.includes(c.categoria));
   else if (!FULL) categorias = categorias.filter(c => previos.get(c.categoria) !== c.hash);
 
-  console.log(`  ${todas} categorías | a procesar: ${categorias.length}${FULL ? ' (--full)' : ' (nuevas o cambiadas)'}`);
-  if (!categorias.length) { console.log('Nada que hacer: el catálogo no cambió.'); return; }
+  console.log('  ' + c.claude('❯') + ' ' + c.bold(c.cyan(`${categorias.length.toLocaleString('es-VE')}`)) + c.gray(` categorías a procesar de ${todas}${FULL ? ' (--full)' : ' (nuevas o cambiadas)'}`));
+  if (!categorias.length) { console.log('\n ' + c.ok('▎') + ' ' + c.bold(c.ok('Nada que hacer: el catálogo no cambió.')) + '\n'); return; }
 
   // ------------------------------------------------ lotes con concurrencia
   const lotes = [];

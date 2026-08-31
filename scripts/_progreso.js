@@ -14,10 +14,24 @@ const TTY = process.stdout.isTTY;
 const ANCHO = 28;
 const CUADROS = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
+const COLORTERM = process.env.COLORTERM || '';
+const TRUECOLOR = TTY && (COLORTERM === 'truecolor' || COLORTERM === '24bit' || process.env.TERM_PROGRAM === 'vscode' || process.env.WT_SESSION);
+
 const e = (n, s) => (TTY ? `\x1b[${n}m${s}\x1b[0m` : s);
-const dim = s => e(2, s);
-const verde = s => e(32, s);
-const cian = s => e(36, s);
+const rgb = (r, g, b, s) => (TTY ? (TRUECOLOR ? `\x1b[38;2;${r};${g};${b}m${s}\x1b[0m` : e(36, s)) : s);
+
+const c = {
+  dim: s => e(2, s),
+  bold: s => e(1, s),
+  claude: s => rgb(205, 105, 74, s),       // Terracota Serrucho (#cd694a)
+  cyan: s => rgb(125, 207, 255, s),         // Azul claro cian (#7dcfff)
+  ok: s => rgb(78, 169, 111, s),           // Verde suave (#4ea96f)
+  err: s => rgb(247, 118, 142, s),         // Rojo suave (#f7768e)
+  warn: s => rgb(224, 175, 104, s),        // Amarillo/Ocre (#e0af68)
+  gray: s => rgb(139, 143, 163, s),        // Gris medio (#8b8fa3)
+  darkGray: s => rgb(86, 95, 137, s),      // Gris azulado (#565f89)
+  num: s => rgb(192, 202, 245, s),         // Blanco suave (#c0caf5)
+};
 const num = n => Number(n).toLocaleString('es-VE');
 
 function tiempo(seg) {
@@ -39,21 +53,17 @@ module.exports = function progreso(total, opciones) {
     const llenos = Math.round((pct / 100) * ANCHO);
     const transcurrido = (Date.now() - t0) / 1000;
     const ritmo = hechos / Math.max(transcurrido, 0.001);
-    // La estimación necesita algo de historia. Con menos de 3s o 2 lotes el ritmo es ruido
-    // y salía "faltan 0s" nada más arrancar, que parece un error.
     const fiable = transcurrido >= 3 && hechos > 0;
     const restante = hechos < total
       ? (fiable ? 'faltan ' + tiempo((total - hechos) / ritmo) : 'calculando…')
       : tiempo(transcurrido);
 
-    const barra = verde('█'.repeat(llenos)) + dim('░'.repeat(ANCHO - llenos));
-    const linea = '  ' + cian(CUADROS[cuadro % CUADROS.length]) + '  ' + barra +
-      '  ' + num(hechos) + dim('/') + num(total) +
-      '  ' + pct.toFixed(1).padStart(5) + '%' +
-      dim('  ' + restante) +
-      (extra ? dim('  ' + extra) : '');
-    // limpiar hasta el final de línea, no solo volver al inicio: si la línea anterior era
-    // más larga quedaban restos
+    const barra = c.cyan('█'.repeat(llenos)) + c.darkGray('░'.repeat(ANCHO - llenos));
+    const linea = '  ' + c.claude(CUADROS[cuadro % CUADROS.length]) + '  ' + barra +
+      '  ' + c.num(num(hechos)) + c.darkGray('/') + c.num(num(total)) +
+      '  ' + c.num(pct.toFixed(1).padStart(5) + '%') +
+      c.darkGray('  ·  ' + restante) +
+      (extra ? '  ' + c.claude(extra) : '');
     process.stdout.write('\r\x1b[2K' + linea);
   }
 
@@ -83,7 +93,7 @@ module.exports = function progreso(total, opciones) {
       if (reloj) clearInterval(reloj);
       const seg = (Date.now() - t0) / 1000;
       if (TTY) process.stdout.write('\r\x1b[2K');
-      if (resumen) console.log('  ' + verde('✓') + ' ' + resumen + dim('  ·  ' + tiempo(seg)));
+      if (resumen) console.log('  ' + c.ok('⏺') + ' ' + c.bold(c.num(resumen)) + c.darkGray('  ·  ' + tiempo(seg)));
     },
   };
 };
