@@ -357,20 +357,29 @@ async function estado() {
     } else {
       const simRuido = ruido.length ? ruido[0].similitud : 0;
       margenVector = top[0].similitud - simRuido;
-      panelCos.push(' ' + c.darkGray('cos(θ) sobre 1.536 dimensiones'));
+      panelCos.push(' ' + c.darkGray('cos(θ) sobre 1.536 dimensiones (esfera unidad)'));
+      
+      // Gráfico Braille de los vectores proyectados en el panel:
+      const lineasGrafo = diagramaCoseno(DEMO, [
+        { sim: top[0].similitud, etiqueta: top[0].similitud.toFixed(2) + ' ' + top[0].descripcion.slice(0, 10), color: c.ok },
+        { sim: UMBRAL_VECTOR, etiqueta: UMBRAL_VECTOR.toFixed(2) + ' umbral', color: c.warn },
+        { sim: simRuido, etiqueta: simRuido.toFixed(2) + ' ruido', color: c.err },
+      ], AD - 2, 9);
+      for (const l of lineasGrafo) panelCos.push(' ' + l);
+
       panelCos.push(' ' + c.bold(c.claude(`"${DEMO}"`)) + c.darkGray(' → vecinos'));
-      for (const f of top) {
+      for (const f of top.slice(0, 3)) {
         panelCos.push('  ' + (f.similitud >= UMBRAL_VECTOR ? c.ok(f.similitud.toFixed(3)) : c.darkGray(f.similitud.toFixed(3))) +
-          ' ' + barraSim(f.similitud, 14) + ' ' + c.gray(f.descripcion.slice(0, 20)));
+          ' ' + barraSim(f.similitud, 12) + ' ' + c.gray(f.descripcion.slice(0, 18)));
       }
-      panelCos.push('  ' + c.warn(UMBRAL_VECTOR.toFixed(3)) + ' ' + c.darkGray('╌'.repeat(14)) + ' ' + c.darkGray('umbral'));
-      panelCos.push('  ' + c.err(simRuido.toFixed(3)) + ' ' + barraSim(simRuido, 14) + ' ' + c.darkGray('ruido (suelo)'));
+      panelCos.push('  ' + c.warn(UMBRAL_VECTOR.toFixed(3)) + ' ' + c.darkGray('╌'.repeat(12)) + ' ' + c.darkGray('umbral'));
+      panelCos.push('  ' + c.err(simRuido.toFixed(3)) + ' ' + barraSim(simRuido, 12) + ' ' + c.darkGray('ruido (suelo)'));
       const sano = margenVector > 0.05;
       panelCos.push('  ' + (sano ? GL.ok : GL.err) + ' ' + c.bold(c.num('margen ' + margenVector.toFixed(3))) +
         (sano ? c.darkGray('  separa de verdad') : c.err('  la capa no aporta')));
     }
   }
-  panelCos.push('  ' + c.darkGray('└ ') + c.cyan('rag.js coseno "..."'));
+  panelCos.push('  ' + c.darkGray('└ ') + c.cyan('rag.js coseno "..."') + c.darkGray(' para pantalla completa'));
 
   spin.fin();
   const izq = CAP; CAP = null;
