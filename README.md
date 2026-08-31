@@ -90,15 +90,71 @@ Con la capa vectorial 246 aciertos frente a 239 sin ella, o sea **+7 atribuibles
 Para el detalle completo —estadísticas, decisiones, lo que se probó y **no** funcionó, y
 dónde investigar mejoras— ver **[RAG.md](RAG.md)**.
 
-### Flujo del mensaje (workflow n8n, 30 nodos)
+### 🗺️ Mapa Visual del Workflow en n8n (33 Nodos, 4 Zonas)
 
-1. **Webhook** recibe el evento de WAHA → filtra que sea un cliente real (no grupos/propios) y anti-duplicados.
-2. **Notas de voz** se transcriben con Groq Whisper antes de procesarse.
-3. **Filtro de texto** + **rate limit** (máx. 10 mensajes / 60 s por teléfono) + **handover manual** (si un empleado tomó el chat, el bot calla).
-4. **Cliente Memoria** carga nombre/notas del cliente desde Supabase/Engram.
-5. **AI Agent** razona con sus herramientas y produce la respuesta.
-6. **Sanitize Agent Output** descarta salidas corruptas del LLM (tool-calls filtradas / bucles de repetición) antes de enviarlas.
-7. Según marcadores de la respuesta: `[ESCALAR_HUMANO]` → cola de atención; `[PEDIR_AYUDA]` → solicitud de ayuda; si no, se envía la respuesta al cliente.
+El flujo en n8n está organizado visualmente en **4 Zonas Lógicas** con Sticky Notes de colores, eliminando cruces de cables y separando responsabilidades:
+
+```mermaid
+flowchart TD
+    classDef z1 fill:#f3e8ff,stroke:#9333ea,stroke-width:2px,color:#581c87;
+    classDef z2 fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f;
+    classDef z3 fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#075985;
+    classDef z4 fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d;
+    classDef tool fill:#ffffff,stroke:#0284c7,stroke-dasharray: 4 4,color:#0369a1;
+    classDef drop fill:#fee2e2,stroke:#dc2626,stroke-width:1px,color:#991b1b;
+
+    subgraph ZONA1["🟣 ZONA 1: Ingesta & Seguridad"]
+        W[Webhook Trigger]:::z1 --> S{¿Mensaje Saliente?}:::z1
+        S -->|Sí · fromMe| DH[Detectar Handoff Empleado]:::z1 --> D1[Descartar]:::drop
+        S -->|No · Cliente| CR{¿Es Cliente Real?}:::z1
+        CR -->|No| D2[Descartar]:::drop
+        CR -->|Sí| AD[Filtro Anti-Duplicado]:::z1
+    end
+
+    subgraph ZONA2["🟡 ZONA 2: Pre-Procesamiento & Sesión"]
+        AD --> DB[Debounce Ráfaga]:::z2
+        DB --> WH[Transcribir Nota de Voz · Whisper]:::z2
+        WH --> TXT{¿Es Texto Válido?}:::z2
+        TXT -->|No| RNT[Responder No-Texto]:::z2
+        TXT -->|Sí| CS[Verificar Sesión de Chat]:::z2
+        CS --> RL{¿Superó Rate Limit?}:::z2
+        RL -->|Sí · >10 msg/min| RLD[Descartar]:::drop
+        RL -->|No| MH{¿Atención Manual?}:::z2
+        MH -->|Sí| MHA[Silencio · Modo Empleado]:::drop
+        MH -->|No| CM[Cargar Memoria Cliente]:::z2
+    end
+
+    subgraph ZONA3["🔵 ZONA 3: Agente de IA & Herramientas"]
+        CM --> AGENT["🤖 AI Agent (Perucho)"]:::z3
+        
+        MODEL["🧠 OpenRouter Model"]:::tool -.-> AGENT
+        MEM["💾 Buffer Memory"]:::tool -.-> AGENT
+        T1["🔍 buscar_productos"]:::tool -.-> AGENT
+        T2["📋 hacer_presupuesto"]:::tool -.-> AGENT
+        T3["💵 obtener_tasa_bcv"]:::tool -.-> AGENT
+        T4["🧠 memoria_engram"]:::tool -.-> AGENT
+        
+        AGENT --> SAN["🛡️ Sanitize Output"]:::z3
+    end
+
+    subgraph ZONA4["🟢 ZONA 4: Enrutamiento & Despacho WAHA"]
+        SAN --> ESC{¿Requiere Escalar?}:::z4
+        ESC -->|Sí · ESCALAR_HUMANO| MAN[Activar Chat Manual]:::z4
+        MAN --> AP[Registrar Atención Pendiente]:::z4
+        MAN --> WA_ESC[Enviar Mensaje Escalamiento]:::z4
+        
+        ESC -->|No| AYU{¿Pedir Ayuda?}:::z4
+        AYU -->|Sí · PEDIR_AYUDA| SA[Registrar Solicitud Ayuda]:::z4 --> WA_AYU[Enviar Mensaje Puente]:::z4
+        AYU -->|No · Normal| WA_RESP[Enviar Respuesta Directa]:::z4
+    end
+```
+
+| Zona | Color | Qué resuelve |
+| :--- | :--- | :--- |
+| **🟣 Zona 1** | Púrpura | **Ingesta & Seguridad**: Webhook, discriminación de mensajes propios (`fromMe`) para handoff, filtro de grupos/estados y anti-duplicados por ID. |
+| **🟡 Zona 2** | Amarillo | **Pre-Procesamiento & Sesión**: Debounce de ráfagas rápidas, transcripción Whisper, rate limit (10 msg/min), control de sesión y reactivación tras 30 min. |
+| **🔵 Zona 3** | Azul | **Agente de IA & Herramientas**: Orquestación de razonamiento con Luna/Sonnet, memoria conversacional, 5 herramientas de negocio y sanitización de salida. |
+| **🟢 Zona 4** | Verde | **Enrutamiento & Despacho**: Clasificador trifurcado (`[ESCALAR_HUMANO]`, `[PEDIR_AYUDA]`, Respuesta directa) con entrega HTTP hacia WAHA. |
 
 ### Herramientas del agente (toolCode en n8n)
 
