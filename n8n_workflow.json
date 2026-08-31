@@ -16,8 +16,8 @@
       "id": "webhook_node",
       "name": "Webhook Trigger",
       "position": [
-        112,
-        304
+        -200,
+        260
       ],
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
@@ -51,8 +51,8 @@
       "id": "filter_text_node",
       "name": "Is Text Message?",
       "position": [
-        272,
-        304
+        1140,
+        380
       ],
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3
@@ -79,21 +79,21 @@
       "id": "reply_non_text_node",
       "name": "Reply Non-Text",
       "position": [
-        272,
-        128
+        1140,
+        160
       ],
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4
     },
     {
       "parameters": {
-        "jsCode": "// Check Chat Session via Supabase REST (reemplaza el nodo Postgres roto).\n// Upsert por telefono con rate-limit por ventana de 60s. Devuelve {estado, msg_count, telefono}.\n// Reactivación automática: si un humano tomó el chat pero lleva >30 min sin escribirle\n// al cliente, el bot vuelve a responder solo.\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };\nconst REACTIVAR_MS = 30 * 60 * 1000; // 30 min sin respuesta al cliente -> el bot retoma\nlet telefono = null;\ntry { telefono = $('Webhook Trigger').first().json.body.payload.from; } catch (e) {}\nlet estado = 'automatico', msg_count = 1;\n// Chats que el bot NO debe atender (proveedores, cuentas internas). Sticky: no se\n// reactiva sola como 'manual', y los upserts de este nodo y del handoff no la pisan\n// porque nunca mandan la columna.\nlet no_atender = false;\ntry {\n  if (telefono) {\n    const r = await axios.get(SB + '/rest/v1/chat_sessions?telefono=eq.' + encodeURIComponent(telefono) + '&select=estado,msg_count,window_start,manual_since,no_atender', { headers: H });\n    const row = r.data && r.data[0];\n    const now = Date.now();\n    let window_start;\n    let reactivar = false;\n    if (row) {\n      no_atender = row.no_atender === true;\n      estado = row.estado || 'automatico';\n      if (estado === 'manual') {\n        const ms = row.manual_since ? new Date(row.manual_since).getTime() : 0;\n        if (!ms || (now - ms > REACTIVAR_MS)) { estado = 'automatico'; reactivar = true; }\n      }\n      const ws = row.window_start ? new Date(row.window_start).getTime() : 0;\n      if (now - ws > 60000) { msg_count = 1; window_start = new Date().toISOString(); }\n      else { msg_count = (Number(row.msg_count) || 0) + 1; window_start = row.window_start; }\n    } else {\n      msg_count = 1; window_start = new Date().toISOString();\n    }\n    const up = { telefono, estado, msg_count, window_start, updated_at: new Date().toISOString() };\n    if (reactivar) up.manual_since = null;\n    await axios.post(SB + '/rest/v1/chat_sessions?on_conflict=telefono', up, { headers: H });\n  }\n} catch (e) {}\nreturn [{ json: { estado, msg_count, telefono, no_atender } }];"
+        "jsCode": "// Check Chat Session via Supabase REST (reemplaza el nodo Postgres roto).\n// Upsert por telefono con rate-limit por ventana de 60s. Devuelve {estado, msg_count, telefono}.\n// Reactivación automática: si un humano tomó el chat pero lleva >30 min sin escribirle\n// al cliente, el bot vuelve a responder solo.\nconst axios = require('axios');\nconst SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';\nconst ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };\nconst REACTIVAR_MS = 30 * 60 * 1000; // 30 min sin respuesta al cliente -> el bot retoma\nlet telefono = null;\ntry { telefono = $('Webhook Trigger').first().json.body.payload.from; } catch (e) {}\nlet estado = 'automatico', msg_count = 1;\n// Chats que el bot NO debe atender (proveedores, cuentas internas). Sticky: no se\n// reactiva sola como 'manual', y los upserts de este nodo y del handoff no la pisan\n// porque nunca mandan la columna.\nlet no_atender = false;\ntry {\n  if (telefono) {\n    const r = await axios.get(SB + '/rest/v1/chat_sessions?telefono=eq.' + encodeURIComponent(telefono) + '&select=estado,msg_count,window_start,manual_since,no_atender', { headers: H });\n    const row = r.data && r.data[0];\n    const now = Date.now();\n    let window_start;\n    let reactivar = false;\n    if (row) {\n      no_atender = row.no_atender === true;\n      estado = row.estado || 'automatico';\n      if (estado === 'manual') {\n        const ms = row.manual_since ? new Date(row.manual_since).getTime() : 0;\n        if (!ms || (now - ms > REACTIVAR_MS)) { estado = 'automatico'; reactivar = true; }\n      }\n      const ws = row.window_start ? new Date(row.window_start).getTime() : 0;\n      if (now - ws > 60000) { msg_count = 1; window_start = new Date().toISOString(); }\n      else { msg_count = (Number(row.msg_count) || 0) + 1; window_start = row.window_start; }\n    } else {\n      msg_count = 1; window_start = new Date().toISOString();\n    }\n    const up = { telefono, estado, msg_count, window_start, updated_at: new Date().toISOString() };\n    if (reactivar) up.manual_since = null;\n    await axios.post(SB + '/rest/v1/chat_sessions?on_conflict=telefono', up, { headers: H });\n  }\n} catch (e) {}\nreturn [{ json: { estado, msg_count, telefono, no_atender } }];"
       },
       "id": "postgres_session_node",
       "name": "Check Chat Session",
       "position": [
-        432,
-        304
+        1360,
+        380
       ],
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -126,8 +126,8 @@
       "id": "rate_limit_node",
       "name": "Rate Limited?",
       "position": [
-        592,
-        304
+        1580,
+        380
       ],
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3
@@ -137,8 +137,8 @@
       "id": "rate_limit_noop",
       "name": "Rate Limit Drop",
       "position": [
-        592,
-        128
+        1580,
+        160
       ],
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1
@@ -179,8 +179,8 @@
       "id": "if_manual_node",
       "name": "Is Manual Handover?",
       "position": [
-        752,
-        304
+        1800,
+        380
       ],
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3
@@ -196,8 +196,8 @@
       "id": "ai_agent_node",
       "name": "AI Agent",
       "position": [
-        1008,
-        400
+        2260,
+        380
       ],
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1
@@ -212,8 +212,8 @@
       "id": "openrouter_model_node",
       "name": "OpenRouter Chat Model",
       "position": [
-        928,
-        592
+        2040,
+        580
       ],
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
       "typeVersion": 1,
@@ -230,8 +230,8 @@
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
       "typeVersion": 1.3,
       "position": [
-        1072,
-        592
+        2180,
+        580
       ],
       "parameters": {
         "sessionIdType": "customKey",
@@ -266,21 +266,21 @@
       "id": "if_escalar_node",
       "name": "Check Escalation",
       "position": [
-        1408,
-        400
+        2800,
+        380
       ],
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3
     },
     {
       "parameters": {
-        "jsCode": "// Set Chat Manual via Supabase REST (reemplaza el nodo Postgres roto).\n// Marca la sesion del cliente como 'manual' para que el bot deje de responder (lo atiende un humano).\n// manual_since permite reactivar el bot solo tras 30 min de silencio (ver Check Chat Session).\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };\nlet telefono = null;\ntry { telefono = $('Webhook Trigger').first().json.body.payload.from; } catch (e) {}\ntry { if (telefono) { await axios.post(SB + '/rest/v1/chat_sessions?on_conflict=telefono', { telefono, estado: 'manual', manual_since: new Date().toISOString(), updated_at: new Date().toISOString() }, { headers: H }); } } catch (e) {}\nreturn [{ json: $json }];"
+        "jsCode": "// Set Chat Manual via Supabase REST (reemplaza el nodo Postgres roto).\n// Marca la sesion del cliente como 'manual' para que el bot deje de responder (lo atiende un humano).\n// manual_since permite reactivar el bot solo tras 30 min de silencio (ver Check Chat Session).\nconst axios = require('axios');\nconst SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';\nconst ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };\nlet telefono = null;\ntry { telefono = $('Webhook Trigger').first().json.body.payload.from; } catch (e) {}\ntry { if (telefono) { await axios.post(SB + '/rest/v1/chat_sessions?on_conflict=telefono', { telefono, estado: 'manual', manual_since: new Date().toISOString(), updated_at: new Date().toISOString() }, { headers: H }); } } catch (e) {}\nreturn [{ json: $json }];"
       },
       "id": "postgres_set_manual_node",
       "name": "Set Chat Manual",
       "position": [
-        1600,
-        256
+        3040,
+        200
       ],
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -308,8 +308,8 @@
       "id": "waha_handover_node",
       "name": "Send Handover Message",
       "position": [
-        1808,
-        256
+        3280,
+        140
       ],
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4
@@ -335,8 +335,8 @@
       "id": "waha_agent_node",
       "name": "Send Agent Response",
       "position": [
-        1600,
-        464
+        3280,
+        560
       ],
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -347,8 +347,8 @@
       "id": "manual_handover_noop",
       "name": "Manual Handover Active",
       "position": [
-        1008,
-        208
+        1800,
+        160
       ],
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1
@@ -359,8 +359,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolCode",
       "typeVersion": 1.3,
       "position": [
-        1216,
-        592
+        2320,
+        580
       ],
       "parameters": {
         "name": "buscar_productos",
@@ -379,8 +379,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolCode",
       "typeVersion": 1.3,
       "position": [
-        1216,
-        704
+        2600,
+        580
       ],
       "parameters": {
         "name": "obtener_tasa_bcv",
@@ -399,14 +399,14 @@
       "type": "@n8n/n8n-nodes-langchain.toolCode",
       "typeVersion": 1.3,
       "position": [
-        1216,
-        832
+        2320,
+        740
       ],
       "parameters": {
         "name": "buscar_memoria_engram",
         "description": "Recupera el nombre y las notas/preferencias del cliente ACTUAL (el telefono se detecta automaticamente, no necesitas pasarlo). Llamala al INICIO de la conversacion para recordar quien es el cliente. No requiere parametros.",
         "language": "javaScript",
-        "jsCode": "// buscar_memoria: recupera el cliente desde Supabase (tabla clientes) por telefono.\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON };\nlet { telefono } = query;\ntry { const w = $('Webhook Trigger').first().json.body.payload; if (w && w.from) telefono = w.from; } catch (e) {}\nif (!telefono) return JSON.stringify({ encontrado: false, nota: 'falta telefono' });\ntelefono = String(telefono).trim();\ntry {\n  const r = await axios.get(SB + '/rest/v1/clientes_chat?telefono=eq.' + encodeURIComponent(telefono) + '&select=nombre,notas', { headers: H });\n  const c = r.data && r.data[0];\n  if (!c) return JSON.stringify({ encontrado: false, nombre: null, notas: null });\n  return JSON.stringify({ encontrado: true, nombre: c.nombre || null, notas: c.notas || null });\n} catch (e) {\n  return JSON.stringify({ encontrado: false, error: String(e.message) });\n}\n",
+        "jsCode": "// buscar_memoria: recupera el cliente desde Supabase (tabla clientes) por telefono.\nconst axios = require('axios');\nconst SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';\nconst ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON };\nlet { telefono } = query;\ntry { const w = $('Webhook Trigger').first().json.body.payload; if (w && w.from) telefono = w.from; } catch (e) {}\nif (!telefono) return JSON.stringify({ encontrado: false, nota: 'falta telefono' });\ntelefono = String(telefono).trim();\ntry {\n  const r = await axios.get(SB + '/rest/v1/clientes_chat?telefono=eq.' + encodeURIComponent(telefono) + '&select=nombre,notas', { headers: H });\n  const c = r.data && r.data[0];\n  if (!c) return JSON.stringify({ encontrado: false, nombre: null, notas: null });\n  return JSON.stringify({ encontrado: true, nombre: c.nombre || null, notas: c.notas || null });\n} catch (e) {\n  return JSON.stringify({ encontrado: false, error: String(e.message) });\n}\n",
         "specifyInputSchema": true,
         "schemaType": "fromJson",
         "jsonSchemaExample": "{\n  \"q\": \"584129999999\"\n}",
@@ -419,14 +419,14 @@
       "type": "@n8n/n8n-nodes-langchain.toolCode",
       "typeVersion": 1.3,
       "position": [
-        1216,
-        944
+        2460,
+        740
       ],
       "parameters": {
         "name": "guardar_memoria_engram",
         "description": "Guarda o actualiza la memoria del cliente ACTUAL (el telefono se detecta automaticamente). Parametros: nombre (el nombre del cliente cuando lo diga) y/o nota (un dato o preferencia clave: la obra que hace, marca preferida, RIF, etc). Ejemplo para guardar el nombre: {\"nombre\":\"Maria Gonzalez\"}. Ejemplo para una preferencia: {\"nota\":\"construye una casa, prefiere cemento CSC\"}.",
         "language": "javaScript",
-        "jsCode": "// guardar_memoria: upsert del cliente en Supabase (tabla clientes), llaveado por telefono.\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };\nlet telefono = query.telefono;\nlet nombre = query.nombre || query.name || query.nombre_cliente || query.cliente || '';\nlet nota = query.nota || query.note || query.notas || query.preferencia || query.dato || query.content || query.observacion || '';\n// El telefono real viene del webhook; no dependemos de que el modelo lo pase.\ntry { const w = $('Webhook Trigger').first().json.body.payload; if (w && w.from) telefono = w.from; } catch (e) {}\nif (!telefono) return JSON.stringify({ guardado: false, error: 'falta telefono' });\ntelefono = String(telefono).trim();\ntry {\n  let prev = null;\n  try { const r = await axios.get(SB + '/rest/v1/clientes_chat?telefono=eq.' + encodeURIComponent(telefono) + '&select=nombre,notas', { headers: H }); prev = r.data && r.data[0]; } catch (e) {}\n  const row = { telefono, updated_at: new Date().toISOString() };\n  if (nombre && String(nombre).trim()) row.nombre = String(nombre).trim();\n  if (nota && String(nota).trim()) {\n    const limpia = String(nota).trim();\n    const existentes = (prev && prev.notas) ? prev.notas : '';\n    // evita duplicar la misma nota\n    if (!existentes.toLowerCase().includes(limpia.toLowerCase())) {\n      row.notas = existentes ? (existentes + ' | ' + limpia) : limpia;\n    }\n  }\n  await axios.post(SB + '/rest/v1/clientes_chat', row, { headers: H });\n  return JSON.stringify({ guardado: true, telefono, nombre: row.nombre || (prev && prev.nombre) || null });\n} catch (e) {\n  return JSON.stringify({ guardado: false, error: String(e.message) });\n}\n",
+        "jsCode": "// guardar_memoria: upsert del cliente en Supabase (tabla clientes), llaveado por telefono.\nconst axios = require('axios');\nconst SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';\nconst ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };\nlet telefono = query.telefono;\nlet nombre = query.nombre || query.name || query.nombre_cliente || query.cliente || '';\nlet nota = query.nota || query.note || query.notas || query.preferencia || query.dato || query.content || query.observacion || '';\n// El telefono real viene del webhook; no dependemos de que el modelo lo pase.\ntry { const w = $('Webhook Trigger').first().json.body.payload; if (w && w.from) telefono = w.from; } catch (e) {}\nif (!telefono) return JSON.stringify({ guardado: false, error: 'falta telefono' });\ntelefono = String(telefono).trim();\ntry {\n  let prev = null;\n  try { const r = await axios.get(SB + '/rest/v1/clientes_chat?telefono=eq.' + encodeURIComponent(telefono) + '&select=nombre,notas', { headers: H }); prev = r.data && r.data[0]; } catch (e) {}\n  const row = { telefono, updated_at: new Date().toISOString() };\n  if (nombre && String(nombre).trim()) row.nombre = String(nombre).trim();\n  if (nota && String(nota).trim()) {\n    const limpia = String(nota).trim();\n    const existentes = (prev && prev.notas) ? prev.notas : '';\n    // evita duplicar la misma nota\n    if (!existentes.toLowerCase().includes(limpia.toLowerCase())) {\n      row.notas = existentes ? (existentes + ' | ' + limpia) : limpia;\n    }\n  }\n  await axios.post(SB + '/rest/v1/clientes_chat', row, { headers: H });\n  return JSON.stringify({ guardado: true, telefono, nombre: row.nombre || (prev && prev.nombre) || null });\n} catch (e) {\n  return JSON.stringify({ guardado: false, error: String(e.message) });\n}\n",
         "specifyInputSchema": true,
         "schemaType": "fromJson",
         "jsonSchemaExample": "{\n  \"session_id\": \"584129999999\",\n  \"type\": \"preference\",\n  \"title\": \"Método de pago\",\n  \"content\": \"Pago Móvil\",\n  \"topic_key\": \"cliente:584129999999\"\n}",
@@ -439,8 +439,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolCode",
       "typeVersion": 1.3,
       "position": [
-        1072,
-        800
+        2460,
+        580
       ],
       "parameters": {
         "name": "hacer_presupuesto",
@@ -453,15 +453,15 @@
     },
     {
       "parameters": {
-        "jsCode": "// Nodo de codigo \"Cliente Memoria\": recall determinista + guardado automatico del nombre.\n// Corre en el flujo principal antes del AI Agent. Nunca rompe el flujo (todo en try/catch).\n//\n// 2026-08-20: el bot pedia el nombre en el 29% de sus mensajes y solo lo capturaba el 5% de\n// las veces, porque el regex de abajo exige preambulo (\"me llamo X\") y a \"¿con quien tengo el\n// gusto?\" la gente responde \"Pedro\". Sin nombre guardado, el prompt lo volvia a pedir, sin fin.\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };\nconst PREGUNTA = 'con quién tengo el gusto';\nconst MAX_PREGUNTAS = 2;\n\nlet telefono = null, mensaje = '', nombre = null, notas = null, pushName = null;\ntry {\n  const p = $('Transcribir Nota de Voz').first().json.body.payload;\n  telefono = p && p.from;\n  mensaje = (p && p.body) || '';\n  pushName = (p && p._data && p._data.pushName) || (p && p.notifyName) || (p && p.pushName) || null;\n} catch (e) {}\n\n// 1) Cargar memoria existente (recall)\ntry {\n  if (telefono) {\n    const r = await axios.get(SB + '/rest/v1/clientes_chat?telefono=eq.' + encodeURIComponent(telefono) + '&select=nombre,notas', { headers: H });\n    if (r.data && r.data[0]) { nombre = r.data[0].nombre || null; notas = r.data[0].notas || null; }\n  }\n} catch (e) {}\n\n// 1b) ¿Cuantas veces le pedimos ya el nombre, y fue lo ultimo que dijimos?\nlet vecesPedido = 0, acabaDePreguntar = false;\ntry {\n  if (telefono && !nombre) {\n    const r = await axios.get(SB + '/rest/v1/mensajes_bot?chat_id=eq.' + encodeURIComponent(telefono) + '&select=texto_norm&order=created_at.desc&limit=20', { headers: H });\n    const filas = (r.data || []).map(x => x.texto_norm || '');\n    vecesPedido = filas.filter(t => t.includes(PREGUNTA)).length;\n    acabaDePreguntar = !!filas[0] && filas[0].includes(PREGUNTA);\n  }\n} catch (e) {}\n\n// Palabras que NUNCA son un nombre (saludos, muletillas, roles genericos).\nconst STOP = ['si','no','ok','ya','hola','buenas','buenos','dias','tardes','noches','gracias','nada','todo','bueno','buena','señor','señora','amigo','amiga','jefe','dios','empresa','cliente','casa','tienda','ferreteria','mama','papa','cuanto','cuanta','precio','precios','necesito','quiero','busco','tengo','estoy','ando','voy','dame','tiene','tienen','hay','disponible','me','mi','yo','el','la','de','del','para','por','con','ese','este','esa'];\nfunction formaDeNombre(s) {\n  const t = String(s || '').replace(/\\s+/g, ' ').trim();\n  if (t.length < 3 || t.length > 40) return null;\n  if (!/^[A-Za-zÀ-ÖØ-öø-ÿ' .]+$/.test(t)) return null; // sin digitos, emoji ni simbolos\n  const w = t.replace(/[.']/g, ' ').split(' ').filter(Boolean);\n  if (!w.length || w.length > 3) return null;\n  for (const x of w) { if (x.length < 2 || x.length > 15) return null; }\n  if (w.some(x => STOP.includes(x.toLowerCase()))) return null;\n  return w.map(x => x.charAt(0).toUpperCase() + x.slice(1).toLowerCase()).join(' ');\n}\n// Un termino del catalogo no es un nombre: evita guardar \"Cemento Gris\" como cliente.\nasync function esDelCatalogo(cand) {\n  try {\n    const ws = cand.toLowerCase().split(' ').map(encodeURIComponent).join(',');\n    const r = await axios.get(SB + '/rest/v1/catalogo_vocabulario?select=termino&limit=1&termino=in.(' + ws + ')', { headers: H });\n    return Array.isArray(r.data) && r.data.length > 0;\n  } catch (e) { return false; }\n}\n\n// 2) Detectar el nombre\nlet candidato = null;\nif (telefono && !nombre && mensaje) {\n  // (a) con preambulo explicito: \"me llamo Pedro\", \"soy Pedro\"\n  const m = mensaje.match(/(?:me\\s+llamo|mi\\s+nombre\\s+es|me\\s+dicen|le\\s+habla|habla|aqui|soy)\\s+([A-Za-zÀ-ÖØ-öø-ÿ]{3,}(?:\\s+[A-Za-zÀ-ÖØ-öø-ÿ]{2,})?)/i);\n  if (m) candidato = formaDeNombre(m[1]);\n  // (b) respuesta corta a NUESTRA pregunta: el mensaje entero es el nombre (\"Pedro\")\n  if (!candidato && acabaDePreguntar) candidato = formaDeNombre(mensaje);\n}\nif (candidato && await esDelCatalogo(candidato)) candidato = null;\n// (c) ultimo recurso: el pushName de WhatsApp, si parece un nombre de verdad\nif (telefono && !nombre && !candidato && pushName) {\n  const p = formaDeNombre(pushName);\n  if (p && !(await esDelCatalogo(p))) candidato = p;\n}\nif (candidato) {\n  nombre = candidato;\n  try { await axios.post(SB + '/rest/v1/clientes_chat', { telefono, nombre, updated_at: new Date().toISOString() }, { headers: H }); } catch (e) {}\n}\n\n// 3) ¿El prompt debe pedir el nombre? No si ya lo tenemos, o si ya insistimos 2 veces.\nconst pedir_nombre = (nombre || vecesPedido >= MAX_PREGUNTAS) ? 'no' : 'si';\n\nreturn [{ json: { cliente_nombre: nombre, cliente_notas: notas, telefono_cliente: telefono, pedir_nombre } }];"
+        "jsCode": "// Nodo de codigo \"Cliente Memoria\": recall determinista + guardado automatico del nombre.\n// Corre en el flujo principal antes del AI Agent. Nunca rompe el flujo (todo en try/catch).\n//\n// 2026-08-20: el bot pedia el nombre en el 29% de sus mensajes y solo lo capturaba el 5% de\n// las veces, porque el regex de abajo exige preambulo (\"me llamo X\") y a \"¿con quien tengo el\n// gusto?\" la gente responde \"Pedro\". Sin nombre guardado, el prompt lo volvia a pedir, sin fin.\nconst axios = require('axios');\nconst SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';\nconst ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };\nconst PREGUNTA = 'con quién tengo el gusto';\nconst MAX_PREGUNTAS = 2;\n\nlet telefono = null, mensaje = '', nombre = null, notas = null, pushName = null;\ntry {\n  const p = $('Transcribir Nota de Voz').first().json.body.payload;\n  telefono = p && p.from;\n  mensaje = (p && p.body) || '';\n  pushName = (p && p._data && p._data.pushName) || (p && p.notifyName) || (p && p.pushName) || null;\n} catch (e) {}\n\n// 1) Cargar memoria existente (recall)\ntry {\n  if (telefono) {\n    const r = await axios.get(SB + '/rest/v1/clientes_chat?telefono=eq.' + encodeURIComponent(telefono) + '&select=nombre,notas', { headers: H });\n    if (r.data && r.data[0]) { nombre = r.data[0].nombre || null; notas = r.data[0].notas || null; }\n  }\n} catch (e) {}\n\n// 1b) ¿Cuantas veces le pedimos ya el nombre, y fue lo ultimo que dijimos?\nlet vecesPedido = 0, acabaDePreguntar = false;\ntry {\n  if (telefono && !nombre) {\n    const r = await axios.get(SB + '/rest/v1/mensajes_bot?chat_id=eq.' + encodeURIComponent(telefono) + '&select=texto_norm&order=created_at.desc&limit=20', { headers: H });\n    const filas = (r.data || []).map(x => x.texto_norm || '');\n    vecesPedido = filas.filter(t => t.includes(PREGUNTA)).length;\n    acabaDePreguntar = !!filas[0] && filas[0].includes(PREGUNTA);\n  }\n} catch (e) {}\n\n// Palabras que NUNCA son un nombre (saludos, muletillas, roles genericos).\nconst STOP = ['si','no','ok','ya','hola','buenas','buenos','dias','tardes','noches','gracias','nada','todo','bueno','buena','señor','señora','amigo','amiga','jefe','dios','empresa','cliente','casa','tienda','ferreteria','mama','papa','cuanto','cuanta','precio','precios','necesito','quiero','busco','tengo','estoy','ando','voy','dame','tiene','tienen','hay','disponible','me','mi','yo','el','la','de','del','para','por','con','ese','este','esa'];\nfunction formaDeNombre(s) {\n  const t = String(s || '').replace(/\\s+/g, ' ').trim();\n  if (t.length < 3 || t.length > 40) return null;\n  if (!/^[A-Za-zÀ-ÖØ-öø-ÿ' .]+$/.test(t)) return null; // sin digitos, emoji ni simbolos\n  const w = t.replace(/[.']/g, ' ').split(' ').filter(Boolean);\n  if (!w.length || w.length > 3) return null;\n  for (const x of w) { if (x.length < 2 || x.length > 15) return null; }\n  if (w.some(x => STOP.includes(x.toLowerCase()))) return null;\n  return w.map(x => x.charAt(0).toUpperCase() + x.slice(1).toLowerCase()).join(' ');\n}\n// Un termino del catalogo no es un nombre: evita guardar \"Cemento Gris\" como cliente.\nasync function esDelCatalogo(cand) {\n  try {\n    const ws = cand.toLowerCase().split(' ').map(encodeURIComponent).join(',');\n    const r = await axios.get(SB + '/rest/v1/catalogo_vocabulario?select=termino&limit=1&termino=in.(' + ws + ')', { headers: H });\n    return Array.isArray(r.data) && r.data.length > 0;\n  } catch (e) { return false; }\n}\n\n// 2) Detectar el nombre\nlet candidato = null;\nif (telefono && !nombre && mensaje) {\n  // (a) con preambulo explicito: \"me llamo Pedro\", \"soy Pedro\"\n  const m = mensaje.match(/(?:me\\s+llamo|mi\\s+nombre\\s+es|me\\s+dicen|le\\s+habla|habla|aqui|soy)\\s+([A-Za-zÀ-ÖØ-öø-ÿ]{3,}(?:\\s+[A-Za-zÀ-ÖØ-öø-ÿ]{2,})?)/i);\n  if (m) candidato = formaDeNombre(m[1]);\n  // (b) respuesta corta a NUESTRA pregunta: el mensaje entero es el nombre (\"Pedro\")\n  if (!candidato && acabaDePreguntar) candidato = formaDeNombre(mensaje);\n}\nif (candidato && await esDelCatalogo(candidato)) candidato = null;\n// (c) ultimo recurso: el pushName de WhatsApp, si parece un nombre de verdad\nif (telefono && !nombre && !candidato && pushName) {\n  const p = formaDeNombre(pushName);\n  if (p && !(await esDelCatalogo(p))) candidato = p;\n}\nif (candidato) {\n  nombre = candidato;\n  try { await axios.post(SB + '/rest/v1/clientes_chat', { telefono, nombre, updated_at: new Date().toISOString() }, { headers: H }); } catch (e) {}\n}\n\n// 3) ¿El prompt debe pedir el nombre? No si ya lo tenemos, o si ya insistimos 2 veces.\nconst pedir_nombre = (nombre || vecesPedido >= MAX_PREGUNTAS) ? 'no' : 'si';\n\nreturn [{ json: { cliente_nombre: nombre, cliente_notas: notas, telefono_cliente: telefono, pedir_nombre } }];"
       },
       "id": "cliente_memoria_node",
       "name": "Cliente Memoria",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        620,
-        470
+        2020,
+        380
       ],
       "onError": "continueRegularOutput"
     },
@@ -472,8 +472,8 @@
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        96,
-        460
+        480,
+        140
       ]
     },
     {
@@ -532,33 +532,33 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        96,
-        304
+        260,
+        380
       ]
     },
     {
       "parameters": {
-        "jsCode": "const axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=representation' };\nconst GATE = 300;\nconst out = [];\nfor (const it of $input.all()) {\n  const item = it.json || {};\n  const body = item.body || {};\n  const payload = body.payload || {};\n  const catchup = !!body.catchup;\n  const msgId = payload.id || body.id || null;\n  const chatId = payload.from || body.from || null;\n  let ts = Number(payload.timestamp || 0);\n  if (ts > 1e12) ts = ts / 1000;\n  const ageSec = ts > 0 ? (Date.now() / 1000 - ts) : 0;\n  // Compuerta de frescura: los mensajes viejos que NO vienen de la recuperacion (catchup)\n  // se descartan aqui, para que una rafaga al reconectar tras un apagado no dispare respuestas solas (evita baneo).\n  if (!catchup && ageSec > GATE) { continue; }\n  // Texto del cliente, para poder auditar la conversacion completa despues (mensajes_bot\n  // solo guarda el lado del bot). En notas de voz e imagenes el body todavia NO es texto:\n  // lo rellena por PATCH el nodo \"Transcribir Nota de Voz\", que corre justo despues.\n  const mime = ((payload.media && payload.media.mimetype) || '').toLowerCase();\n  const msgType = (payload.type || '').toLowerCase();\n  const esAudio = payload.hasMedia === true && (mime.includes('audio') || msgType === 'ptt' || msgType === 'audio');\n  const esImagen = payload.hasMedia === true && mime.includes('image/');\n  const tipo = esAudio ? 'ptt' : esImagen ? 'image' : (payload.hasMedia === true ? 'otro' : 'texto');\n  let texto = typeof payload.body === 'string' ? payload.body : '';\n  if (texto.startsWith('data:')) texto = ''; // media en base64, no es texto\n  texto = texto.slice(0, 4000) || null;\n  // Dedup por ID de mensaje: nunca responder dos veces el mismo mensaje.\n  if (msgId) {\n    try {\n      const r = await axios.post(SB + '/rest/v1/mensajes_procesados', { message_id: String(msgId), chat_id: chatId, texto, tipo }, { headers: H });\n      if (Array.isArray(r.data) && r.data.length === 0) { continue; }\n    } catch (e) {}\n  }\n  out.push({ json: item });\n}\nreturn out;\n"
+        "jsCode": "const axios = require('axios');\nconst SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';\nconst ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=representation' };\nconst GATE = 300;\nconst out = [];\nfor (const it of $input.all()) {\n  const item = it.json || {};\n  const body = item.body || {};\n  const payload = body.payload || {};\n  const catchup = !!body.catchup;\n  const msgId = payload.id || body.id || null;\n  const chatId = payload.from || body.from || null;\n  let ts = Number(payload.timestamp || 0);\n  if (ts > 1e12) ts = ts / 1000;\n  const ageSec = ts > 0 ? (Date.now() / 1000 - ts) : 0;\n  // Compuerta de frescura: los mensajes viejos que NO vienen de la recuperacion (catchup)\n  // se descartan aqui, para que una rafaga al reconectar tras un apagado no dispare respuestas solas (evita baneo).\n  if (!catchup && ageSec > GATE) { continue; }\n  // Texto del cliente, para poder auditar la conversacion completa despues (mensajes_bot\n  // solo guarda el lado del bot). En notas de voz e imagenes el body todavia NO es texto:\n  // lo rellena por PATCH el nodo \"Transcribir Nota de Voz\", que corre justo despues.\n  const mime = ((payload.media && payload.media.mimetype) || '').toLowerCase();\n  const msgType = (payload.type || '').toLowerCase();\n  const esAudio = payload.hasMedia === true && (mime.includes('audio') || msgType === 'ptt' || msgType === 'audio');\n  const esImagen = payload.hasMedia === true && mime.includes('image/');\n  const tipo = esAudio ? 'ptt' : esImagen ? 'image' : (payload.hasMedia === true ? 'otro' : 'texto');\n  let texto = typeof payload.body === 'string' ? payload.body : '';\n  if (texto.startsWith('data:')) texto = ''; // media en base64, no es texto\n  texto = texto.slice(0, 4000) || null;\n  // Dedup por ID de mensaje: nunca responder dos veces el mismo mensaje.\n  if (msgId) {\n    try {\n      const r = await axios.post(SB + '/rest/v1/mensajes_procesados', { message_id: String(msgId), chat_id: chatId, texto, tipo }, { headers: H });\n      if (Array.isArray(r.data) && r.data.length === 0) { continue; }\n    } catch (e) {}\n  }\n  out.push({ json: item });\n}\nreturn out;\n"
       },
       "id": "filtro_antidup_node",
       "name": "Filtro Anti-Duplicado",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        180,
-        470
+        480,
+        380
       ],
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "// Encola al cliente en atenciones_pendientes cuando escala a un empleado.\n// La app de empleados se entera por Realtime. Dedup: una sola atencion 'pendiente' por telefono.\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nlet telefono = null, motivo = null, pushName = null;\ntry { telefono = $('Webhook Trigger').first().json.body.payload.from; } catch (e) {}\ntry { motivo = ($('Webhook Trigger').first().json.body.payload.body || '').toString().slice(0, 300) || null; } catch (e) {}\ntry { const _p = $('Webhook Trigger').first().json.body.payload; pushName = (_p && _p._data && _p._data.pushName) || (_p && _p.notifyName) || (_p && _p.pushName) || null; } catch (e) {}\ntry {\n  if (telefono) {\n    const ex = await axios.get(SB + '/rest/v1/atenciones_pendientes?status=eq.pendiente&select=id&telefono=eq.' + encodeURIComponent(telefono), { headers: H });\n    if (!ex.data || ex.data.length === 0) {\n      let nombre = null;\n      try { const c = await axios.get(SB + '/rest/v1/clientes_chat?select=nombre&telefono=eq.' + encodeURIComponent(telefono), { headers: H }); nombre = (c.data && c.data[0] && c.data[0].nombre) || null; } catch (e) {}\n      if (!nombre && pushName) nombre = String(pushName).slice(0, 80);\n      await axios.post(SB + '/rest/v1/atenciones_pendientes', { telefono, nombre, motivo, status: 'pendiente' }, { headers: H });\n    }\n  }\n} catch (e) {}\nreturn [{ json: $json }];"
+        "jsCode": "// Encola al cliente en atenciones_pendientes cuando escala a un empleado.\n// La app de empleados se entera por Realtime. Dedup: una sola atencion 'pendiente' por telefono.\nconst axios = require('axios');\nconst SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';\nconst ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nlet telefono = null, motivo = null, pushName = null;\ntry { telefono = $('Webhook Trigger').first().json.body.payload.from; } catch (e) {}\ntry { motivo = ($('Webhook Trigger').first().json.body.payload.body || '').toString().slice(0, 300) || null; } catch (e) {}\ntry { const _p = $('Webhook Trigger').first().json.body.payload; pushName = (_p && _p._data && _p._data.pushName) || (_p && _p.notifyName) || (_p && _p.pushName) || null; } catch (e) {}\ntry {\n  if (telefono) {\n    const ex = await axios.get(SB + '/rest/v1/atenciones_pendientes?status=eq.pendiente&select=id&telefono=eq.' + encodeURIComponent(telefono), { headers: H });\n    if (!ex.data || ex.data.length === 0) {\n      let nombre = null;\n      try { const c = await axios.get(SB + '/rest/v1/clientes_chat?select=nombre&telefono=eq.' + encodeURIComponent(telefono), { headers: H }); nombre = (c.data && c.data[0] && c.data[0].nombre) || null; } catch (e) {}\n      if (!nombre && pushName) nombre = String(pushName).slice(0, 80);\n      await axios.post(SB + '/rest/v1/atenciones_pendientes', { telefono, nombre, motivo, status: 'pendiente' }, { headers: H });\n    }\n  }\n} catch (e) {}\nreturn [{ json: $json }];"
       },
       "id": "code_registrar_atencion_node",
       "name": "Registrar Atencion Pendiente",
       "position": [
-        1608,
-        106
+        3280,
+        260
       ],
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -591,21 +591,21 @@
       "id": "if_pedir_ayuda_node",
       "name": "Check Pedir Ayuda",
       "position": [
-        1408,
-        656
+        3040,
+        480
       ],
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3
     },
     {
       "parameters": {
-        "jsCode": "// Registra una solicitud de ayuda (el bot no encontro algo o el cliente refuto el resultado).\n// La app de empleados elige el/los producto(s) y n8n reenvia.\n//\n// consulta        -> lo que LEE EL EMPLEADO: mensaje + contexto de la conversacion.\n// consulta_limpia -> lo que APRENDE EL BUSCADOR (fn_aprender_item). Solo el mensaje.\n// No mezclar los dos: con el contexto dentro, el motor aprenderia la respuesta del bot.\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nconst DEDUP_HORAS = 3;\nconst MARCADORES = ['[pedir_ayuda]', '[escalar_humano]'];\nconst limpiar = (t) => String(t || '').replace(/\\s+/g, ' ').trim();\n\nlet telefono = null, consulta = null, pushName = null, msgId = '';\ntry {\n  // Transcribir Nota de Voz, no Webhook Trigger: en una nota de voz o una foto el body del\n  // webhook es el media crudo; aqui ya viene la transcripcion o la descripcion.\n  const p = $('Transcribir Nota de Voz').first().json.body.payload;\n  telefono = p && p.from;\n  msgId = String((p && p.id) || '');\n  consulta = limpiar(p && p.body).slice(0, 300) || null;\n  pushName = (p && p._data && p._data.pushName) || (p && p.notifyName) || (p && p.pushName) || null;\n} catch (e) {}\n\n// Contexto: sin esto el empleado recibe \"De este\" y no puede hacer nada.\nlet contexto = '';\ntry {\n  if (telefono) {\n    const r = await axios.get(SB + '/rest/v1/mensajes_procesados?chat_id=eq.' + encodeURIComponent(telefono) + '&select=message_id,texto,procesado_at&order=procesado_at.desc&limit=8', { headers: H, timeout: 4000 });\n    const previos = (r.data || [])\n      .filter(f => String(f.message_id) !== msgId && f.texto)\n      .slice(0, 3)\n      .reverse()\n      .map(f => limpiar(f.texto).slice(0, 90))\n      .filter(Boolean);\n    if (previos.length) contexto = 'antes dijo: ' + previos.map(t => '\"' + t + '\"').join(' · ');\n\n    const b = await axios.get(SB + '/rest/v1/mensajes_bot?chat_id=eq.' + encodeURIComponent(telefono) + '&select=texto_norm&order=created_at.desc&limit=5', { headers: H, timeout: 4000 });\n    const ultima = (b.data || [])\n      .map(x => limpiar(x.texto_norm))\n      .find(t => t && MARCADORES.indexOf(t) === -1);\n    if (ultima) contexto += (contexto ? ' | ' : '') + 'Perucho respondio: ' + ultima.slice(0, 150);\n  }\n} catch (e) {}\n\ntry {\n  if (telefono) {\n    // El bloqueo por duplicado CADUCA: una solicitud pendiente sin atender no puede dejar\n    // al cliente sin poder pedir ayuda para siempre.\n    const desde = new Date(Date.now() - DEDUP_HORAS * 3600000).toISOString();\n    const ex = await axios.get(SB + '/rest/v1/solicitudes_ayuda?status=eq.pendiente&select=id&telefono=eq.' + encodeURIComponent(telefono) + '&creado_en=gte.' + encodeURIComponent(desde), { headers: H });\n    if (!ex.data || ex.data.length === 0) {\n      let nombre = null;\n      try { const c = await axios.get(SB + '/rest/v1/clientes_chat?select=nombre&telefono=eq.' + encodeURIComponent(telefono), { headers: H }); nombre = (c.data && c.data[0] && c.data[0].nombre) || null; } catch (e) {}\n      if (!nombre && pushName) nombre = String(pushName).slice(0, 80);\n      const consultaConContexto = contexto\n        ? (consulta || '(sin texto)') + '\\n— ' + contexto.slice(0, 260)\n        : consulta;\n      await axios.post(SB + '/rest/v1/solicitudes_ayuda', {\n        telefono, nombre,\n        consulta: consultaConContexto,\n        consulta_limpia: consulta,\n        motivo: 'no_encontrado', status: 'pendiente',\n      }, { headers: H });\n    }\n  }\n} catch (e) {}\nreturn [{ json: $json }];"
+        "jsCode": "// Registra una solicitud de ayuda (el bot no encontro algo o el cliente refuto el resultado).\n// La app de empleados elige el/los producto(s) y n8n reenvia.\n//\n// consulta        -> lo que LEE EL EMPLEADO: mensaje + contexto de la conversacion.\n// consulta_limpia -> lo que APRENDE EL BUSCADOR (fn_aprender_item). Solo el mensaje.\n// No mezclar los dos: con el contexto dentro, el motor aprenderia la respuesta del bot.\nconst axios = require('axios');\nconst SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';\nconst ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nconst DEDUP_HORAS = 3;\nconst MARCADORES = ['[pedir_ayuda]', '[escalar_humano]'];\nconst limpiar = (t) => String(t || '').replace(/\\s+/g, ' ').trim();\n\nlet telefono = null, consulta = null, pushName = null, msgId = '';\ntry {\n  // Transcribir Nota de Voz, no Webhook Trigger: en una nota de voz o una foto el body del\n  // webhook es el media crudo; aqui ya viene la transcripcion o la descripcion.\n  const p = $('Transcribir Nota de Voz').first().json.body.payload;\n  telefono = p && p.from;\n  msgId = String((p && p.id) || '');\n  consulta = limpiar(p && p.body).slice(0, 300) || null;\n  pushName = (p && p._data && p._data.pushName) || (p && p.notifyName) || (p && p.pushName) || null;\n} catch (e) {}\n\n// Contexto: sin esto el empleado recibe \"De este\" y no puede hacer nada.\nlet contexto = '';\ntry {\n  if (telefono) {\n    const r = await axios.get(SB + '/rest/v1/mensajes_procesados?chat_id=eq.' + encodeURIComponent(telefono) + '&select=message_id,texto,procesado_at&order=procesado_at.desc&limit=8', { headers: H, timeout: 4000 });\n    const previos = (r.data || [])\n      .filter(f => String(f.message_id) !== msgId && f.texto)\n      .slice(0, 3)\n      .reverse()\n      .map(f => limpiar(f.texto).slice(0, 90))\n      .filter(Boolean);\n    if (previos.length) contexto = 'antes dijo: ' + previos.map(t => '\"' + t + '\"').join(' · ');\n\n    const b = await axios.get(SB + '/rest/v1/mensajes_bot?chat_id=eq.' + encodeURIComponent(telefono) + '&select=texto_norm&order=created_at.desc&limit=5', { headers: H, timeout: 4000 });\n    const ultima = (b.data || [])\n      .map(x => limpiar(x.texto_norm))\n      .find(t => t && MARCADORES.indexOf(t) === -1);\n    if (ultima) contexto += (contexto ? ' | ' : '') + 'Perucho respondio: ' + ultima.slice(0, 150);\n  }\n} catch (e) {}\n\ntry {\n  if (telefono) {\n    // El bloqueo por duplicado CADUCA: una solicitud pendiente sin atender no puede dejar\n    // al cliente sin poder pedir ayuda para siempre.\n    const desde = new Date(Date.now() - DEDUP_HORAS * 3600000).toISOString();\n    const ex = await axios.get(SB + '/rest/v1/solicitudes_ayuda?status=eq.pendiente&select=id&telefono=eq.' + encodeURIComponent(telefono) + '&creado_en=gte.' + encodeURIComponent(desde), { headers: H });\n    if (!ex.data || ex.data.length === 0) {\n      let nombre = null;\n      try { const c = await axios.get(SB + '/rest/v1/clientes_chat?select=nombre&telefono=eq.' + encodeURIComponent(telefono), { headers: H }); nombre = (c.data && c.data[0] && c.data[0].nombre) || null; } catch (e) {}\n      if (!nombre && pushName) nombre = String(pushName).slice(0, 80);\n      const consultaConContexto = contexto\n        ? (consulta || '(sin texto)') + '\\n— ' + contexto.slice(0, 260)\n        : consulta;\n      await axios.post(SB + '/rest/v1/solicitudes_ayuda', {\n        telefono, nombre,\n        consulta: consultaConContexto,\n        consulta_limpia: consulta,\n        motivo: 'no_encontrado', status: 'pendiente',\n      }, { headers: H });\n    }\n  }\n} catch (e) {}\nreturn [{ json: $json }];"
       },
       "id": "code_registrar_solicitud_node",
       "name": "Registrar Solicitud Ayuda",
       "position": [
-        1620,
-        656
+        3280,
+        420
       ],
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -633,8 +633,8 @@
       "id": "waha_bridge_node",
       "name": "Send Bridge Message",
       "position": [
-        1840,
-        656
+        3500,
+        420
       ],
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4
@@ -645,8 +645,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        520,
-        470
+        920,
+        380
       ],
       "parameters": {
         "jsCode": "const axios = require('axios');\nconst https = require('https');\n\nconst item = $input.first().json;\nconst wBody = item.body || {};\nconst payload = wBody.payload || wBody;\nconst msgType = (payload.type || '').toLowerCase();\nconst rawMime = (payload.media && payload.media.mimetype || '').toLowerCase();\n\nconst isAudio = payload.hasMedia === true && (rawMime.includes('audio') || msgType === 'ptt' || msgType === 'audio');\nconst isImage = payload.hasMedia === true && rawMime.includes('image/');\n\nif (!isAudio && !isImage) {\n  return [$input.first()];\n}\n\nconst WAHA_KEY = $env.WAHA_API_KEY;\nconst OR_KEY = $env.OPENROUTER_API_KEY;\nif (!OR_KEY) { return [$input.first()]; }\n\n// Descargar media de WAHA\nlet mediaBuffer;\nlet actualMime = rawMime.split(';')[0].trim() || 'application/octet-stream';\n\nif (payload.media && payload.media.url) {\n  try {\n    const mediaUrl = payload.media.url.replace('http://localhost:3000', 'http://waha_serrucho:3000');\n    const resp = await axios.get(mediaUrl, { headers: { 'X-API-Key': WAHA_KEY }, responseType: 'arraybuffer', timeout: 30000 });\n    mediaBuffer = Buffer.from(resp.data);\n    actualMime = (payload.media.mimetype || actualMime).split(';')[0].trim();\n  } catch (e) {}\n}\n\nif (!mediaBuffer && payload.body && String(payload.body).startsWith('data:')) {\n  try {\n    const parts = payload.body.split(',');\n    const m = parts[0].split(';')[0].replace('data:', '').trim();\n    if (parts[1]) { mediaBuffer = Buffer.from(parts[1], 'base64'); actualMime = m || actualMime; }\n  } catch (e) {}\n}\n\nif (!mediaBuffer) { return [$input.first()]; }\n\nlet resultText = '';\n\nif (isAudio) {\n  // === AUDIO: Transcribir con OpenRouter Whisper ===\n  let fmt = 'ogg';\n  if (actualMime.includes('wav')) fmt = 'wav';\n  else if (actualMime.includes('mp3') || actualMime.includes('mpeg')) fmt = 'mp3';\n  else if (actualMime.includes('mp4')) fmt = 'mp4';\n  else if (actualMime.includes('webm')) fmt = 'webm';\n  else if (actualMime.includes('flac')) fmt = 'flac';\n\n  const reqBody = JSON.stringify({ model: 'openai/whisper-large-v3-turbo', input_audio: { data: mediaBuffer.toString('base64'), format: fmt } });\n\n  resultText = await new Promise((resolve) => {\n    const req = https.request({\n      hostname: 'openrouter.ai', port: 443, path: '/api/v1/audio/transcriptions', method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OR_KEY, 'Content-Length': Buffer.byteLength(reqBody) }\n    }, (res) => {\n      const chunks = [];\n      res.on('data', c => chunks.push(c));\n      res.on('end', () => {\n        const t = Buffer.concat(chunks).toString();\n        if (res.statusCode === 200) { try { resolve((JSON.parse(t).text || '').trim()); } catch (e) { resolve(t.trim()); } }\n        else resolve('');\n      });\n    });\n    req.on('error', () => resolve(''));\n    req.setTimeout(60000, () => { req.destroy(); resolve(''); });\n    req.write(reqBody);\n    req.end();\n  });\n\n} else if (isImage) {\n  // === IMAGEN: Analizar con gpt-4o-mini via OpenRouter ===\n  const dataUrl = 'data:' + actualMime + ';base64,' + mediaBuffer.toString('base64');\n  const reqBody = JSON.stringify({\n    model: 'openai/gpt-4o-mini',\n    max_tokens: 450,\n    messages: [{\n      role: 'user',\n      content: [\n        { type: 'text', text: 'Eres el asistente de una ferretería venezolana llamada El Serrucho. Analiza esta imagen con el objetivo de identificar EXACTAMENTE qué producto es. Si muestra un producto de ferretería, construcción, plomería, electricidad o herramientas, menciona: tipo de producto, marca o texto visible en etiquetas/empaque/loza (transcribe el texto si se alcanza a leer), color, medida si es visible, y el tipo de instalación si aplica (pared, piso, empotrado, sobreponer). Si NO logras leer con certeza la marca, el modelo o algún detalle clave, dilo explícitamente (por ejemplo: no logro leer la marca con claridad, o no se distingue si es de pared o de piso). Si es una lista de materiales o presupuesto escrito, léela completa y textual. Si es algo diferente a ferretería, descríbelo brevemente. Responde en español, conciso y directo, máximo 4 oraciones.' },\n        { type: 'image_url', image_url: { url: dataUrl } }\n      ]\n    }]\n  });\n\n  const desc = await new Promise((resolve) => {\n    const req = https.request({\n      hostname: 'openrouter.ai', port: 443, path: '/api/v1/chat/completions', method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OR_KEY, 'Content-Length': Buffer.byteLength(reqBody) }\n    }, (res) => {\n      const chunks = [];\n      res.on('data', c => chunks.push(c));\n      res.on('end', () => {\n        const t = Buffer.concat(chunks).toString();\n        if (res.statusCode === 200) { try { resolve((JSON.parse(t).choices[0].message.content || '').trim()); } catch (e) { resolve(''); } }\n        else resolve('');\n      });\n    });\n    req.on('error', () => resolve(''));\n    req.setTimeout(60000, () => { req.destroy(); resolve(''); });\n    req.write(reqBody);\n    req.end();\n  });\n\n  resultText = desc ? '[Imagen del cliente]: ' + desc : '';\n}\n\n// Completar el registro del entrante: al pasar por \"Filtro Anti-Duplicado\" esto era\n// media sin texto. Ahora si hay transcripcion (voz) o descripcion (foto), se guarda.\ntry {\n  const _id = payload.id || wBody.id || null;\n  if (_id && resultText) {\n    const _SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\n    const _ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\n    await axios.patch(\n      _SB + '/rest/v1/mensajes_procesados?message_id=eq.' + encodeURIComponent(String(_id)),\n      { texto: String(resultText).slice(0, 4000), tipo: isImage ? 'image' : 'ptt' },\n      { headers: { apikey: _ANON, Authorization: 'Bearer ' + _ANON, 'Content-Type': 'application/json' }, timeout: 3000 }\n    );\n  }\n} catch (e) {}\n\nif (!resultText) { return [$input.first()]; }\n\nconst modified = JSON.parse(JSON.stringify(item));\nconst pld = modified.body.payload || modified.body;\npld.body = resultText;\npld._transcribed = true;\npld._tipo_original = isImage ? 'image' : 'ptt';\nreturn [{ json: modified }];"
@@ -659,11 +659,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1208,
-        400
+        2520,
+        380
       ],
       "parameters": {
-        "jsCode": "// Guardia anti-salida-corrupta del agente + detección de RESERVA (avisar al empleado).\n// 1) Si el LLM filtra una tool-call o entra en bucle, reemplaza por un fallback amable.\n// 2) Si el agente marcó [RESERVA: ...], quita el marcador (el cliente NUNCA lo ve) y registra\n//    la reserva en atenciones_pendientes para que la app avise al empleado (nombre + producto).\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nconst FALLBACK = 'Disculpa 🙏, se me enredó un cable procesando eso 👨🏻‍🔧. ¿Me repites qué necesitas (o tu lista de materiales)? Así te lo busco y te armo el presupuesto enseguida 🪚';\nconst RESERVA_RE = /\\[\\s*RESERVA\\s*:?\\s*([^\\]]*)\\]/i;\n\nfunction looksCorrupt(text) {\n  if (!text || typeof text !== 'string') return false;\n  if (text.length > 4000) return true;\n  if (/Calling\\s+[\\w-]+\\s+with input\\s*:/i.test(text)) return true;\n  if (/\"id\"\\s*:\\s*\"call_/.test(text)) return true;\n  const head = text.slice(0, 4000);\n  if (/(.{1,4})\\1{20,}/s.test(head)) return true;\n  return false;\n}\n\nlet telefono = null, pushName = null;\ntry { const p = $('Webhook Trigger').first().json.body.payload; telefono = p && p.from; pushName = (p && p._data && p._data.pushName) || (p && p.notifyName) || (p && p.pushName) || null; } catch (e) {}\n\nfor (const item of items) {\n  const out = item.json ? item.json.output : undefined;\n  if (looksCorrupt(out)) {\n    console.warn('[Sanitize] salida corrupta del agente -> fallback. Original (200 chars):', String(out).slice(0, 200));\n    item.json.output = FALLBACK;\n    item.json._sanitized = true;\n    continue;\n  }\n  if (typeof out === 'string' && RESERVA_RE.test(out)) {\n    const m = out.match(RESERVA_RE);\n    const detalle = ((m && m[1]) || '').replace(/\\s+/g, ' ').trim().slice(0, 200);\n    let limpio = out.replace(RESERVA_RE, '').replace(/[ \\t]+\\n/g, '\\n').replace(/\\n{3,}/g, '\\n\\n').trim();\n    if (!limpio) limpio = '¡Listo! 👍 Te lo dejo apartado y un empleado lo prepara enseguida 👨🏻‍🔧🪚';\n    item.json.output = limpio;\n    item.json._reserva = true;\n    try {\n      if (telefono) {\n        let nombre = null;\n        try { const c = await axios.get(SB + '/rest/v1/clientes_chat?select=nombre&telefono=eq.' + encodeURIComponent(telefono), { headers: H, timeout: 3000 }); nombre = (c.data && c.data[0] && c.data[0].nombre) || null; } catch (e) {}\n        if (!nombre && pushName) nombre = String(pushName).slice(0, 80);\n        let yaHay = false;\n        try { const r = await axios.get(SB + '/rest/v1/atenciones_pendientes?status=eq.pendiente&motivo=like.*RESERVA*&telefono=eq.' + encodeURIComponent(telefono) + '&select=id', { headers: H, timeout: 3000 }); yaHay = Array.isArray(r.data) && r.data.length > 0; } catch (e) {}\n        if (!yaHay) {\n          await axios.post(SB + '/rest/v1/atenciones_pendientes', { telefono, nombre, motivo: '🛒 RESERVA: ' + (detalle || 'el cliente quiere reservar un producto'), status: 'pendiente' }, { headers: H, timeout: 3000 });\n        }\n      }\n    } catch (e) {}\n  }\n}\n\n// [handoff] Registrar lo que envía el bot para distinguirlo de un empleado.\ntry {\n  const _norm = (t) => String(t || '').toLowerCase().replace(/\\*/g, '').replace(/\\s+/g, ' ').trim().slice(0, 300);\n  if (telefono) {\n    for (const _it of items) {\n      const _t = _it && _it.json ? _it.json.output : null;\n      if (_t) { try { await axios.post(SB + '/rest/v1/mensajes_bot', { chat_id: telefono, texto_norm: _norm(_t) }, { headers: H }); } catch (e) {} }\n    }\n  }\n} catch (e) {}\n\nreturn items;"
+        "jsCode": "// Guardia anti-salida-corrupta del agente + detección de RESERVA (avisar al empleado).\n// 1) Si el LLM filtra una tool-call o entra en bucle, reemplaza por un fallback amable.\n// 2) Si el agente marcó [RESERVA: ...], quita el marcador (el cliente NUNCA lo ve) y registra\n//    la reserva en atenciones_pendientes para que la app avise al empleado (nombre + producto).\nconst axios = require('axios');\nconst SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';\nconst ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nconst FALLBACK = 'Disculpa 🙏, se me enredó un cable procesando eso 👨🏻‍🔧. ¿Me repites qué necesitas (o tu lista de materiales)? Así te lo busco y te armo el presupuesto enseguida 🪚';\nconst RESERVA_RE = /\\[\\s*RESERVA\\s*:?\\s*([^\\]]*)\\]/i;\n\nfunction looksCorrupt(text) {\n  if (!text || typeof text !== 'string') return false;\n  if (text.length > 4000) return true;\n  if (/Calling\\s+[\\w-]+\\s+with input\\s*:/i.test(text)) return true;\n  if (/\"id\"\\s*:\\s*\"call_/.test(text)) return true;\n  const head = text.slice(0, 4000);\n  if (/(.{1,4})\\1{20,}/s.test(head)) return true;\n  return false;\n}\n\nlet telefono = null, pushName = null;\ntry { const p = $('Webhook Trigger').first().json.body.payload; telefono = p && p.from; pushName = (p && p._data && p._data.pushName) || (p && p.notifyName) || (p && p.pushName) || null; } catch (e) {}\n\nfor (const item of items) {\n  const out = item.json ? item.json.output : undefined;\n  if (looksCorrupt(out)) {\n    console.warn('[Sanitize] salida corrupta del agente -> fallback. Original (200 chars):', String(out).slice(0, 200));\n    item.json.output = FALLBACK;\n    item.json._sanitized = true;\n    continue;\n  }\n  if (typeof out === 'string' && RESERVA_RE.test(out)) {\n    const m = out.match(RESERVA_RE);\n    const detalle = ((m && m[1]) || '').replace(/\\s+/g, ' ').trim().slice(0, 200);\n    let limpio = out.replace(RESERVA_RE, '').replace(/[ \\t]+\\n/g, '\\n').replace(/\\n{3,}/g, '\\n\\n').trim();\n    if (!limpio) limpio = '¡Listo! 👍 Te lo dejo apartado y un empleado lo prepara enseguida 👨🏻‍🔧🪚';\n    item.json.output = limpio;\n    item.json._reserva = true;\n    try {\n      if (telefono) {\n        let nombre = null;\n        try { const c = await axios.get(SB + '/rest/v1/clientes_chat?select=nombre&telefono=eq.' + encodeURIComponent(telefono), { headers: H, timeout: 3000 }); nombre = (c.data && c.data[0] && c.data[0].nombre) || null; } catch (e) {}\n        if (!nombre && pushName) nombre = String(pushName).slice(0, 80);\n        let yaHay = false;\n        try { const r = await axios.get(SB + '/rest/v1/atenciones_pendientes?status=eq.pendiente&motivo=like.*RESERVA*&telefono=eq.' + encodeURIComponent(telefono) + '&select=id', { headers: H, timeout: 3000 }); yaHay = Array.isArray(r.data) && r.data.length > 0; } catch (e) {}\n        if (!yaHay) {\n          await axios.post(SB + '/rest/v1/atenciones_pendientes', { telefono, nombre, motivo: '🛒 RESERVA: ' + (detalle || 'el cliente quiere reservar un producto'), status: 'pendiente' }, { headers: H, timeout: 3000 });\n        }\n      }\n    } catch (e) {}\n  }\n}\n\n// [handoff] Registrar lo que envía el bot para distinguirlo de un empleado.\ntry {\n  const _norm = (t) => String(t || '').toLowerCase().replace(/\\*/g, '').replace(/\\s+/g, ' ').trim().slice(0, 300);\n  if (telefono) {\n    for (const _it of items) {\n      const _t = _it && _it.json ? _it.json.output : null;\n      if (_t) { try { await axios.post(SB + '/rest/v1/mensajes_bot', { chat_id: telefono, texto_norm: _norm(_t) }, { headers: H }); } catch (e) {} }\n    }\n  }\n} catch (e) {}\n\nreturn items;"
       }
     },
     {
@@ -695,19 +695,19 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -120,
-        460
+        40,
+        260
       ]
     },
     {
       "parameters": {
-        "jsCode": "// Detecta cuando un EMPLEADO le escribe al cliente desde el mismo WhatsApp de la tienda.\n// Los salientes (fromMe) del propio BOT se ignoran comparándolos contra mensajes_bot y\n// contra las plantillas fijas; cualquier otro saliente = un humano tomó el chat -> 'manual'.\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };\nconst norm = (t) => String(t || '').toLowerCase().replace(/\\*/g, '').replace(/\\s+/g, ' ').trim().slice(0, 300);\n// Plantillas fijas que envía el bot (si cambian en los nodos Send*, actualizarlas aquí).\nconst PLANTILLAS_BOT = [\n  norm('En un momento uno de nuestros asesores comerciales continuará atendiéndote de forma personalizada. ¡Muchas gracias por tu paciencia!'),\n  norm('Dame un momentico 👨🏻‍🔧, déjame confirmarlo con un compañero y te escribo enseguida 🪚'),\n  norm(\"👨🏻‍🔧 ¡Hola! Soy *Perucho*, el bot de Ferretería El Serrucho 🪚. Solo respondo mensajes de *texto*, 🎤 *notas de voz* e 🖼️ *imágenes*. Si enviaste un video o documento, por favor escríbeme lo que necesitas 📝\"),\n].filter(Boolean);\n\n// Coincidencia INEQUIVOCA. Antes bastaba una inclusion en cualquier direccion, asi que\n// una respuesta corta del empleado (\"no\", \"si\", \"gracias\") aparecia dentro de casi\n// cualquier mensaje del bot y el relevo humano no se detectaba nunca. La inclusion solo\n// se acepta si el texto contenido es largo (tolera truncado a 300 y ediciones menores).\nconst MIN_INCL = 40;\nconst coincide = (a, b) => {\n  if (!a || !b) return false;\n  if (a === b) return true;\n  if (a.includes(b) && b.length >= MIN_INCL) return true;\n  if (b.includes(a) && a.length >= MIN_INCL) return true;\n  return false;\n};\nconst CATCHUP = norm('🙏 ¡Disculpa la demora! Ya estoy de vuelta en línea 🪚');\n\nlet payload = null;\ntry { payload = $('Webhook Trigger').first().json.body.payload; } catch (e) {}\nif (!payload) return [{ json: { skip: 'sin_payload' } }];\n\n// En un saliente el cliente es el destinatario (to). Fallback defensivo a from.\nconst cliente = payload.to || payload.from || null;\nconsole.log('[Handoff] saliente to=' + payload.to + ' from=' + payload.from + ' id=' + payload.id);\n\n// Solo chats 1:1 de clientes (ignorar grupos, difusión, estados y newsletters).\nif (!cliente || /@g\\.us|@broadcast|@newsletter/.test(cliente)) {\n  return [{ json: { skip: 'no_cliente', cliente } }];\n}\n\nlet texto = '';\ntry { texto = payload.body || (payload._data && payload._data.body) || ''; } catch (e) {}\nlet ntext = norm(texto);\nif (CATCHUP && ntext.startsWith(CATCHUP)) ntext = ntext.slice(CATCHUP.length).trim();\n\nlet esBot = false;\nif (ntext) {\n  for (const tpl of PLANTILLAS_BOT) {\n    if (coincide(ntext, tpl)) { esBot = true; break; }\n  }\n  if (!esBot) {\n    try {\n      const since = new Date(Date.now() - 10 * 60000).toISOString();\n      const r = await axios.get(SB + '/rest/v1/mensajes_bot?chat_id=eq.' + encodeURIComponent(cliente) + '&created_at=gte.' + since + '&select=texto_norm&order=created_at.desc&limit=20', { headers: H, timeout: 3000 });\n      for (const rw of (r.data || [])) {\n        const s = rw.texto_norm || '';\n        if (coincide(s, ntext)) { esBot = true; break; }\n      }\n    } catch (e) {}\n  }\n}\n\nif (esBot) return [{ json: { esBot: true, cliente } }];\n\n// Un humano escribió al cliente -> callar al bot y registrar cuándo.\ntry {\n  await axios.post(SB + '/rest/v1/chat_sessions?on_conflict=telefono', { telefono: cliente, estado: 'manual', manual_since: new Date().toISOString(), updated_at: new Date().toISOString() }, { headers: H });\n  console.log('[Handoff] EMPLEADO tomó el chat ' + cliente + ' -> manual');\n} catch (e) {}\nreturn [{ json: { esBot: false, handoff: true, cliente } }];"
+        "jsCode": "// Detecta cuando un EMPLEADO le escribe al cliente desde el mismo WhatsApp de la tienda.\n// Los salientes (fromMe) del propio BOT se ignoran comparándolos contra mensajes_bot y\n// contra las plantillas fijas; cualquier otro saliente = un humano tomó el chat -> 'manual'.\nconst axios = require('axios');\nconst SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';\nconst ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };\nconst norm = (t) => String(t || '').toLowerCase().replace(/\\*/g, '').replace(/\\s+/g, ' ').trim().slice(0, 300);\n// Plantillas fijas que envía el bot (si cambian en los nodos Send*, actualizarlas aquí).\nconst PLANTILLAS_BOT = [\n  norm('En un momento uno de nuestros asesores comerciales continuará atendiéndote de forma personalizada. ¡Muchas gracias por tu paciencia!'),\n  norm('Dame un momentico 👨🏻‍🔧, déjame confirmarlo con un compañero y te escribo enseguida 🪚'),\n  norm(\"👨🏻‍🔧 ¡Hola! Soy *Perucho*, el bot de Ferretería El Serrucho 🪚. Solo respondo mensajes de *texto*, 🎤 *notas de voz* e 🖼️ *imágenes*. Si enviaste un video o documento, por favor escríbeme lo que necesitas 📝\"),\n].filter(Boolean);\n\n// Coincidencia INEQUIVOCA. Antes bastaba una inclusion en cualquier direccion, asi que\n// una respuesta corta del empleado (\"no\", \"si\", \"gracias\") aparecia dentro de casi\n// cualquier mensaje del bot y el relevo humano no se detectaba nunca. La inclusion solo\n// se acepta si el texto contenido es largo (tolera truncado a 300 y ediciones menores).\nconst MIN_INCL = 40;\nconst coincide = (a, b) => {\n  if (!a || !b) return false;\n  if (a === b) return true;\n  if (a.includes(b) && b.length >= MIN_INCL) return true;\n  if (b.includes(a) && a.length >= MIN_INCL) return true;\n  return false;\n};\nconst CATCHUP = norm('🙏 ¡Disculpa la demora! Ya estoy de vuelta en línea 🪚');\n\nlet payload = null;\ntry { payload = $('Webhook Trigger').first().json.body.payload; } catch (e) {}\nif (!payload) return [{ json: { skip: 'sin_payload' } }];\n\n// En un saliente el cliente es el destinatario (to). Fallback defensivo a from.\nconst cliente = payload.to || payload.from || null;\nconsole.log('[Handoff] saliente to=' + payload.to + ' from=' + payload.from + ' id=' + payload.id);\n\n// Solo chats 1:1 de clientes (ignorar grupos, difusión, estados y newsletters).\nif (!cliente || /@g\\.us|@broadcast|@newsletter/.test(cliente)) {\n  return [{ json: { skip: 'no_cliente', cliente } }];\n}\n\nlet texto = '';\ntry { texto = payload.body || (payload._data && payload._data.body) || ''; } catch (e) {}\nlet ntext = norm(texto);\nif (CATCHUP && ntext.startsWith(CATCHUP)) ntext = ntext.slice(CATCHUP.length).trim();\n\nlet esBot = false;\nif (ntext) {\n  for (const tpl of PLANTILLAS_BOT) {\n    if (coincide(ntext, tpl)) { esBot = true; break; }\n  }\n  if (!esBot) {\n    try {\n      const since = new Date(Date.now() - 10 * 60000).toISOString();\n      const r = await axios.get(SB + '/rest/v1/mensajes_bot?chat_id=eq.' + encodeURIComponent(cliente) + '&created_at=gte.' + since + '&select=texto_norm&order=created_at.desc&limit=20', { headers: H, timeout: 3000 });\n      for (const rw of (r.data || [])) {\n        const s = rw.texto_norm || '';\n        if (coincide(s, ntext)) { esBot = true; break; }\n      }\n    } catch (e) {}\n  }\n}\n\nif (esBot) return [{ json: { esBot: true, cliente } }];\n\n// Un humano escribió al cliente -> callar al bot y registrar cuándo.\ntry {\n  await axios.post(SB + '/rest/v1/chat_sessions?on_conflict=telefono', { telefono: cliente, estado: 'manual', manual_since: new Date().toISOString(), updated_at: new Date().toISOString() }, { headers: H });\n  console.log('[Handoff] EMPLEADO tomó el chat ' + cliente + ' -> manual');\n} catch (e) {}\nreturn [{ json: { esBot: false, handoff: true, cliente } }];"
       },
       "id": "detector_handoff_node",
       "name": "Detectar Handoff Empleado",
       "position": [
-        112,
-        560
+        260,
+        140
       ],
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -719,12 +719,76 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        340,
-        470
+        700,
+        380
       ],
       "parameters": {
-        "jsCode": "// \"Debounce Ráfaga\": el cliente suele escribir en varios mensajes seguidos. Cada mensaje\n// abre su propia ejecución y ninguna ve a las otras, así que respondía a todas por separado\n// (8 casos medidos, con el saludo completo repetido). Aquí esperamos un momento y solo\n// sobrevive la ÚLTIMA ejecución de la ráfaga, que se lleva los mensajes previos sin\n// responder como contexto. Ante cualquier error deja pasar el mensaje tal cual: nunca\n// puede callar al bot por su cuenta.\nconst axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nconst ESPERA_MS = 7000;   // cubre 7 de los 8 huecos observados (1,1,1,3,3,4,5 y 13 s)\nconst MAX_PREVIOS = 5;\n\nconst out = [];\nfor (const it of $input.all()) {\n  const item = it.json || {};\n  const payload = (item.body && item.body.payload) || {};\n  const chatId = payload.from || null;\n  const msgId = String(payload.id || '');\n  if (!chatId || !msgId) { out.push({ json: item }); continue; }\n\n  try { await new Promise(r => setTimeout(r, ESPERA_MS)); } catch (e) {}\n\n  let superado = false;\n  try {\n    const u = await axios.get(SB + '/rest/v1/mensajes_procesados?chat_id=eq.' + encodeURIComponent(chatId) + '&select=message_id,procesado_at,texto&order=procesado_at.desc&limit=' + (MAX_PREVIOS + 1), { headers: H, timeout: 5000 });\n    const filas = u.data || [];\n    const idx = filas.findIndex(f => String(f.message_id) === msgId);\n    // idx === -1: no me veo en la lista (fallo el insert, o llego una avalancha). Ante la\n    // duda respondo: callarme por error es peor que responder de mas, y el rate-limit ya\n    // corta las avalanchas de verdad.\n    if (idx > 0) {\n      superado = true;\n      console.log('[Ráfaga] ' + chatId + ': llegó algo más nuevo, esta ejecución se calla');\n    } else if (idx === 0) {\n      // Soy el último. Recojo lo que el cliente escribió DESPUÉS de mi última respuesta:\n      // eso es justo la ráfaga que quedó sin contestar.\n      let desde = null;\n      try {\n        const b = await axios.get(SB + '/rest/v1/mensajes_bot?chat_id=eq.' + encodeURIComponent(chatId) + '&select=created_at&order=created_at.desc&limit=1', { headers: H, timeout: 5000 });\n        if (b.data && b.data[0] && b.data[0].created_at) desde = new Date(b.data[0].created_at).getTime();\n      } catch (e) {}\n      if (!desde) desde = Date.now() - 5 * 60000;\n      const previos = filas\n        .filter(f => String(f.message_id) !== msgId && f.texto && new Date(f.procesado_at).getTime() > desde)\n        .sort((a, b) => new Date(a.procesado_at) - new Date(b.procesado_at))\n        .map(f => String(f.texto).trim())\n        .filter(Boolean);\n      if (previos.length) {\n        payload._rafaga_previa = previos.join('\\n').slice(0, 1500) + '\\n';\n        console.log('[Ráfaga] ' + chatId + ': uniendo ' + previos.length + ' mensaje(s) previo(s)');\n      }\n    }\n  } catch (e) { console.warn('[Ráfaga] fallo la comprobación, dejo pasar: ' + (e && e.message)); }\n\n  if (!superado) out.push({ json: item });\n}\nreturn out;"
+        "jsCode": "// \"Debounce Ráfaga\": el cliente suele escribir en varios mensajes seguidos. Cada mensaje\n// abre su propia ejecución y ninguna ve a las otras, así que respondía a todas por separado\n// (8 casos medidos, con el saludo completo repetido). Aquí esperamos un momento y solo\n// sobrevive la ÚLTIMA ejecución de la ráfaga, que se lleva los mensajes previos sin\n// responder como contexto. Ante cualquier error deja pasar el mensaje tal cual: nunca\n// puede callar al bot por su cuenta.\nconst axios = require('axios');\nconst SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';\nconst ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nconst ESPERA_MS = 7000;   // cubre 7 de los 8 huecos observados (1,1,1,3,3,4,5 y 13 s)\nconst MAX_PREVIOS = 5;\n\nconst out = [];\nfor (const it of $input.all()) {\n  const item = it.json || {};\n  const payload = (item.body && item.body.payload) || {};\n  const chatId = payload.from || null;\n  const msgId = String(payload.id || '');\n  if (!chatId || !msgId) { out.push({ json: item }); continue; }\n\n  try { await new Promise(r => setTimeout(r, ESPERA_MS)); } catch (e) {}\n\n  let superado = false;\n  try {\n    const u = await axios.get(SB + '/rest/v1/mensajes_procesados?chat_id=eq.' + encodeURIComponent(chatId) + '&select=message_id,procesado_at,texto&order=procesado_at.desc&limit=' + (MAX_PREVIOS + 1), { headers: H, timeout: 5000 });\n    const filas = u.data || [];\n    const idx = filas.findIndex(f => String(f.message_id) === msgId);\n    // idx === -1: no me veo en la lista (fallo el insert, o llego una avalancha). Ante la\n    // duda respondo: callarme por error es peor que responder de mas, y el rate-limit ya\n    // corta las avalanchas de verdad.\n    if (idx > 0) {\n      superado = true;\n      console.log('[Ráfaga] ' + chatId + ': llegó algo más nuevo, esta ejecución se calla');\n    } else if (idx === 0) {\n      // Soy el último. Recojo lo que el cliente escribió DESPUÉS de mi última respuesta:\n      // eso es justo la ráfaga que quedó sin contestar.\n      let desde = null;\n      try {\n        const b = await axios.get(SB + '/rest/v1/mensajes_bot?chat_id=eq.' + encodeURIComponent(chatId) + '&select=created_at&order=created_at.desc&limit=1', { headers: H, timeout: 5000 });\n        if (b.data && b.data[0] && b.data[0].created_at) desde = new Date(b.data[0].created_at).getTime();\n      } catch (e) {}\n      if (!desde) desde = Date.now() - 5 * 60000;\n      const previos = filas\n        .filter(f => String(f.message_id) !== msgId && f.texto && new Date(f.procesado_at).getTime() > desde)\n        .sort((a, b) => new Date(a.procesado_at) - new Date(b.procesado_at))\n        .map(f => String(f.texto).trim())\n        .filter(Boolean);\n      if (previos.length) {\n        payload._rafaga_previa = previos.join('\\n').slice(0, 1500) + '\\n';\n        console.log('[Ráfaga] ' + chatId + ': uniendo ' + previos.length + ' mensaje(s) previo(s)');\n      }\n    }\n  } catch (e) { console.warn('[Ráfaga] fallo la comprobación, dejo pasar: ' + (e && e.message)); }\n\n  if (!superado) out.push({ json: item });\n}\nreturn out;"
       }
+    },
+    {
+      "parameters": {
+        "content": "## 🟣 ZONA 1: Ingesta & Seguridad\n**Propósito:** Recepción de Webhook desde WAHA.\n- Filtro de mensajes salientes (fromMe) para detectar handoff humano.\n- Detección de chats de clientes válidos (ignora grupos y estados).\n- Filtro anti-duplicados por ID de mensaje.",
+        "height": 560,
+        "width": 780,
+        "color": 4
+      },
+      "id": "sticky_zona_1",
+      "name": "Sticky Note - Ingesta",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 🟡 ZONA 2: Pre-Procesamiento & Sesión\n**Propósito:** Preparación y normalización del mensaje.\n- Debounce de ráfagas rápidas de mensajes del cliente.\n- Transcripción de notas de voz con **Groq Whisper**.\n- Verificación de sesión de chat, control de tasa (10 msg/min) y reactivación tras 30 min.\n- Carga de memoria del cliente desde Supabase y Engram.",
+        "height": 560,
+        "width": 1480,
+        "color": 2
+      },
+      "id": "sticky_zona_2",
+      "name": "Sticky Note - Preprocesamiento",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        640,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 🔵 ZONA 3: Agente de IA & Herramientas\n**Propósito:** Razonamiento del asistente experto 'Perucho'.\n- **Modelo:** OpenAI / OpenRouter (Luna / Sonnet)\n- **Memoria de Sesión:** Buffer de ventana de conversación\n- **Herramientas de Negocio:**\n  1. `buscar_productos`: Motor multicapa con medidas y equivalencias\n  2. `hacer_presupuesto`: Cotización multi-item con cálculo de recargo y BCV\n  3. `obtener_tasa_bcv`: Tasa oficial de cambio al día\n  4. `buscar_memoria_engram` / `guardar_memoria_engram`: Persistencia a largo plazo\n- **Sanitización:** Prevención de tool-calls corruptas o repeticiones.",
+        "height": 840,
+        "width": 780,
+        "color": 5
+      },
+      "id": "sticky_zona_3",
+      "name": "Sticky Note - Agente IA",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1980,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 🟢 ZONA 4: Enrutamiento & Despacho WAHA\n**Propósito:** Clasificación de respuesta y envío por WhatsApp.\n- `[ESCALAR_HUMANO]` ➔ Notifica al cliente y registra en `atenciones_pendientes`.\n- `[PEDIR_AYUDA]` ➔ Envía mensaje puente y registra en `solicitudes_ayuda`.\n- **Respuesta Directa** ➔ Envía la cotización / respuesta formateada al cliente.",
+        "height": 640,
+        "width": 880,
+        "color": 6
+      },
+      "id": "sticky_zona_4",
+      "name": "Sticky Note - Despacho",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2740,
+        60
+      ]
     }
   ],
   "connections": {
