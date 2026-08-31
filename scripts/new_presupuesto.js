@@ -7,7 +7,7 @@ function nUSD(n){ const r = Math.round(Number(n)*100)/100; return Number.isInteg
 function nBs(n){ return (Math.round(Number(n)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function nBsInt(n){ return Math.round(Number(n)).toLocaleString('en-US'); }
 function tc(s){ return String(s).toLowerCase().split(/\s+/).map(w=>{ if(/\d/.test(w)) return w.toUpperCase(); if(w.length<=3) return w.toUpperCase(); return w.charAt(0).toUpperCase()+w.slice(1); }).join(' '); }
-function norm(t){ return String(t).toLowerCase().replace(/(\d)\s*,\s*(\d)/g,'$1.$2').replace(/[×✕✖]/g,'x').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 .\/-]/g,' ').replace(/\s+/g,' ').trim(); }
+function norm(t){ return String(t).toLowerCase().replace(/(\d)\s*,\s*(\d)/g,'$1.$2').replace(/[×✕✖]/g,'x').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\b([cp])\/([a-z])/g, '$1/ $2').replace(/[^a-z0-9 .\/-]/g,' ').replace(/\s+/g,' ').trim(); }
 // Normaliza medidas compuestas: "3 x 1-1/2", "3x1.1/2", "1 1/2 x 1 1/2" -> "3x1-1/2", "1-1/2x1-1/2"
 function normMedida(s){
   let t = norm(s);
