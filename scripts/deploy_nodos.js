@@ -9,9 +9,9 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const ID = 'ugHOTQv3Vb6cuTct';
-const BASE = process.env.N8N_API_URL_LOCAL || 'http://localhost:5678/api/v1';
+const BASE = process.env.N8N_API_URL_LOCAL || 'http://127.0.0.1:5678/api/v1';
 const key = (fs.readFileSync(path.join(ROOT, '.env'), 'utf8').match(/^N8N_API_KEY=(.+)$/m) || [])[1].trim();
-const H = { 'X-N8N-API-KEY': key, 'Content-Type': 'application/json', accept: 'application/json' };
+const H = { 'X-N8N-API-KEY': key, 'Content-Type': 'application/json', accept: 'application/json', Connection: 'close' };
 const DRY = process.argv.includes('--dry');
 
 const lf = s => s.replace(/\r\n/g, '\n');
@@ -76,4 +76,4 @@ const MAPA = [
   console.log('\nPUT status:', put.status);
   if (!put.ok) { console.log(await put.text()); process.exit(1); }
   console.log(`OK — ${cambios} nodo(s) desplegados a n8n.`);
-})().catch(e => { console.error('ERROR', e.message); process.exit(1); });
+})().catch(e => { console.error('ERROR', e.message, e.cause || '', e.stack); process.exit(1); });
