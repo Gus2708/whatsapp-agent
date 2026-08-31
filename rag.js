@@ -20,46 +20,83 @@ const SB = pick('SUPABASE_URL') || 'https://rgniqjfooifchyctnbzu.supabase.co';
 const ANON = pick('SUPABASE_ANON_KEY');
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
 
-// ───────────────────────────────────────────────────────────────────── presentación
+// ───────────────────────────────────────────────────────────────────── presentación (Brainless / Claude Code theme)
 const TTY = process.stdout.isTTY;
 const W = 64;                                   // ancho fijo: alinea todo sin depender del contenido
+
+// Detección de color truecolor / 24-bit
+const COLORTERM = process.env.COLORTERM || '';
+const TRUECOLOR = TTY && (COLORTERM === 'truecolor' || COLORTERM === '24bit' || process.env.TERM_PROGRAM === 'vscode' || process.env.WT_SESSION);
+
 const e = (n, s) => (TTY ? `\x1b[${n}m${s}\x1b[0m` : s);
+const rgb = (r, g, b, s) => (TTY ? (TRUECOLOR ? `\x1b[38;2;${r};${g};${b}m${s}\x1b[0m` : e(36, s)) : s);
+const rgbBg = (r, g, b, s) => (TTY ? (TRUECOLOR ? `\x1b[48;2;${r};${g};${b}m${s}\x1b[0m` : s) : s);
+
 const c = {
-  dim: s => e(2, s), bold: s => e(1, s),
-  ok: s => e(32, s), err: s => e(31, s), warn: s => e(33, s),
-  cyan: s => e(36, s), num: s => e(97, s),
+  dim: s => e(2, s),
+  bold: s => e(1, s),
+  italic: s => e(3, s),
+  // Paleta Tokyo Night / Claude Code:
+  claude: s => rgb(205, 105, 74, s),       // Terracota / Serrucho (#cd694a)
+  cyan: s => rgb(125, 207, 255, s),         // Azul claro cian (#7dcfff)
+  violet: s => rgb(187, 154, 247, s),       // Lavanda / Violeta (#bb9af7)
+  ok: s => rgb(78, 169, 111, s),           // Verde suave (#4ea96f)
+  err: s => rgb(247, 118, 142, s),         // Rojo pastel (#f7768e)
+  warn: s => rgb(224, 175, 104, s),        // Amarillo/Ocre (#e0af68)
+  gray: s => rgb(139, 143, 163, s),        // Gris medio (#8b8fa3)
+  darkGray: s => rgb(86, 95, 137, s),      // Gris azulado tenue (#565f89)
+  num: s => rgb(192, 202, 245, s),         // Blanco suave (#c0caf5)
+  chipBg: s => (TRUECOLOR ? `\x1b[48;2;30;30;36m\x1b[38;2;192;202;245m${s}\x1b[0m` : e(7, s)),
 };
+
 // longitud visible (sin códigos de color) para poder alinear
 const vis = s => String(s).replace(/\x1b\[[0-9;]*m/g, '').length;
 const pad = (s, n) => s + ' '.repeat(Math.max(0, n - vis(s)));
 const padL = (s, n) => ' '.repeat(Math.max(0, n - vis(s))) + s;
 
-const GL = { ok: c.ok('✓'), err: c.err('✗'), warn: c.warn('▲'), dot: c.dim('·') };
+const GL = {
+  ok: c.ok('⏺'),
+  err: c.err('⏺'),
+  warn: c.warn('▲'),
+  dot: c.darkGray('·'),
+  tree: c.darkGray('⎿'),
+  prompt: c.claude('❯'),
+  chip: c.cyan('›'),
+};
 
 function cabecera(titulo, sub) {
-  const linea = '─'.repeat(W - 2);
-  out('\n' + c.dim('╭' + linea + '╮'));
-  const izq = ' ' + c.bold(c.cyan(titulo));
-  const der = sub ? c.dim(sub) + ' ' : '';
-  out(c.dim('│') + pad(izq, W - 2 - vis(der)) + der + c.dim('│'));
-  out(c.dim('╰' + linea + '╯'));
+  // Diseño Fieldset Legend al estilo Claude Code (Brainless)
+  const tag = ' ' + c.bold(c.claude(titulo)) + ' ';
+  const subTexto = sub ? ' ' + c.darkGray(sub) + ' ' : '';
+  const restoIzq = 3;
+  const restoDer = Math.max(0, W - 2 - restoIzq - vis(tag) - vis(subTexto));
+  const lineaSup = c.darkGray('╭' + '─'.repeat(restoIzq)) + tag + c.darkGray('─'.repeat(restoDer)) + (sub ? c.dim(subTexto) : '') + c.darkGray('╮');
+  const lineaInf = c.darkGray('╰' + '─'.repeat(W - 2) + '╯');
+  
+  out('\n' + lineaSup);
+  const statusLine = '  ' + c.darkGray('branch: main') + c.darkGray(' · ') + c.gray('Ferretería El Serrucho') + c.darkGray(' · ') + c.ok('●') + ' ' + c.darkGray('online');
+  out(c.darkGray('│') + pad(statusLine, W - 2) + c.darkGray('│'));
+  out(lineaInf);
 }
+
 function seccion(t) {
-  out('\n ' + c.bold(t));
-  out(' ' + c.dim('─'.repeat(W - 2)));
+  out('\n ' + c.claude('◆') + ' ' + c.bold(c.num(t)));
+  out(' ' + c.darkGray('─'.repeat(W - 2)));
 }
+
 // fila etiqueta ......... valor  [glifo]
-// El valor SIEMPRE termina en la misma columna; el glifo va después, fuera de esa columna.
-// (Antes se restaba el ancho del glifo a la etiqueta y eso desalineaba las filas con estado.)
 function fila(etiqueta, valor, glifo) {
-  const anchoValor = 14;
-  out('  ' + pad(c.dim(etiqueta), W - 6 - anchoValor) + padL(valor, anchoValor) + (glifo ? ' ' + glifo : ''));
+  const glifoStr = glifo ? ' ' + glifo : '';
+  const esp = W - 2 - vis(glifoStr) - vis(valor);
+  const etiq = pad(c.gray(etiqueta), Math.max(0, esp));
+  out('  ' + etiq + valor + glifoStr);
 }
+
 function barra(pct, ancho) {
   const n = ancho || 22;
-  const llenos = Math.round((pct / 100) * n);
+  const llenos = Math.max(0, Math.min(n, Math.round((pct / 100) * n)));
   const color = pct >= 99.5 ? c.ok : pct >= 90 ? c.warn : c.err;
-  return color('█'.repeat(llenos)) + c.dim('░'.repeat(n - llenos));
+  return color('█'.repeat(llenos)) + c.darkGray('░'.repeat(n - llenos));
 }
 const num = n => Number(n).toLocaleString('es-VE');
 const dias = d => (d === null ? '—' : d === 0 ? 'hoy' : d === 1 ? 'ayer' : `hace ${d} días`);
@@ -133,9 +170,12 @@ function cargando() {
   if (!TTY) return { paso() {}, fin() {} };
   const marcos = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
   let i = 0, txt = '';
+  const t0 = Date.now();
   const t = setInterval(() => {
-    process.stdout.write('\r\x1b[2K ' + c.cyan(marcos[i++ % marcos.length]) + ' ' + c.dim(txt));
-  }, 90);
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(1) + 's';
+    const hint = c.darkGray(` (${elapsed} · esc para cancelar)`);
+    process.stdout.write('\r\x1b[2K ' + c.claude(marcos[i++ % marcos.length]) + ' ' + c.num(txt) + hint);
+  }, 80);
   t.unref();
   return {
     paso(s) { txt = s; },
@@ -145,19 +185,20 @@ function cargando() {
 
 function dosColumnas(izq, derIn) {
   if (!DOBLE) { for (const l of izq) console.log(l); for (const l of derIn) console.log(l); return; }
+  // La cabecera tiene 1 salto de línea antes de la caja + 3 líneas de caja
   const der = ['', '', '', ...derIn];               // arranca bajo el marco del título
   const n = Math.max(izq.length, der.length);
   for (let i = 0; i < n; i++) {
     const d = der[i] || '';
-    console.log(pad(izq[i] || '', W + 2) + c.dim('│') + (d ? ' ' + d : ''));
+    console.log(pad(izq[i] || '', W + 4) + (i === 0 ? ' ' : c.darkGray('│')) + (d ? ' ' + d : ''));
   }
 }
 
-// ── piezas de gráfica para la columna derecha
-function tituloDer(t) { return ['', ' ' + c.bold(t), ' ' + c.dim('─'.repeat(AD - 2))]; }
+// ── piezas de gráfica para la columna derecha (estilo Brainless)
+function tituloDer(t) { return ['', ' ' + c.claude('◆') + ' ' + c.bold(c.num(t)), ' ' + c.darkGray('─'.repeat(AD - 2))]; }
 function barraH(valor, max, ancho, color) {
-  const n = max > 0 ? Math.round((valor / max) * ancho) : 0;
-  return (color || c.cyan)('█'.repeat(n)) + c.dim('░'.repeat(Math.max(0, ancho - n)));
+  const n = max > 0 ? Math.max(0, Math.min(ancho, Math.round((valor / max) * ancho))) : 0;
+  return (color || c.cyan)('█'.repeat(n)) + c.darkGray('░'.repeat(Math.max(0, ancho - n)));
 }
 
 // productos agrupados por el mes de su última venta: dice cuánto del catálogo sigue vivo
@@ -180,14 +221,14 @@ function panelActividad(popRows) {
   }
   const max = Math.max(1, ...claves.map(k => cubos.get(k) || 0));
   const L = tituloDer('ACTIVIDAD DEL CATÁLOGO');
-  L.push(' ' + c.dim('productos según el mes de su última venta'));
+  L.push(' ' + c.darkGray('productos según el mes de su última venta'));
   for (const k of claves) {
     const v = cubos.get(k) || 0;
     const et = MESES[Number(k.slice(5, 7)) - 1] + ' ' + k.slice(2, 4);
-    L.push('  ' + c.dim(et) + ' ' + barraH(v, max, 22) + ' ' + padL(c.num(num(v)), 6));
+    L.push('  ' + c.gray(et) + ' ' + barraH(v, max, 22, c.cyan) + ' ' + padL(c.num(num(v)), 6));
   }
   // 'antes' agrupa 8+ meses: dibujarle una barra al lado de un mes suelto engaña
-  L.push('  ' + c.dim(pad('antes', 29)) + padL(c.dim(num(viejos)), 6));
+  L.push('  ' + c.darkGray(pad('antes', 29)) + padL(c.darkGray(num(viejos)), 6));
   return L;
 }
 
@@ -195,9 +236,9 @@ function panelStock(vivos, fantasma) {
   const tot = vivos + fantasma;
   const p = v => (tot ? (v / tot) * 100 : 0);
   const L = tituloDer('COMPOSICIÓN DEL STOCK');
-  L.push(' ' + c.dim('los ' + num(tot) + ' productos con existencia'));
-  L.push('  ' + c.dim(pad('vendido en 1 año', 17)) + barraH(vivos, tot, 14, c.ok) + ' ' + padL(c.num(num(vivos)), 6) + c.dim(p(vivos).toFixed(0).padStart(4) + '%'));
-  L.push('  ' + c.dim(pad('sin venta', 17)) + barraH(fantasma, tot, 14, c.warn) + ' ' + padL(c.num(num(fantasma)), 6) + c.dim(p(fantasma).toFixed(0).padStart(4) + '%'));
+  L.push(' ' + c.darkGray('los ' + num(tot) + ' productos con existencia'));
+  L.push('  ' + c.gray(pad('vendido en 1 año', 17)) + barraH(vivos, tot, 14, c.ok) + ' ' + padL(c.num(num(vivos)), 6) + c.darkGray(p(vivos).toFixed(0).padStart(4) + '%'));
+  L.push('  ' + c.gray(pad('sin venta', 17)) + barraH(fantasma, tot, 14, c.warn) + ' ' + padL(c.num(num(fantasma)), 6) + c.darkGray(p(fantasma).toFixed(0).padStart(4) + '%'));
   return L;
 }
 
@@ -234,7 +275,7 @@ async function estado() {
   fila('descripción movida', c.num(num(movidas.length)), movidas.length ? GL.warn : GL.ok);
   fila('último embedding', dias(dEmb));
   if (sinVector.length) {
-    out('  ' + c.dim('└ p.ej. ' + sinVector.slice(0, 3).map(p => p.codigo_interno + ' ' + p.descripcion.slice(0, 26)).join('  ')));
+    out('  ' + c.darkGray('⎿ ') + c.gray('p.ej. ' + sinVector.slice(0, 3).map(p => c.cyan(p.codigo_interno) + ' ' + p.descripcion.slice(0, 24)).join('  ')));
   }
 
   spin.paso('diccionario coloquial…');
@@ -246,7 +287,7 @@ async function estado() {
   fila('términos activos', c.num(num(terminos)));
   fila('categorías cubiertas', c.num(num(cats.length)));
   fila('última generación', String(ultVocab).slice(0, 10) || '—', vocabNuevo ? GL.warn : GL.ok);
-  if (vocabNuevo) out('  ' + c.warn('└ es más nuevo que los vectores: el texto embebido cambió'));
+  if (vocabNuevo) out('  ' + c.darkGray('⎿ ') + c.warn('más nuevo que los vectores: el texto embebido cambió'));
 
   spin.paso('ranking por ventas…');
   seccion('RANKING POR VENTAS');
@@ -270,9 +311,9 @@ async function estado() {
 
   fila('con historial de venta', c.num(num(popRows.length)));
   fila('con existencia', c.num(num(conStockArr.length)));
-  fila('stock sin venta en 1 año', c.num(num(fantasma.length)) + c.dim(` (${pctFantasma.toFixed(0)}%)`), pctFantasma > 30 ? GL.warn : GL.ok);
+  fila('stock sin venta en 1 año', c.num(num(fantasma.length)) + c.darkGray(` (${pctFantasma.toFixed(0)}%)`), pctFantasma > 30 ? GL.warn : GL.ok);
   fila('recalculado', dias(dPop), dPop !== null && dPop > 3 ? GL.warn : GL.ok);
-  if (pctFantasma > 30) out('  ' + c.dim('└ el ranking por ventas los hunde solos: score 0 o negativo'));
+  if (pctFantasma > 30) out('  ' + c.darkGray('⎿ ') + c.gray('el ranking por ventas los hunde solos: score 0 o negativo'));
 
   // ── conectividad: sin esto, las capas 4 y 5 se apagan sin avisar
   spin.paso('probando OpenRouter y OpenAI…');
@@ -297,40 +338,38 @@ async function estado() {
     if (s.ok) { fila(s.nombre, c.num(s.ms + ' ms'), GL.ok); continue; }
     const detalle = s.faltaKey ? 'sin key' : s.geo ? 'bloqueo por país' : s.red ? s.motivo : `HTTP ${s.estado}`;
     fila(s.nombre, c.err(detalle), GL.err);
-    if (s.geo) out('  ' + c.warn('└ ¿VPN caída? OpenAI bloquea Venezuela: sin VPN no hay embeddings'));
+    if (s.geo) out('  ' + c.darkGray('⎿ ') + c.warn('¿VPN caída? OpenAI bloquea Venezuela: sin VPN no hay embeddings'));
     caidos.push(s);
   }
 
-  // ── el coseno en vivo: sin esto el margen señal/ruido puede derrumbarse sin que nadie
-  // lo note. Un vector "funciona" siempre (devuelve vecinos); lo que decide si SIRVE es la
-  // distancia entre una consulta legítima y texto sin sentido.
+  // ── el coseno en vivo
   spin.paso('midiendo el coseno en vivo…');
   let margenVector = null;
   const panelCos = tituloDer('EL COSENO EN VIVO');
   if (!sondas[1].ok) {
-    panelCos.push(' ' + c.dim('sin OpenAI no se puede medir'));
+    panelCos.push(' ' + c.darkGray('sin OpenAI no se puede medir'));
   } else {
     const vecs = await embeder([DEMO, BASURA]);
     const [top, ruido] = vecs ? await Promise.all([vecinos(vecs[0], 4), vecinos(vecs[1], 1)]) : [[], []];
     if (!top.length) {
-      panelCos.push(' ' + c.dim('la RPC no devolvió vecinos'));
+      panelCos.push(' ' + c.darkGray('la RPC no devolvió vecinos'));
     } else {
       const simRuido = ruido.length ? ruido[0].similitud : 0;
       margenVector = top[0].similitud - simRuido;
-      panelCos.push(' ' + c.dim('cos(θ) sobre 1.536 dimensiones'));
-      panelCos.push(' ' + c.bold(`"${DEMO}"`) + c.dim(' → vecinos'));
+      panelCos.push(' ' + c.darkGray('cos(θ) sobre 1.536 dimensiones'));
+      panelCos.push(' ' + c.bold(c.claude(`"${DEMO}"`)) + c.darkGray(' → vecinos'));
       for (const f of top) {
-        panelCos.push('  ' + (f.similitud >= UMBRAL_VECTOR ? c.ok(f.similitud.toFixed(3)) : c.dim(f.similitud.toFixed(3))) +
-          ' ' + barraSim(f.similitud, 14) + ' ' + c.dim(f.descripcion.slice(0, 20)));
+        panelCos.push('  ' + (f.similitud >= UMBRAL_VECTOR ? c.ok(f.similitud.toFixed(3)) : c.darkGray(f.similitud.toFixed(3))) +
+          ' ' + barraSim(f.similitud, 14) + ' ' + c.gray(f.descripcion.slice(0, 20)));
       }
-      panelCos.push('  ' + c.warn(UMBRAL_VECTOR.toFixed(3)) + ' ' + c.dim('╌'.repeat(14)) + ' ' + c.dim('umbral'));
-      panelCos.push('  ' + c.err(simRuido.toFixed(3)) + ' ' + barraSim(simRuido, 14) + ' ' + c.dim('ruido (suelo)'));
+      panelCos.push('  ' + c.warn(UMBRAL_VECTOR.toFixed(3)) + ' ' + c.darkGray('╌'.repeat(14)) + ' ' + c.darkGray('umbral'));
+      panelCos.push('  ' + c.err(simRuido.toFixed(3)) + ' ' + barraSim(simRuido, 14) + ' ' + c.darkGray('ruido (suelo)'));
       const sano = margenVector > 0.05;
-      panelCos.push('  ' + (sano ? GL.ok : GL.err) + ' ' + c.bold('margen ' + margenVector.toFixed(3)) +
-        (sano ? c.dim('  separa de verdad') : c.err('  la capa no aporta')));
+      panelCos.push('  ' + (sano ? GL.ok : GL.err) + ' ' + c.bold(c.num('margen ' + margenVector.toFixed(3))) +
+        (sano ? c.darkGray('  separa de verdad') : c.err('  la capa no aporta')));
     }
   }
-  panelCos.push('  ' + c.dim('└ ') + c.cyan('rag.js coseno "..."'));
+  panelCos.push('  ' + c.darkGray('└ ') + c.cyan('rag.js coseno "..."'));
 
   spin.fin();
   const izq = CAP; CAP = null;
@@ -348,15 +387,15 @@ async function estado() {
 
   console.log('');
   if (!problemas.length) {
-    console.log(' ' + c.ok('▎') + ' ' + c.bold('Todo al día') + c.dim(`  ·  ${((Date.now() - t0) / 1000).toFixed(1)}s`));
+    console.log(' ' + c.ok('▎') + ' ' + c.bold(c.ok('Todo al día')) + c.darkGray(`  ·  ${((Date.now() - t0) / 1000).toFixed(1)}s`));
     return 0;
   }
-  console.log(' ' + c.err('▎') + ' ' + c.bold('Requiere acción'));
-  for (const [p] of problemas) console.log('   ' + GL.err + ' ' + p);
+  console.log(' ' + c.err('▎') + ' ' + c.bold(c.err('Requiere acción')));
+  for (const [p] of problemas) console.log('   ' + GL.err + ' ' + c.num(p));
   // los fallos de red no se arreglan con un comando (van con null): no inventar uno
   const cmds = [...new Set(problemas.map(p => p[1]).filter(Boolean))];
   if (cmds.length) {
-    console.log('\n   ' + c.dim('ejecuta:') + '  ' + cmds.map(x => c.cyan('node rag.js ' + x)).join(c.dim('  y  ')));
+    console.log('\n   ' + c.darkGray('ejecuta:') + '  ' + cmds.map(x => c.cyan('node rag.js ' + x)).join(c.darkGray('  y  ')));
   }
   return 1;
 }
@@ -529,10 +568,10 @@ async function coseno(consulta) {
   const q = consulta || DEMO;
   cabecera('CÓMO DECIDE EL VECTOR', 'similitud de coseno');
 
-  console.log(' ' + c.dim('Cada descripción se convierte en un vector de 1.536 números. Dos textos'));
-  console.log(' ' + c.dim('se comparan por el ÁNGULO entre sus vectores, no por sus palabras:'));
+  console.log(' ' + c.gray('Cada descripción se convierte en un vector de 1.536 números. Dos textos'));
+  console.log(' ' + c.gray('se comparan por el ÁNGULO entre sus vectores, no por sus palabras:'));
   console.log('');
-  console.log('   ' + c.cyan('cos(θ) = (A · B) / (|A| · |B|)') + c.dim('     1 = mismo sentido · 0 = sin relación'));
+  console.log('   ' + c.cyan('cos(θ) = (A · B) / (|A| · |B|)') + c.darkGray('     1 = mismo sentido · 0 = sin relación'));
 
   const spinC = cargando();
   spinC.paso('embebiendo la consulta y midiendo vecinos…');
@@ -548,12 +587,12 @@ async function coseno(consulta) {
   // un ángulo de verdad, no una licencia del dibujante.
   const simRuido = ruido.length ? ruido[0].similitud : 0;
   const norma = Math.sqrt(vecs[0].reduce((a, x) => a + x * x, 0));
-  console.log('\n ' + c.dim('|A| = ') + c.num(norma.toFixed(3)) +
-    c.dim('  → OpenAI normaliza, así que cos(θ) = A · B directamente'));
+  console.log('\n ' + c.darkGray('|A| = ') + c.num(norma.toFixed(3)) +
+    c.darkGray('  → OpenAI normaliza, así que cos(θ) = A · B directamente'));
   const anchoD = Math.min(COLS - 6, 74);
   if (anchoD < 64) {
     console.log('');
-    console.log(' ' + c.dim('(el diagrama necesita una terminal de 70 columnas o más)'));
+    console.log(' ' + c.darkGray('(el diagrama necesita una terminal de 70 columnas o más)'));
   } else {
     const lineas = diagramaCoseno(q, [
       { sim: top[0].similitud, etiqueta: top[0].similitud.toFixed(3) + ' ' + top[0].descripcion.slice(0, 16), color: c.ok },
@@ -563,36 +602,36 @@ async function coseno(consulta) {
     console.log('');
     for (const l of lineas) console.log(' ' + l);
     console.log('');
-    console.log(' ' + c.dim('El ángulo de cada rayo CON A es el real. El ángulo entre dos rayos no:'));
-    console.log(' ' + c.dim('1.536 dimensiones no caben en dos, y esa parte se pierde al proyectar.'));
+    console.log(' ' + c.darkGray('El ángulo de cada rayo CON A es el real. El ángulo entre dos rayos no:'));
+    console.log(' ' + c.darkGray('1.536 dimensiones no caben en dos, y esa parte se pierde al proyectar.'));
   }
 
-  console.log('\n ' + c.bold(`"${q}"`) + c.dim('  → los 5 vectores más cercanos del catálogo'));
-  console.log(' ' + c.dim('─'.repeat(W - 2)));
+  console.log('\n ' + c.bold(c.claude(`"${q}"`)) + c.darkGray('  → los 5 vectores más cercanos del catálogo'));
+  console.log(' ' + c.darkGray('─'.repeat(W - 2)));
   for (const f of top) {
     const pasa = f.similitud >= UMBRAL_VECTOR;
-    console.log('  ' + (pasa ? c.ok(f.similitud.toFixed(3)) : c.dim(f.similitud.toFixed(3))) +
-      ' ' + c.dim(padL(grados(f.similitud), 4)) + '  ' + barraSim(f.similitud) +
-      '  ' + f.descripcion.slice(0, 34));
+    console.log('  ' + (pasa ? c.ok(f.similitud.toFixed(3)) : c.darkGray(f.similitud.toFixed(3))) +
+      ' ' + c.darkGray(padL(grados(f.similitud), 4)) + '  ' + barraSim(f.similitud) +
+      '  ' + c.gray(f.descripcion.slice(0, 34)));
   }
 
   // el umbral y el suelo de ruido, que es lo que de verdad explica la decisión
-  console.log(' ' + c.dim('─'.repeat(W - 2)));
-  console.log('  ' + c.warn(UMBRAL_VECTOR.toFixed(3)) + c.dim('       ' + '╌'.repeat(24) + '  umbral: por debajo no se adopta'));
-  console.log('  ' + c.err(simRuido.toFixed(3)) + ' ' + c.dim(padL(grados(simRuido), 4)) + '  ' + barraSim(simRuido) +
-    '  ' + c.dim(`"${BASURA}" (sin sentido)`));
+  console.log(' ' + c.darkGray('─'.repeat(W - 2)));
+  console.log('  ' + c.warn(UMBRAL_VECTOR.toFixed(3)) + c.darkGray('       ' + '╌'.repeat(24) + '  umbral: por debajo no se adopta'));
+  console.log('  ' + c.err(simRuido.toFixed(3)) + ' ' + c.darkGray(padL(grados(simRuido), 4)) + '  ' + barraSim(simRuido) +
+    '  ' + c.darkGray(`"${BASURA}" (sin sentido)`));
 
   const margen = top[0].similitud - simRuido;
   console.log('');
   const sano = margen > 0.05;
-  console.log(' ' + (sano ? c.ok('▎') : c.err('▎')) + ' ' + c.bold('margen señal/ruido ' + margen.toFixed(3)) + '  ' +
-    (sano ? c.dim('hay separación: el umbral distingue de verdad') : c.err('NO hay umbral posible: la capa es inservible')));
-  console.log(' ' + c.dim('  Con los embeddings v1 este margen era 0.012 y la capa aportaba cero.'));
-  console.log(' ' + c.dim('  Enriquecer el texto (categoría + coloquialismos) lo llevó a ~0.12.'));
+  console.log(' ' + (sano ? c.ok('▎') : c.err('▎')) + ' ' + c.bold(c.num('margen señal/ruido ' + margen.toFixed(3))) + '  ' +
+    (sano ? c.darkGray('hay separación: el umbral distingue de verdad') : c.err('NO hay umbral posible: la capa es inservible')));
+  console.log(' ' + c.darkGray('  Con los embeddings v1 este margen era 0.012 y la capa aportaba cero.'));
+  console.log(' ' + c.darkGray('  Enriquecer el texto (categoría + coloquialismos) lo llevó a ~0.12.'));
   return 0;
 }
 
-// ───────────────────────────────────────────────────────────────────── buscar
+// ───────────────────────────────────────────────────────────────────── buscar (Brainless / Claude Code style)
 async function buscar(consulta) {
   if (!consulta) { console.log(' uso: ' + c.cyan('node rag.js buscar "cemento gris"')); return 1; }
   const body = fs.readFileSync(path.join(ROOT, 'scratch_live', 'live_buscar.js'), 'utf8');
@@ -603,32 +642,47 @@ async function buscar(consulta) {
   const fakeEnv = { OPENROUTER_API_KEY: pick('OPENROUTER_API_KEY'), OPENAI_API_KEY: pick('OPENAI_API_KEY') };
   const run = new Function('query', 'require', '$env', '"use strict"; return (async () => {\n' + body + '\n})();');
   const spin = cargando();
-  spin.paso('ejecutando el cuerpo real del nodo…');
+  spin.paso('ejecutando matcher…');
   const t0 = Date.now();
   let r;
   try { r = JSON.parse(await run({ p_busqueda: consulta }, n => (n === 'axios' ? ax : require(n)), fakeEnv)); }
   catch (x) { spin.fin(); console.log(' ' + GL.err + ' la búsqueda lanzó excepción: ' + x.message); return 1; }
   const ms = Date.now() - t0;
+  spin.fin();
 
-  cabecera(`"${consulta}"`, `${ms} ms`);
+  // Turno de usuario estilo Claude Code:
+  console.log('\n ' + c.claude('❯') + ' ' + c.bold(c.num(consulta)));
+  
+  // Tool-call header (Brainless):
+  console.log(' ' + c.ok('⏺') + ' ' + c.bold('Supabase::buscar_productos') + c.darkGray(`(p_busqueda: "${consulta}")`));
+  
   const marcas = [];
   if (r.rescate) marcas.push(c.warn('HIPÓTESIS → ' + r.rescate));
   if (r.parcial) marcas.push(c.warn('parcial'));
   if (r.aclarar) marcas.push(c.warn('consulta vaga'));
   if (r.no_vendido) marcas.push(c.warn('no vendido'));
-  console.log(' ' + c.dim(`${r.encontrados || 0} resultado(s)`) + (marcas.length ? '   ' + marcas.join(c.dim(' · ')) : ''));
+
+  const nResultados = (r.productos || []).length;
+  console.log('   ' + c.darkGray('⎿') + ' ' + c.gray(`${nResultados} producto(s) encontrado(s) en `) + c.cyan(`${ms} ms`) +
+    (marcas.length ? '  ' + c.darkGray('·') + '  ' + marcas.join(c.darkGray(' · ')) : ''));
   console.log('');
 
   for (const p of (r.productos || [])) {
-    console.log('  ' + (p.disponible ? c.ok('●') : c.err('●')) + ' ' + p.nombre);
-    console.log('    ' + c.dim(pad(p.precio_divisas_texto, 10) + p.precio_bs_texto));
+    const estadoDot = p.disponible ? c.ok('⏺') : c.err('⏺');
+    const badge = p.disponible ? c.ok('[DISPONIBLE]') : c.err('[AGOTADO]');
+    console.log('    ' + estadoDot + ' ' + c.bold(c.num(p.nombre)) + '  ' + badge);
+    const precios = c.claude(pad(p.precio_divisas_texto || '$ —', 12)) + c.darkGray('│ ') + c.num(p.precio_bs_texto || 'Bs. —');
+    console.log('      ' + c.darkGray('⎿ ') + precios);
   }
-  if (!(r.productos || []).length) console.log('  ' + c.dim('(sin resultados)'));
+  if (!nResultados) console.log('    ' + c.darkGray('⎿ (sin resultados en el catálogo)'));
 
   if (r.instruccion) {
-    console.log('\n ' + c.dim('instrucción al bot'));
-    console.log(' ' + c.dim('─'.repeat(W - 2)));
-    console.log(' ' + String(r.instruccion).slice(0, 300).replace(/\n/g, '\n '));
+    console.log('\n   ' + c.claude('◆') + ' ' + c.bold(c.gray('Instrucción generada para el bot:')));
+    console.log('   ' + c.darkGray('─'.repeat(W - 6)));
+    for (const linea of String(r.instruccion).trim().split('\n')) {
+      console.log('   ' + c.darkGray('│') + ' ' + c.gray(linea));
+    }
+    console.log('   ' + c.darkGray('╰' + '─'.repeat(W - 6)));
   }
   return 0;
 }
@@ -638,7 +692,7 @@ async function buscar(consulta) {
 async function suite(flags) {
   const rapida = flags.includes('--rapida');
   cabecera('SUITE DE BÚSQUEDA', rapida ? 'modo rápido' : 'completa');
-  if (!rapida) console.log(' ' + c.dim('el recall de 320 tarda ~15 min; usa --rapida para saltarlo'));
+  if (!rapida) console.log(' ' + c.darkGray('el recall de 320 tarda ~15 min; usa --rapida para saltarlo'));
 
   const pasos = [
     { nombre: 'Regresión', script: 'scripts/_test_busqueda_50.js', args: [], parse: s => {
@@ -667,23 +721,22 @@ async function suite(flags) {
   console.log('');
   let totalCasos = 0, totalFallos = 0, rotos = 0;
   for (const p of pasos) {
-    // el progreso en el sitio solo tiene sentido en terminal: por tubería el \r queda literal
-    if (TTY) process.stdout.write('  ' + c.dim('▸ ') + pad(p.nombre, 20) + c.dim('corriendo…'));
+    if (TTY) process.stdout.write('  ' + c.darkGray('▸ ') + pad(c.gray(p.nombre), 20) + c.darkGray('corriendo…'));
     const t0 = Date.now();
     const { salida } = correrCapturando(p.script, p.args);
     const r = p.parse(salida);
     const seg = ((Date.now() - t0) / 1000).toFixed(0) + 's';
-    if (TTY) process.stdout.write('\r' + ' '.repeat(W) + '\r');   // borrar el "corriendo…", no solo volver al inicio
-    if (!r) { console.log('  ' + GL.err + ' ' + pad(p.nombre, 20) + c.err('no pude leer el resultado') + c.dim('  ' + seg)); rotos++; continue; }
+    if (TTY) process.stdout.write('\r' + ' '.repeat(W) + '\r');
+    if (!r) { console.log('  ' + GL.err + ' ' + pad(p.nombre, 20) + c.err('no pude leer el resultado') + c.darkGray('  ' + seg)); rotos++; continue; }
     totalCasos += r.casos; totalFallos += r.fallos;
     const g = r.fallos === 0 ? GL.ok : GL.warn;
-    console.log('  ' + g + ' ' + pad(p.nombre, 20) + pad(c.num(r.casos + ' casos'), 12) + c.dim(r.detalle) + c.dim('  ' + seg));
+    console.log('  ' + g + ' ' + pad(c.num(p.nombre), 20) + pad(c.gray(r.casos + ' casos'), 12) + c.darkGray(r.detalle) + c.darkGray('  ' + seg));
   }
 
-  console.log('\n ' + c.dim('─'.repeat(W - 2)));
+  console.log('\n ' + c.darkGray('─'.repeat(W - 2)));
   const sano = totalFallos === 0 && rotos === 0;
-  console.log(' ' + (sano ? c.ok('▎') : c.warn('▎')) + ' ' + c.bold(`${num(totalCasos)} casos`) +
-    c.dim('  ·  ') + (totalFallos ? c.warn(`${totalFallos} con problema`) : c.ok('sin fallos')));
+  console.log(' ' + (sano ? c.ok('▎') : c.warn('▎')) + ' ' + c.bold(c.num(`${num(totalCasos)} casos`)) +
+    c.darkGray('  ·  ') + (totalFallos ? c.warn(`${totalFallos} con problema`) : c.ok('sin fallos')));
   return sano ? 0 : 1;
 }
 
@@ -692,7 +745,7 @@ async function popularidad() {
   const r = await fetch(`${SB}/rest/v1/rpc/refrescar_popularidad_reciente`, { method: 'POST', headers: H, body: '{}' });
   const t = await r.text();
   if (!r.ok) { console.log(' ' + GL.err + ' falló: ' + t.slice(0, 160)); return 1; }
-  console.log(' ' + GL.ok + ' ranking recalculado: ' + c.num(num(t)) + ' productos con historial de venta');
+  console.log(' ' + GL.ok + ' ' + c.bold('Ranking recalculado:') + ' ' + c.num(num(t)) + c.gray(' productos con historial de venta'));
   return 0;
 }
 
@@ -700,9 +753,9 @@ async function popularidad() {
 function ayuda() {
   cabecera('RAG · Perucho', 'CLI de la capa de búsqueda');
   const g = (t, items) => {
-    console.log('\n ' + c.bold(t));
+    console.log('\n ' + c.claude('◆') + ' ' + c.bold(c.num(t)));
     for (const [cmd, desc, nota] of items) {
-      console.log('   ' + c.cyan(pad(cmd, 26)) + desc + (nota ? ' ' + c.dim(nota) : ''));
+      console.log('   ' + c.cyan(pad(cmd, 26)) + c.gray(desc) + (nota ? ' ' + c.darkGray(nota) : ''));
     }
   };
   g('Diagnóstico', [
@@ -726,8 +779,8 @@ function ayuda() {
     ['popularidad', 'recalcula el ranking por ventas'],
     ['desplegar [--dry]', 'sube los dumps a n8n', '(corre npm test antes)'],
   ]);
-  console.log('\n ' + c.dim('`medir` cachea sus consultas a propósito: comparar dos corridas con'));
-  console.log(' ' + c.dim('preguntas distintas no mide nada.') + '\n');
+  console.log('\n ' + c.darkGray('`medir` cachea sus consultas a propósito: comparar dos corridas con'));
+  console.log(' ' + c.darkGray('preguntas distintas no mide nada.') + '\n');
   return 0;
 }
 
