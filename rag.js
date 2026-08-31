@@ -11,6 +11,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const readline = require('readline');
 const { spawnSync } = require('child_process');
 
 const ROOT = __dirname;
@@ -784,16 +785,112 @@ function ayuda() {
   return 0;
 }
 
+// ───────────────────────────────────────────────────────────────────── TUI interactiva (Brainless / Claude Code REPL)
+async function iniciarTUI() {
+  console.clear();
+  cabecera('RAG · Perucho', 'TUI Interactiva');
+
+  const menu = () => {
+    console.log('\n ' + c.claude('◆') + ' ' + c.bold(c.num('Comandos rápidos:')));
+    console.log('   ' + c.cyan('[1]') + ' ' + c.num('Estado general') + '      ' +
+                c.cyan('[2]') + ' ' + c.num('Coseno en vivo') + '     ' +
+                c.cyan('[3]') + ' ' + c.num('Diagnóstico'));
+    console.log('   ' + c.cyan('[4]') + ' ' + c.num('Generar embeddings') + '  ' +
+                c.cyan('[5]') + ' ' + c.num('Vocabulario') + '        ' +
+                c.cyan('[6]') + ' ' + c.num('Popularidad'));
+    console.log('   ' + c.cyan('[7]') + ' ' + c.num('Suite de tests') + '      ' +
+                c.cyan('[8]') + ' ' + c.num('Limpiar pantalla') + '   ' +
+                c.cyan('[0]') + ' ' + c.num('Salir'));
+    console.log('\n ' + c.darkGray('Escribe cualquier producto para buscarlo directamente, un número de opción o /comando.') + '\n');
+  };
+
+  menu();
+
+  const comandosCompletar = ['/estado', '/buscar ', '/coseno', '/diag ', '/embeddings', '/vocabulario', '/descripciones', '/popularidad', '/suite', '/cls', '/salir', '/ayuda'];
+  const completer = line => {
+    const hits = comandosCompletar.filter(c => c.startsWith(line.trim()));
+    return [hits.length ? hits : comandosCompletar, line];
+  };
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    prompt: ' ' + c.claude('❯') + ' ',
+    completer,
+  });
+
+  rl.prompt();
+
+  for await (const linea of rl) {
+    const input = linea.trim();
+    if (!input) { rl.prompt(); continue; }
+
+    const partes = input.split(' ');
+    const primero = partes[0].toLowerCase();
+    const argumento = partes.slice(1).join(' ').trim();
+
+    if (primero === '0' || primero === '/salir' || primero === 'exit' || primero === 'quit' || primero === 'q') {
+      console.log('\n ' + c.ok('⏺') + ' ' + c.gray('Sesión finalizada. ¡Hasta luego!') + '\n');
+      rl.close();
+      return 0;
+    }
+
+    if (primero === '8' || primero === '/cls' || primero === 'clear') {
+      console.clear();
+      cabecera('RAG · Perucho', 'TUI Interactiva');
+      menu();
+      rl.prompt();
+      continue;
+    }
+
+    if (primero === '1' || primero === '/estado' || primero === 'estado') {
+      await estado();
+    } else if (primero === '2' || primero === '/coseno' || primero === 'coseno') {
+      await coseno(argumento || null);
+    } else if (primero === '3' || primero === '/diag' || primero === 'diag') {
+      correr('scripts/_diag_vector.js', argumento ? [argumento] : []);
+    } else if (primero === '4' || primero === '/embeddings' || primero === 'embeddings') {
+      correr('scripts/generar_embeddings.js', argumento ? [argumento] : []);
+    } else if (primero === '5' || primero === '/vocabulario' || primero === 'vocabulario') {
+      correr('scripts/generar_vocabulario.js', argumento ? [argumento] : []);
+    } else if (primero === '6' || primero === '/popularidad' || primero === 'popularidad') {
+      await popularidad();
+    } else if (primero === '7' || primero === '/suite' || primero === 'suite') {
+      await suite(['--rapida']);
+    } else if (primero === '/descripciones' || primero === 'descripciones') {
+      correr('scripts/generar_descripciones.js', argumento ? [argumento] : []);
+    } else if (primero === '/buscar' || primero === 'buscar') {
+      await buscar(argumento);
+    } else if (primero === '/ayuda' || primero === 'ayuda' || primero === '?') {
+      ayuda();
+      menu();
+    } else {
+      // Todo texto libre sin prefijo se asume como búsqueda instantánea inteligente
+      await buscar(input);
+    }
+
+    console.log('');
+    rl.prompt();
+  }
+  return 0;
+}
+
 // ───────────────────────────────────────────────────────────────────── despacho
 const [cmd, ...rest] = process.argv.slice(2);
 const resto = rest.filter(a => !a.startsWith('--'));
 const flags = rest.filter(a => a.startsWith('--'));
 
 (async () => {
+  // Si no se especifica comando y estamos en una terminal interactiva (TTY), iniciar TUI interactiva
+  if (!cmd && TTY) {
+    return await iniciarTUI();
+  }
+
   switch ((cmd || 'estado').toLowerCase()) {
+    case 'tui': case 'interactivo': case 'i': return await iniciarTUI();
     case 'estado': case 'status':        return await estado();
     case 'buscar': case 'search':        return await buscar(resto.join(' '));
-    case 'coseno': case 'vectores':  return await coseno(resto.join(' '));
+    case 'coseno': case 'vectores':      return await coseno(resto.join(' '));
     case 'diag':                         return correr('scripts/_diag_vector.js', resto.length ? [resto.join(' ')] : []) ? 0 : 1;
     case 'suite':                        return await suite(flags);
     case 'medir': case 'bench':          return correr('scripts/_test_coloquial.js', flags) ? 0 : 1;
@@ -814,3 +911,4 @@ const flags = rest.filter(a => a.startsWith('--'));
   }
 })().then(x => process.exit(x || 0))
   .catch(x => { console.error(' ' + GL.err + ' ERROR: ' + x.message); process.exit(1); });
+
