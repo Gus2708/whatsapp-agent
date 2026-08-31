@@ -65,18 +65,19 @@ const GL = {
   chip: c.cyan('›'),
 };
 
-function cabecera(titulo, sub) {
+function cabecera(titulo, sub, ancho) {
   // Diseño Fieldset Legend al estilo Claude Code (Brainless)
+  const anchoCaja = ancho || (DOBLE ? W + AD + 5 : W);
   const tag = ' ' + c.bold(c.claude(titulo)) + ' ';
   const subTexto = sub ? ' ' + c.darkGray(sub) + ' ' : '';
   const restoIzq = 3;
-  const restoDer = Math.max(0, W - 2 - restoIzq - vis(tag) - vis(subTexto));
+  const restoDer = Math.max(0, anchoCaja - 2 - restoIzq - vis(tag) - vis(subTexto));
   const lineaSup = c.darkGray('╭' + '─'.repeat(restoIzq)) + tag + c.darkGray('─'.repeat(restoDer)) + (sub ? c.dim(subTexto) : '') + c.darkGray('╮');
-  const lineaInf = c.darkGray('╰' + '─'.repeat(W - 2) + '╯');
+  const lineaInf = c.darkGray('╰' + '─'.repeat(anchoCaja - 2) + '╯');
   
   out('\n' + lineaSup);
   const statusLine = '  ' + c.darkGray('branch: main') + c.darkGray(' · ') + c.gray('Ferretería El Serrucho') + c.darkGray(' · ') + c.ok('●') + ' ' + c.darkGray('online');
-  out(c.darkGray('│') + pad(statusLine, W - 2) + c.darkGray('│'));
+  out(c.darkGray('│') + pad(statusLine, anchoCaja - 2) + c.darkGray('│'));
   out(lineaInf);
 }
 
@@ -186,17 +187,16 @@ function cargando() {
 
 function dosColumnas(izq, derIn) {
   if (!DOBLE) { for (const l of izq) console.log(l); for (const l of derIn) console.log(l); return; }
-  // La cabecera tiene 1 salto de línea antes de la caja + 3 líneas de caja
-  const der = ['', '', '', ...derIn];               // arranca bajo el marco del título
+  const der = derIn;
   const n = Math.max(izq.length, der.length);
   for (let i = 0; i < n; i++) {
     const d = der[i] || '';
-    console.log(pad(izq[i] || '', W + 4) + (i === 0 ? ' ' : c.darkGray('│')) + (d ? ' ' + d : ''));
+    console.log(pad(izq[i] || '', W + 4) + c.darkGray('│') + (d ? ' ' + d : ''));
   }
 }
 
 // ── piezas de gráfica para la columna derecha (estilo Brainless)
-function tituloDer(t) { return ['', ' ' + c.claude('◆') + ' ' + c.bold(c.num(t)), ' ' + c.darkGray('─'.repeat(AD - 2))]; }
+function tituloDer(t) { return [' ' + c.claude('◆') + ' ' + c.bold(c.num(t)), ' ' + c.darkGray('─'.repeat(AD - 2))]; }
 function barraH(valor, max, ancho, color) {
   const n = max > 0 ? Math.max(0, Math.min(ancho, Math.round((valor / max) * ancho))) : 0;
   return (color || c.cyan)('█'.repeat(n)) + c.darkGray('░'.repeat(Math.max(0, ancho - n)));
@@ -267,7 +267,8 @@ async function estado() {
   const dEmb = ultEmb ? Math.floor((Date.now() - new Date(ultEmb).getTime()) / 86400000) : null;
   const cobertura = productos.length ? ((productos.length - sinVector.length) / productos.length) * 100 : 0;
 
-  seccion('CATÁLOGO Y VECTORES');
+  out(' ' + c.claude('◆') + ' ' + c.bold(c.num('CATÁLOGO Y VECTORES')));
+  out(' ' + c.darkGray('─'.repeat(W - 2)));
   fila('productos en catálogo', c.num(num(productos.length)));
   fila('con vector', c.num(num(emb.length)));
   fila('cobertura vectorial', c.num(cobertura.toFixed(1) + '%'));
@@ -382,8 +383,13 @@ async function estado() {
   panelCos.push('  ' + c.darkGray('└ ') + c.cyan('rag.js coseno "..."') + c.darkGray(' para pantalla completa'));
 
   spin.fin();
-  const izq = CAP; CAP = null;
-  const der = [...panelCos, ...panelActividad(popRows), ...panelStock(conStockArr.length - fantasma.length, fantasma.length)];
+  const todoIzq = CAP; CAP = null;
+  // La cabecera son las primeras 4 líneas (salto inicial + 3 líneas de caja)
+  const cabeceraLineas = todoIzq.slice(0, 4);
+  const izq = todoIzq.slice(4);
+  const der = [...panelCos, '', ...panelActividad(popRows), '', ...panelStock(conStockArr.length - fantasma.length, fantasma.length)];
+  
+  for (const l of cabeceraLineas) console.log(l);
   dosColumnas(izq, der);
 
   // ── veredicto
@@ -878,7 +884,7 @@ async function iniciarTUI() {
       await buscar(input);
     }
 
-    console.log('');
+    menu();
     rl.prompt();
   }
   return 0;

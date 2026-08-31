@@ -258,11 +258,10 @@ node rag.js ayuda                 # Catálogo completo de comandos
 ```
 
 ```
-╭─── RAG · Perucho ──────────────────── Ferretería El Serrucho ╮    │
-│  branch: main · Ferretería El Serrucho · ● online            │    │
-╰──────────────────────────────────────────────────────────────╯    │
-                                                                    │  ◆ EL COSENO EN VIVO
- ◆ CATÁLOGO Y VECTORES                                              │  ────────────────────────────────────────────
+╭─── RAG · Perucho ─────────────────────────────────────────────────────────────────────── Ferretería El Serrucho ╮
+│  branch: main · Ferretería El Serrucho · ● online                                                               │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ ◆ CATÁLOGO Y VECTORES                                              │  ◆ EL COSENO EN VIVO
  ──────────────────────────────────────────────────────────────     │  cos(θ) sobre 1.536 dimensiones (esfera unidad)
   productos en catálogo                                    7.689    │    ⡄ A = tapa para el baño
   con vector                                               7.689    │    ⡇⢀⠤⡞⢆
