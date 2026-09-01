@@ -1,4 +1,4 @@
-﻿
+
 
 ---
 
@@ -188,7 +188,7 @@ En Ferretería El Serrucho nos especializamos en materiales de construcción, he
 
 ---
 
-## Corrida #3 — 6/6/2026, 1:29:53 a. m. — Tasa: 86% (43/50) [Prueba Real a 584227898847@c.us]
+## Corrida #3 — 6/6/2026, 1:29:53 a. m. — Tasa: 86% (43/50) [Prueba Real a 584XXXXXXXXX@c.us]
 
 | ID | Tipo | Pregunta | Veredicto | Problemas |
 |---|---|---|---|---|
@@ -348,7 +348,7 @@ Si necesitas más información o deseas realizar un pedido, ¡estoy aquí para a
 
 ---
 
-## Corrida #4 — 6/6/2026, 1:58:15 a. m. — Tasa: 98% (49/50) [Prueba Real a 584227898847@c.us]
+## Corrida #4 — 6/6/2026, 1:58:15 a. m. — Tasa: 98% (49/50) [Prueba Real a 584XXXXXXXXX@c.us]
 
 | ID | Tipo | Pregunta | Veredicto | Problemas |
 |---|---|---|---|---|
@@ -442,7 +442,7 @@ Precio Bs (BCV): 2.10$ o 1,192.13bs
 
 ---
 
-## Corrida #5 — 6/6/2026, 2:18:18 a. m. — Tasa: 98% (49/50) [Prueba Real a 584227898847@c.us]
+## Corrida #5 — 6/6/2026, 2:18:18 a. m. — Tasa: 98% (49/50) [Prueba Real a 584XXXXXXXXX@c.us]
 
 | ID | Tipo | Pregunta | Veredicto | Problemas |
 |---|---|---|---|---|
@@ -512,7 +512,7 @@ Hola Soy *Perucho* 👨🏻‍🔧 El bot de IA experto ferretero de *El Serruch
 
 ---
 
-## Corrida #6 — 6/6/2026, 2:35:41 a. m. — Tasa: 100% (50/50) [Prueba Real a 584227898847@c.us]
+## Corrida #6 — 6/6/2026, 2:35:41 a. m. — Tasa: 100% (50/50) [Prueba Real a 584XXXXXXXXX@c.us]
 
 | ID | Tipo | Pregunta | Veredicto | Problemas |
 |---|---|---|---|---|
@@ -569,7 +569,7 @@ Hola Soy *Perucho* 👨🏻‍🔧 El bot de IA experto ferretero de *El Serruch
 
 ---
 
-## Corrida #7 — 6/6/2026, 8:53:03 a. m. — Tasa: 96% (48/50) [Prueba Real a 584227898847@c.us]
+## Corrida #7 — 6/6/2026, 8:53:03 a. m. — Tasa: 96% (48/50) [Prueba Real a 584XXXXXXXXX@c.us]
 
 | ID | Tipo | Pregunta | Veredicto | Problemas |
 |---|---|---|---|---|
@@ -662,7 +662,7 @@ Parece que estoy teniendo dificultades técnicas para buscar el tepe negro en es
 
 ---
 
-## Corrida #8 — 6/6/2026, 9:36:55 a. m. — Tasa: 100% (50/50) [Prueba Real a 584227898847@c.us]
+## Corrida #8 — 6/6/2026, 9:36:55 a. m. — Tasa: 100% (50/50) [Prueba Real a 584XXXXXXXXX@c.us]
 
 | ID | Tipo | Pregunta | Veredicto | Problemas |
 |---|---|---|---|---|

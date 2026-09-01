@@ -1,3 +1,9 @@
+const fs = require('fs');
+const path = require('path');
+const envPath = path.join(__dirname, '..', '.env');
+const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
+
 // READ-ONLY(*): prueba end-to-end de un MODELO contra el agente real.
 // Usa el systemMessage desplegado + el cuerpo EXACTO de buscar_productos /
 // hacer_presupuesto contra Supabase real, y corre el bucle de tool-calling

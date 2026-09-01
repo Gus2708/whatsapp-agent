@@ -8,10 +8,15 @@
  */
 const http = require('http');
 const https = require('https');
+const fs = require('fs');
+const path = require('path');
+const envPath = path.join(__dirname, '..', '.env');
+const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
 
-const N8N_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhOTE3NGNiNi02NTI1LTQyNmItOTAwNS0zMGJkZTFjYjE3NWMiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiNDc2YTBkOWItYzc3Ny00NjdlLWFkNDItM2RhMmU2NDUxZGZjIiwiaWF0IjoxNzgwNjg4NjcxfQ.r_Yu3KrJGTO6mSWVFZYihxFUbqnLzGJp7c0J5rOiSP0';
-const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';
-const SBHOST = 'rgniqjfooifchyctnbzu.supabase.co';
+const N8N_KEY = pick('N8N_API_KEY');
+const ANON = pick('SUPABASE_ANON_KEY');
+const SBHOST = (pick('SUPABASE_URL') || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // 5 presupuestos con productos estrella (alta rotación / que sí se venden)
@@ -41,7 +46,7 @@ async function execData(id){ const r = await n8n({hostname:'localhost',port:5678
 function payload(text){
   const from = '5849'+Math.floor(Math.random()*1e8).toString().padStart(8,'0')+'@c.us';
   return JSON.stringify({ id:'evt_'+Date.now(), timestamp:Math.floor(Date.now()/1000), event:'message', session:'default',
-    me:{id:'584227898847@c.us',pushName:'Perucho'}, engine:'NOWEB',
+    me:{id:pick('BOT_PHONE_NUMBER') || '584120000000@c.us', pushName:pick('BOT_NAME') || 'Bot'}, engine:'NOWEB',
     payload:{ id:'m'+Date.now(), timestamp:Math.floor(Date.now()/1000), from, fromMe:false, source:'app', body:text, hasMedia:false, _data:{pushName:'Tester'} } });
 }
 

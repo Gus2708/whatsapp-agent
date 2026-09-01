@@ -6,8 +6,12 @@
  */
 const http = require('http');
 const fs   = require('fs');
+const path = require('path');
+const envPath = path.join(__dirname, '..', '.env');
+const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
 
-const N8N_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhOTE3NGNiNi02NTI1LTQyNmItOTAwNS0zMGJkZTFjYjE3NWMiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiNDc2YTBkOWItYzc3Ny00NjdlLWFkNDItM2RhMmU2NDUxZGZjIiwiaWF0IjoxNzgwNjg4NjcxfQ.r_Yu3KrJGTO6mSWVFZYihxFUbqnLzGJp7c0J5rOiSP0';
+const N8N_KEY = pick('N8N_API_KEY');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ── Escenarios ────────────────────────────────────────────────────────────────
@@ -91,8 +95,8 @@ async function execData(id) {
 function mkPayload(text) {
   return JSON.stringify({
     id:'evt_study_'+Date.now(), timestamp:Math.floor(Date.now()/1000), event:'message', session:'default',
-    me:{id:'584227898847@c.us',pushName:'Perucho'}, engine:'NOWEB',
-    payload:{id:'msg_'+Date.now(),timestamp:Math.floor(Date.now()/1000),from:'584246209979@c.us',fromMe:false,source:'app',body:text,hasMedia:false,_data:{pushName:'Tester'}}
+    me:{id:pick('BOT_PHONE_NUMBER') || '584120000000@c.us', pushName:pick('BOT_NAME') || 'Bot'}, engine:'NOWEB',
+    payload:{id:'msg_'+Date.now(),timestamp:Math.floor(Date.now()/1000),from:pick('TEST_PHONE_NUMBER') || '584120000001@c.us',fromMe:false,source:'app',body:text,hasMedia:false,_data:{pushName:'Tester'}}
   });
 }
 

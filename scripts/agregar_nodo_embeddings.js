@@ -19,7 +19,7 @@ const BASE = process.env.N8N_API_URL_LOCAL || 'http://localhost:5678/api/v1';
 const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
 const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || '').trim();
 const H = { 'X-N8N-API-KEY': pick('N8N_API_KEY'), 'Content-Type': 'application/json', accept: 'application/json' };
-const SBURL = pick('SUPABASE_URL') || 'https://rgniqjfooifchyctnbzu.supabase.co';
+const SBURL = pick('SUPABASE_URL') || pick('SUPABASE_URL');
 const ANON = pick('SUPABASE_ANON_KEY');
 
 const NOMBRE = 'Sync Vocabulario Catálogo';

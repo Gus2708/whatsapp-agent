@@ -1,6 +1,12 @@
+const fs = require('fs');
+const path = require('path');
+const envPath = path.join(__dirname, '..', '.env');
+const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
+
 // Regla absoluta: SIEMPRE llamar buscar_productos para precios/productos (no alucinar)
 const http = require('http');
-const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhOTE3NGNiNi02NTI1LTQyNmItOTAwNS0zMGJkZTFjYjE3NWMiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiNDc2YTBkOWItYzc3Ny00NjdlLWFkNDItM2RhMmU2NDUxZGZjIiwiaWF0IjoxNzgwNjg4NjcxfQ.r_Yu3KrJGTO6mSWVFZYihxFUbqnLzGJp7c0J5rOiSP0';
+const KEY = pick('N8N_API_KEY');
 const WF_ID = 'ugHOTQv3Vb6cuTct';
 function get(){return new Promise((res,rej)=>{http.get({hostname:'localhost',port:5678,path:`/api/v1/workflows/${WF_ID}`,headers:{'X-N8N-API-KEY':KEY}},r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>res(JSON.parse(d)));}).on('error',rej);});}
 function put(p){return new Promise((res,rej)=>{const b=JSON.stringify(p);const r=http.request({hostname:'localhost',port:5678,path:`/api/v1/workflows/${WF_ID}`,method:'PUT',headers:{'X-N8N-API-KEY':KEY,'Content-Type':'application/json','Content-Length':Buffer.byteLength(b)}},resp=>{let d='';resp.on('data',c=>d+=c);resp.on('end',()=>res({status:resp.statusCode,body:d}));});r.on('error',rej);r.write(b);r.end();});}

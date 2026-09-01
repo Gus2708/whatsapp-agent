@@ -1,3 +1,9 @@
+const fs = require('fs');
+const path = require('path');
+const envPath = path.join(__dirname, '..', '.env');
+const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
+
 // Detección de [PEDIR_AYUDA]: cuando el bot no encuentra un producto o el cliente refuta el resultado,
 // registra una solicitud_ayuda + manda un mensaje puente al cliente (no envía la respuesta normal).
 // Se inserta en la rama FALSE de "Check Escalation" para no tocar la escalación ni romper la respuesta normal:
@@ -12,13 +18,13 @@ const BASE = process.env.N8N_API_URL_LOCAL || 'http://localhost:5678/api/v1';
 const env = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8');
 const key = (env.match(/^N8N_API_KEY=(.+)$/m) || [])[1].trim();
 const H = { 'X-N8N-API-KEY': key, 'Content-Type': 'application/json', 'accept': 'application/json' };
-const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';
+const ANON = pick('SUPABASE_ANON_KEY');
 
 const registrarCode = [
   "// Registra una solicitud de ayuda (el bot no encontro algo o el cliente refuto el resultado).",
   "// La app de empleados elige el/los producto(s) y n8n reenvia. Dedup: una solicitud 'pendiente' por telefono.",
   "const axios = require('axios');",
-  "const SB = 'https://rgniqjfooifchyctnbzu.supabase.co';",
+  "const SB = pick('SUPABASE_URL');",
   "const ANON = '" + ANON + "';",
   "const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };",
   "let telefono = null, consulta = null;",

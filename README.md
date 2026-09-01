@@ -90,15 +90,71 @@ Con la capa vectorial 246 aciertos frente a 239 sin ella, o sea **+7 atribuibles
 Para el detalle completo —estadísticas, decisiones, lo que se probó y **no** funcionó, y
 dónde investigar mejoras— ver **[RAG.md](RAG.md)**.
 
-### Flujo del mensaje (workflow n8n, 30 nodos)
+### 🗺️ Mapa Visual del Workflow en n8n (33 Nodos, 4 Zonas)
 
-1. **Webhook** recibe el evento de WAHA → filtra que sea un cliente real (no grupos/propios) y anti-duplicados.
-2. **Notas de voz** se transcriben con Groq Whisper antes de procesarse.
-3. **Filtro de texto** + **rate limit** (máx. 10 mensajes / 60 s por teléfono) + **handover manual** (si un empleado tomó el chat, el bot calla).
-4. **Cliente Memoria** carga nombre/notas del cliente desde Supabase/Engram.
-5. **AI Agent** razona con sus herramientas y produce la respuesta.
-6. **Sanitize Agent Output** descarta salidas corruptas del LLM (tool-calls filtradas / bucles de repetición) antes de enviarlas.
-7. Según marcadores de la respuesta: `[ESCALAR_HUMANO]` → cola de atención; `[PEDIR_AYUDA]` → solicitud de ayuda; si no, se envía la respuesta al cliente.
+El flujo en n8n está organizado visualmente en **4 Zonas Lógicas** con Sticky Notes de colores, eliminando cruces de cables y separando responsabilidades:
+
+```mermaid
+flowchart TD
+    classDef z1 fill:#f3e8ff,stroke:#9333ea,stroke-width:2px,color:#581c87;
+    classDef z2 fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f;
+    classDef z3 fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#075985;
+    classDef z4 fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d;
+    classDef tool fill:#ffffff,stroke:#0284c7,stroke-dasharray: 4 4,color:#0369a1;
+    classDef drop fill:#fee2e2,stroke:#dc2626,stroke-width:1px,color:#991b1b;
+
+    subgraph ZONA1["🟣 ZONA 1: Ingesta & Seguridad"]
+        W[Webhook Trigger]:::z1 --> S{¿Mensaje Saliente?}:::z1
+        S -->|Sí · fromMe| DH[Detectar Handoff Empleado]:::z1 --> D1[Descartar]:::drop
+        S -->|No · Cliente| CR{¿Es Cliente Real?}:::z1
+        CR -->|No| D2[Descartar]:::drop
+        CR -->|Sí| AD[Filtro Anti-Duplicado]:::z1
+    end
+
+    subgraph ZONA2["🟡 ZONA 2: Pre-Procesamiento & Sesión"]
+        AD --> DB[Debounce Ráfaga]:::z2
+        DB --> WH[Transcribir Nota de Voz · Whisper]:::z2
+        WH --> TXT{¿Es Texto Válido?}:::z2
+        TXT -->|No| RNT[Responder No-Texto]:::z2
+        TXT -->|Sí| CS[Verificar Sesión de Chat]:::z2
+        CS --> RL{¿Superó Rate Limit?}:::z2
+        RL -->|Sí · >10 msg/min| RLD[Descartar]:::drop
+        RL -->|No| MH{¿Atención Manual?}:::z2
+        MH -->|Sí| MHA[Silencio · Modo Empleado]:::drop
+        MH -->|No| CM[Cargar Memoria Cliente]:::z2
+    end
+
+    subgraph ZONA3["🔵 ZONA 3: Agente de IA & Herramientas"]
+        CM --> AGENT["🤖 AI Agent (Perucho)"]:::z3
+        
+        MODEL["🧠 OpenRouter Model"]:::tool -.-> AGENT
+        MEM["💾 Buffer Memory"]:::tool -.-> AGENT
+        T1["🔍 buscar_productos"]:::tool -.-> AGENT
+        T2["📋 hacer_presupuesto"]:::tool -.-> AGENT
+        T3["💵 obtener_tasa_bcv"]:::tool -.-> AGENT
+        T4["🧠 memoria_engram"]:::tool -.-> AGENT
+        
+        AGENT --> SAN["🛡️ Sanitize Output"]:::z3
+    end
+
+    subgraph ZONA4["🟢 ZONA 4: Enrutamiento & Despacho WAHA"]
+        SAN --> ESC{¿Requiere Escalar?}:::z4
+        ESC -->|Sí · ESCALAR_HUMANO| MAN[Activar Chat Manual]:::z4
+        MAN --> AP[Registrar Atención Pendiente]:::z4
+        MAN --> WA_ESC[Enviar Mensaje Escalamiento]:::z4
+        
+        ESC -->|No| AYU{¿Pedir Ayuda?}:::z4
+        AYU -->|Sí · PEDIR_AYUDA| SA[Registrar Solicitud Ayuda]:::z4 --> WA_AYU[Enviar Mensaje Puente]:::z4
+        AYU -->|No · Normal| WA_RESP[Enviar Respuesta Directa]:::z4
+    end
+```
+
+| Zona | Color | Qué resuelve |
+| :--- | :--- | :--- |
+| **🟣 Zona 1** | Púrpura | **Ingesta & Seguridad**: Webhook, discriminación de mensajes propios (`fromMe`) para handoff, filtro de grupos/estados y anti-duplicados por ID. |
+| **🟡 Zona 2** | Amarillo | **Pre-Procesamiento & Sesión**: Debounce de ráfagas rápidas, transcripción Whisper, rate limit (10 msg/min), control de sesión y reactivación tras 30 min. |
+| **🔵 Zona 3** | Azul | **Agente de IA & Herramientas**: Orquestación de razonamiento con Luna/Sonnet, memoria conversacional, 5 herramientas de negocio y sanitización de salida. |
+| **🟢 Zona 4** | Verde | **Enrutamiento & Despacho**: Clasificador trifurcado (`[ESCALAR_HUMANO]`, `[PEDIR_AYUDA]`, Respuesta directa) con entrega HTTP hacia WAHA. |
 
 ### Herramientas del agente (toolCode en n8n)
 
@@ -169,13 +225,82 @@ El instalador (`setup.js`) verifica Node/Git/Docker (instala con `winget` en Win
 | :--- | :--- |
 | `WAHA_DASHBOARD_USERNAME` / `WAHA_DASHBOARD_PASSWORD` | Login del panel de WAHA. |
 | `WAHA_API_KEY` | Clave que usan n8n ↔ WAHA para enviar mensajes. |
-| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | Base de datos en la nube. |
-| `OPENROUTER_API_KEY` | Inferencia del modelo (`openai/gpt-5.6-luna`). |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Base de datos en la nube (PostgreSQL + pgvector). |
+| `OPENROUTER_API_KEY` | Inferencia del modelo principal (`openai/gpt-5.6-luna`) y del motor de automejora (`anthropic/claude-sonnet-5`). |
+| `OPENAI_API_KEY` | Generación de embeddings vectoriales (`text-embedding-3-small`). |
 | `GROQ_API_KEY` | Transcripción de notas de voz (Whisper). |
 | `ENGRAM_HOST` | Servidor de memorias (por defecto `host.docker.internal:7437`). |
 | `N8N_API_KEY` | Solo para los scripts de desarrollo/despliegue (`scripts/patch_*.js`). |
+| `ADMIN_PHONE_NUMBERS` | Teléfonos de los administradores para recibir alertas y diagnósticos de automejora (separados por coma, ej. `584XXXXXXXXX@c.us,584YYYYYYYYY@c.us`). |
 
-> ⚠️ **Nunca subas el archivo `.env` al repositorio.** Ya está en `.gitignore`.
+> ⚠️ **Nunca subas el archivo `.env` al repositorio.** Ya está en `.gitignore`. Utiliza [`.env.example`](.env.example) como plantilla.
+
+---
+
+## 🧠 Auto-Mejora y Self-Healing Continuo (Sonnet 5)
+
+El sistema cuenta con un workflow autónomo e independiente en n8n (**`Auto-Mejora y Self-Healing de Búsqueda`**, [workflows/workflow_automejora.json](workflows/workflow_automejora.json)):
+
+1. **Disparo Asíncrono**: Cuando una búsqueda de producto en WhatsApp resulta en 0 coincidencias o desvío a otra categoría (`_weak`), el agente despacha un webhook *fire-and-forget* sin demorar la respuesta al cliente.
+2. **Diagnóstico con Sonnet 5**: [Claude Sonnet 5](https://openrouter.ai/anthropic/claude-sonnet-5) (vía OpenRouter) analiza la causa raíz del fallo en las 5 capas de búsqueda contra los candidatos reales con stock en Supabase.
+3. **Sandbox y Auto-Aplicación**: Valida en memoria la equivalencia de vocabulario propuesta, la inserta de inmediato en `catalogo_vocabulario` (Supabase) con `origen: 'automejora_sonnet'` y genera la auditoría en `automejora_logs`.
+4. **Notificación al Administrador**: Envía un reporte por WhatsApp a los números configurados en `ADMIN_PHONE_NUMBERS` con la causa diagnosticada, el SKU identificado y la acción tomada.
+
+Para desplegar o actualizar el workflow de automejora en tu instancia de n8n:
+```bash
+node scripts/crear_workflow_automejora.js
+```
+
+### 📱 Comandos de Feedback y Control por WhatsApp para Administradores
+
+Los administradores autorizados en `ADMIN_PHONE_NUMBERS` pueden interactuar directamente con el bot por WhatsApp para corregir búsquedas fallidas y consultar métricas:
+
+| Comando WhatsApp | Descripción | Ejemplo |
+| :--- | :--- | :--- |
+| `/feedback <SKU> <consulta>` | Vincula una búsqueda coloquial directamente a un SKU con confianza máxima (10/10). | `/feedback 01726 disco diamantado para concreto 7` |
+| `/feedback <SKU>` | Vincula el SKU especificado a la **última búsqueda fallida** de forma automática. | `/feedback 01726` |
+| `/corregir <SKU>` | Alias de `/feedback`. | `/corregir 01726` |
+| `/status` o `/estado` | Muestra el estado del sistema, tasa BCV actual y las últimas 3 fallas registradas. | `/status` |
+
+> 🔒 **Seguridad**: Solo los números incluidos en la variable `ADMIN_PHONE_NUMBERS` pueden ejecutar comandos `/`; los clientes normales que envíen texto que empiece con `/` son procesados de forma habitual.
+
+---
+
+## 🌙 Workflow: Sync Vocabulario Catálogo (Mantenimiento Nocturno)
+
+* **Archivo:** [`workflows/workflow_vocabulario.json`](workflows/workflow_vocabulario.json)
+* **Trigger:** Cron diario a las **3:00 AM** (`0 3 * * *`).
+
+```mermaid
+flowchart LR
+    CRON["⏰ Cada noche 3:00"] --> SYNC["📚 Sincronizar Vocabulario<br/>(Detección hash MD5 + Luna)"]
+    SYNC --> EMB["🔍 Monitor Embeddings<br/>(Alerta productos sin vector)"]
+    EMB --> POP["⭐ Refrescar Popularidad<br/>(RPC popularidad_productos)"]
+```
+
+### Funciones del Workflow:
+1. **Sincronización Incremental de Vocabulario**: Agrupa los productos por categoría y calcula un hash MD5 de sus descripciones. Solo si una categoría cambió (productos nuevos o editados), le pide a **GPT-5.6 Luna** los modismos, regionalismos y errores ortográficos comunes, insertándolos en `catalogo_vocabulario`.
+2. **Monitor de Embeddings**: Comprueba qué productos con stock carecen de vector semántico en `productos_embedding` o tienen descripciones desfasadas, emitiendo una alerta en el log.
+3. **Refresco de Popularidad**: Ejecuta la función PostgreSQL `popularidad_productos()` para recalcular el orden de relevancia según las facturas y compras reales de los últimos meses.
+
+---
+
+## 👷 Workflow: Reenviar Ayuda (Despacho App de Empleados)
+
+* **Archivo:** [`workflows/workflow_reenviar_ayuda.json`](workflows/workflow_reenviar_ayuda.json)
+* **Trigger:** Polling cada **15 segundos** (`scheduleTrigger`).
+
+```mermaid
+flowchart LR
+    T15["⏱️ Cada 15s"] --> COMP["📝 Componer y Marcar<br/>(Lee solicitudes_ayuda resueltas)"]
+    COMP --> SEND["📱 Enviar WAHA<br/>(Mensaje con cotización al cliente)"]
+```
+
+### Funciones del Workflow:
+1. **Detección Atómica de Ayudas Resueltas**: Consulta en `solicitudes_ayuda` aquellas marcadas con `status = 'resuelto'` por los empleados en la tienda física.
+2. **Composición de Cotización con Recargo y Tasa**: Si el empleado seleccionó productos, extrae precios, calcula el recargo comercial y la conversión en Bolívares según la tasa BCV oficial. Si el empleado marcó *«no disponible»*, compone un mensaje amable explicando la falta de stock.
+3. **Reclamo y Despacho**: Marca atómicamente la solicitud como `status = 'enviado'` para evitar duplicidad y despacha el mensaje vía WAHA HTTP API directamente al chat de WhatsApp del cliente.
+4. **Auto-Aprendizaje**: Registra la asociación entre la consulta original del cliente y los productos elegidos por el empleado en `busqueda_aprendizaje`.
 
 ---
 

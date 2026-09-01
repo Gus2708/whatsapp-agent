@@ -1,0 +1,271 @@
+{
+  "updatedAt": "2026-06-17T13:52:53.761Z",
+  "createdAt": "2026-06-11T04:08:48.937Z",
+  "id": "I29v5i9CxGgN6VKR",
+  "name": "Reenviar Ayuda",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "sched",
+      "name": "Cada 15s",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 15
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "code_comp",
+      "name": "Componer y Marcar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const axios = require('axios');\nconst SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';\nconst ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nconst RECARGO = 1.40;\nfunction nUSD(n){ const r = Math.round(Number(n)*100)/100; return Number.isInteger(r) ? String(r) : r.toFixed(2); }\nfunction nBs(n){ return (Math.round(Number(n)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }\nfunction nBsInt(n){ return Math.round(Number(n)).toLocaleString('en-US'); }\nfunction tc(s){ return String(s).toLowerCase().split(/\\s+/).map(w=>{ if(/\\d/.test(w)) return w.toUpperCase(); if(w.length<=3) return w.toUpperCase(); return w.charAt(0).toUpperCase()+w.slice(1); }).join(' '); }\n\nconst desde = new Date(Date.now() - 2*3600*1000).toISOString();\nlet rows = [];\ntry { const r = await axios.get(SB+'/rest/v1/solicitudes_ayuda?status=eq.resuelto&enviado_en=is.null&resuelto_en=gte.'+encodeURIComponent(desde)+'&select=id,telefono,no_disponible,consulta&order=resuelto_en.asc&limit=20', { headers:H }); rows = r.data||[]; } catch(e){}\n\nconst out = [];\nfor (const sol of rows) {\n  try {\n    let text; let items = [];\n    if (sol.no_disponible) {\n      // El empleado marcó \"no disponible\" (sin productos): avisamos al cliente.\n      text = 'Disculpa la espera 🙏. Justo *no tenemos disponible* eso que buscabas en este momento. ¿Quieres que te ofrezca una alternativa o que un empleado te ayude con algo más? 👨🏻‍🔧';\n    } else {\n      const ir = await axios.get(SB+'/rest/v1/solicitudes_ayuda_items?solicitud_id=eq.'+sol.id+'&select=codigo_producto,descripcion,cantidad,precio_unitario', { headers:H });\n      items = ir.data || [];\n      if (items.length === 0) continue; // resuelto sin productos y sin bandera -> nada que enviar\n      const lines = [];\n      for (const it of items){\n        let p = null;\n        try { const pr = await axios.get(SB+'/rest/v1/productos?codigo_interno=eq.'+encodeURIComponent(it.codigo_producto)+'&select=descripcion,precio_venta', { headers:H }); p = pr.data && pr.data[0]; } catch(e){}\n        const usd = Number((p && p.precio_venta) != null ? p.precio_venta : (it.precio_unitario||0));\n        const cant = Number(it.cantidad||1);\n        lines.push({ nombre: tc((p && p.descripcion) || it.descripcion || it.codigo_producto), usd, cant, sub: usd*cant });\n      }\n      let tasa = null;\n      try { const t = await axios.get(SB+'/rest/v1/tazas?nombre=eq.actual&select=bcv_usd', { headers:H }); tasa = t.data && t.data[0] && Number(t.data[0].bcv_usd); } catch(e){}\n      if (lines.length === 1 && lines[0].cant === 1){\n        const l = lines[0]; const bsUsd = l.usd*RECARGO;\n        text = '¡Listo! Ya lo confirmé con mi compañero 👨🏻‍🔧🪚\\n\\n*'+l.nombre+'*\\nPrecio Divisas: '+nUSD(l.usd)+'$\\nPrecio Bs (BCV): '+(tasa ? (nUSD(bsUsd)+'$ o '+nBs(bsUsd*tasa)+'bs') : (nUSD(bsUsd)+'$'))+'\\n\\n¿Te sirve esta opción? 👨🏻‍🔧';\n      } else {\n        let b = '¡Listo! Ya lo confirmé con mi compañero 👨🏻‍🔧🪚\\n\\n'; let tot=0, n=0;\n        for (const l of lines){ n++; tot+=l.sub; b += n+'. *'+l.nombre+'*\\n   '+l.cant+' x '+nUSD(l.usd)+'$ = *'+nUSD(l.sub)+'$*\\n\\n'; }\n        b += '━━━━━━━━━━━━━━━\\n💵 *Pagando en dólares: '+nUSD(tot)+'$*\\n';\n        b += tasa ? ('🇻🇪 *Pagando en bolívares: '+nUSD(tot*RECARGO)+'$ = Bs '+nBsInt(tot*RECARGO*tasa)+'*') : '_(tasa BCV no disponible)_';\n        text = b;\n      }\n    }\n    // RECLAMO ATÓMICO: marca 'enviado' SOLO si sigue 'resuelto'. Si devuelve fila, la ganó este proceso.\n    const upd = await axios.patch(SB+'/rest/v1/solicitudes_ayuda?id=eq.'+sol.id+'&status=eq.resuelto', { status:'enviado', enviado_en:new Date().toISOString() }, { headers: { ...H, Prefer:'return=representation' } });\n    if (upd.data && upd.data.length > 0) {\n      out.push({ json: { chatId: sol.telefono, text, solicitud_id: sol.id } });\n      if (!sol.no_disponible && sol.consulta && items.length > 0) {\n        const _IgnL = new Set(['de','y','el','la','los','las','un','una','unos','unas','o','que','precio','cuanto','vale','hay','para','con','del','por','al','metro','metros','mts','kg','hola','buenas','porfa','gracias','dame','quiero','busco','tipo','este','esta','ese','esa']);\n        const _tok = String(sol.consulta).toLowerCase().replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u').replace(/ñ/g,'n').replace(/ü/g,'u').replace(/[^a-z0-9 ]/g,' ').replace(/\\s+/g,' ').trim().split(' ').filter(w=>w.length>=2&&!_IgnL.has(w)).join(' ');\n        if (_tok.split(' ').filter(Boolean).length >= 2) {\n          for (const _it of items) {\n            try { await axios.post(SB+'/rest/v1/busqueda_aprendizaje',{termino_raw:String(sol.consulta).slice(0,500),termino_tokens:_tok,codigo_producto:_it.codigo_producto,descripcion_producto:_it.descripcion||''},{headers:{...H,Prefer:'resolution=ignore-duplicates'}}); } catch(e){}\n          }\n        }\n      }\n    }\n  } catch(e){}\n}\nreturn out;  // [] si no hay nada -> el nodo de envío no corre"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "http_waha",
+      "name": "Enviar WAHA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        440,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha_serrucho:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{ $env.WAHA_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ session: 'default', chatId: $json.chatId, text: $json.text }) }}",
+        "options": {
+          "timeout": 12000
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 👷 Despacho de Solicitudes Resueltas por Empleados (Cada 15s)\n1. **Cada 15s**: Polling continuo en Supabase `solicitudes_ayuda`.\n2. **Componer y Marcar**: Arma la cotización con formato de tienda y recargo, calculando tasa BCV y marcando la solicitud como 'enviado'.\n3. **Enviar WAHA**: Despacha el mensaje de WhatsApp al cliente automáticamente.",
+        "height": 320,
+        "width": 720,
+        "color": 6
+      },
+      "id": "sticky_ayuda",
+      "name": "Sticky Note - Reenviar Ayuda",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -140
+      ]
+    }
+  ],
+  "connections": {
+    "Cada 15s": {
+      "main": [
+        [
+          {
+            "node": "Componer y Marcar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Componer y Marcar": {
+      "main": [
+        [
+          {
+            "node": "Enviar WAHA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": {
+    "node:Cada 15s": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": null,
+  "versionId": "9b828686-da3a-4ccd-95c0-ce7763222486",
+  "activeVersionId": "9b828686-da3a-4ccd-95c0-ce7763222486",
+  "versionCounter": 8,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "shared": [
+    {
+      "updatedAt": "2026-06-11T04:08:48.944Z",
+      "createdAt": "2026-06-11T04:08:48.944Z",
+      "role": "workflow:owner",
+      "workflowId": "I29v5i9CxGgN6VKR",
+      "projectId": "o4UwjyJJrlfHWiFr",
+      "project": {
+        "updatedAt": "2026-08-31T21:31:48.976Z",
+        "createdAt": "2026-06-05T19:18:56.994Z",
+        "id": "o4UwjyJJrlfHWiFr",
+        "name": "Unnamed Project",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "a9174cb6-6525-426b-9005-30bde1cb175c"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-06-17T13:52:53.763Z",
+    "createdAt": "2026-06-17T13:52:53.763Z",
+    "versionId": "9b828686-da3a-4ccd-95c0-ce7763222486",
+    "workflowId": "I29v5i9CxGgN6VKR",
+    "nodes": [
+      {
+        "id": "sched",
+        "name": "Cada 15s",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          0
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "seconds",
+                "secondsInterval": 15
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "code_comp",
+        "name": "Componer y Marcar",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          220,
+          0
+        ],
+        "parameters": {
+          "jsCode": "const axios = require('axios');\nconst SB = 'https://rgniqjfooifchyctnbzu.supabase.co';\nconst ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';\nconst H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };\nconst RECARGO = 1.40;\nfunction nUSD(n){ const r = Math.round(Number(n)*100)/100; return Number.isInteger(r) ? String(r) : r.toFixed(2); }\nfunction nBs(n){ return (Math.round(Number(n)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }\nfunction nBsInt(n){ return Math.round(Number(n)).toLocaleString('en-US'); }\nfunction tc(s){ return String(s).toLowerCase().split(/\\s+/).map(w=>{ if(/\\d/.test(w)) return w.toUpperCase(); if(w.length<=3) return w.toUpperCase(); return w.charAt(0).toUpperCase()+w.slice(1); }).join(' '); }\n\nconst desde = new Date(Date.now() - 2*3600*1000).toISOString();\nlet rows = [];\ntry { const r = await axios.get(SB+'/rest/v1/solicitudes_ayuda?status=eq.resuelto&enviado_en=is.null&resuelto_en=gte.'+encodeURIComponent(desde)+'&select=id,telefono,no_disponible,consulta&order=resuelto_en.asc&limit=20', { headers:H }); rows = r.data||[]; } catch(e){}\n\nconst out = [];\nfor (const sol of rows) {\n  try {\n    let text; let items = [];\n    if (sol.no_disponible) {\n      // El empleado marcó \"no disponible\" (sin productos): avisamos al cliente.\n      text = 'Disculpa la espera 🙏. Justo *no tenemos disponible* eso que buscabas en este momento. ¿Quieres que te ofrezca una alternativa o que un empleado te ayude con algo más? 👨🏻‍🔧';\n    } else {\n      const ir = await axios.get(SB+'/rest/v1/solicitudes_ayuda_items?solicitud_id=eq.'+sol.id+'&select=codigo_producto,descripcion,cantidad,precio_unitario', { headers:H });\n      items = ir.data || [];\n      if (items.length === 0) continue; // resuelto sin productos y sin bandera -> nada que enviar\n      const lines = [];\n      for (const it of items){\n        let p = null;\n        try { const pr = await axios.get(SB+'/rest/v1/productos?codigo_interno=eq.'+encodeURIComponent(it.codigo_producto)+'&select=descripcion,precio_venta', { headers:H }); p = pr.data && pr.data[0]; } catch(e){}\n        const usd = Number((p && p.precio_venta) != null ? p.precio_venta : (it.precio_unitario||0));\n        const cant = Number(it.cantidad||1);\n        lines.push({ nombre: tc((p && p.descripcion) || it.descripcion || it.codigo_producto), usd, cant, sub: usd*cant });\n      }\n      let tasa = null;\n      try { const t = await axios.get(SB+'/rest/v1/tazas?nombre=eq.actual&select=bcv_usd', { headers:H }); tasa = t.data && t.data[0] && Number(t.data[0].bcv_usd); } catch(e){}\n      if (lines.length === 1 && lines[0].cant === 1){\n        const l = lines[0]; const bsUsd = l.usd*RECARGO;\n        text = '¡Listo! Ya lo confirmé con mi compañero 👨🏻‍🔧🪚\\n\\n*'+l.nombre+'*\\nPrecio Divisas: '+nUSD(l.usd)+'$\\nPrecio Bs (BCV): '+(tasa ? (nUSD(bsUsd)+'$ o '+nBs(bsUsd*tasa)+'bs') : (nUSD(bsUsd)+'$'))+'\\n\\n¿Te sirve esta opción? 👨🏻‍🔧';\n      } else {\n        let b = '¡Listo! Ya lo confirmé con mi compañero 👨🏻‍🔧🪚\\n\\n'; let tot=0, n=0;\n        for (const l of lines){ n++; tot+=l.sub; b += n+'. *'+l.nombre+'*\\n   '+l.cant+' x '+nUSD(l.usd)+'$ = *'+nUSD(l.sub)+'$*\\n\\n'; }\n        b += '━━━━━━━━━━━━━━━\\n💵 *Pagando en dólares: '+nUSD(tot)+'$*\\n';\n        b += tasa ? ('🇻🇪 *Pagando en bolívares: '+nUSD(tot*RECARGO)+'$ = Bs '+nBsInt(tot*RECARGO*tasa)+'*') : '_(tasa BCV no disponible)_';\n        text = b;\n      }\n    }\n    // RECLAMO ATÓMICO: marca 'enviado' SOLO si sigue 'resuelto'. Si devuelve fila, la ganó este proceso.\n    const upd = await axios.patch(SB+'/rest/v1/solicitudes_ayuda?id=eq.'+sol.id+'&status=eq.resuelto', { status:'enviado', enviado_en:new Date().toISOString() }, { headers: { ...H, Prefer:'return=representation' } });\n    if (upd.data && upd.data.length > 0) {\n      out.push({ json: { chatId: sol.telefono, text, solicitud_id: sol.id } });\n      if (!sol.no_disponible && sol.consulta && items.length > 0) {\n        const _IgnL = new Set(['de','y','el','la','los','las','un','una','unos','unas','o','que','precio','cuanto','vale','hay','para','con','del','por','al','metro','metros','mts','kg','hola','buenas','porfa','gracias','dame','quiero','busco','tipo','este','esta','ese','esa']);\n        const _tok = String(sol.consulta).toLowerCase().replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u').replace(/ñ/g,'n').replace(/ü/g,'u').replace(/[^a-z0-9 ]/g,' ').replace(/\\s+/g,' ').trim().split(' ').filter(w=>w.length>=2&&!_IgnL.has(w)).join(' ');\n        if (_tok.split(' ').filter(Boolean).length >= 2) {\n          for (const _it of items) {\n            try { await axios.post(SB+'/rest/v1/busqueda_aprendizaje',{termino_raw:String(sol.consulta).slice(0,500),termino_tokens:_tok,codigo_producto:_it.codigo_producto,descripcion_producto:_it.descripcion||''},{headers:{...H,Prefer:'resolution=ignore-duplicates'}}); } catch(e){}\n          }\n        }\n      }\n    }\n  } catch(e){}\n}\nreturn out;  // [] si no hay nada -> el nodo de envío no corre"
+        },
+        "onError": "continueRegularOutput"
+      },
+      {
+        "id": "http_waha",
+        "name": "Enviar WAHA",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          440,
+          0
+        ],
+        "onError": "continueRegularOutput",
+        "parameters": {
+          "method": "POST",
+          "url": "http://waha_serrucho:3000/api/sendText",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "X-API-Key",
+                "value": "={{ $env.WAHA_API_KEY }}"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ session: 'default', chatId: $json.chatId, text: $json.text }) }}",
+          "options": {
+            "timeout": 12000
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Cada 15s": {
+        "main": [
+          [
+            {
+              "node": "Componer y Marcar",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Componer y Marcar": {
+        "main": [
+          [
+            {
+              "node": "Enviar WAHA",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "Admin Serrucho",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-06-17T13:52:53.860Z",
+        "id": 228,
+        "workflowId": "I29v5i9CxGgN6VKR",
+        "versionId": "9b828686-da3a-4ccd-95c0-ce7763222486",
+        "event": "activated",
+        "userId": "a9174cb6-6525-426b-9005-30bde1cb175c"
+      },
+      {
+        "createdAt": "2026-06-17T13:52:53.830Z",
+        "id": 227,
+        "workflowId": "I29v5i9CxGgN6VKR",
+        "versionId": "9b828686-da3a-4ccd-95c0-ce7763222486",
+        "event": "deactivated",
+        "userId": "a9174cb6-6525-426b-9005-30bde1cb175c"
+      }
+    ]
+  }
+}

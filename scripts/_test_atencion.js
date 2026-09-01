@@ -1,3 +1,9 @@
+const fs = require('fs');
+const path = require('path');
+const envPath = path.join(__dirname, '..', '.env');
+const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
+
 // Corre el cuerpo EXACTO del nodo "Registrar Atencion Pendiente" (tal como quedó desplegado)
 // contra Supabase real, con un payload de webhook simulado. Verifica insert + dedup.
 const fs = require('fs');

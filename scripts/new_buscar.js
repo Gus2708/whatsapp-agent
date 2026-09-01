@@ -1,13 +1,13 @@
 // buscar_productos v11 — relajacion drop-one, parcial honesto (medida inexistente), equivalencias 110v/4x4/3.60, fuzzy trgm, aprendizaje +/- de empleados, aclarar consulta vaga
 const axios = require('axios');
-const SB = 'https://rgniqjfooifchyctnbzu.supabase.co';
-const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDI2NTUsImV4cCI6MjA5MzQxODY1NX0.MwhE9n5DjbWNN42Qsj-yNmF_sSlOWZbf4mXJy2NUnKQ';
-const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', 'User-Agent': 'SerruchoBot/1.0 (WhatsApp Agent)' };
+const SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || (typeof process !== 'undefined' && process.env.SUPABASE_URL) || '';
+const ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || (typeof process !== 'undefined' && process.env.SUPABASE_ANON_KEY) || '';
+const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', 'User-Agent': 'WhatsAppBot/1.0 (Agent)' };
 function nUSD(n){ const r = Math.round(Number(n)*100)/100; return Number.isInteger(r) ? String(r) : r.toFixed(2); }
 function nBs(n){ return (Math.round(Number(n)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function nBsInt(n){ return Math.round(Number(n)).toLocaleString('en-US'); }
 function tc(s){ return String(s).toLowerCase().split(/\s+/).map(w=>{ if(/\d/.test(w)) return w.toUpperCase(); if(w.length<=3) return w.toUpperCase(); return w.charAt(0).toUpperCase()+w.slice(1); }).join(' '); }
-function norm(t){ return String(t).toLowerCase().replace(/(\d)\s*,\s*(\d)/g,'$1.$2').replace(/[×✕✖]/g,'x').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 .\/-]/g,' ').replace(/\s+/g,' ').trim(); }
+function norm(t){ return String(t).toLowerCase().replace(/(\d)\s*,\s*(\d)/g,'$1.$2').replace(/[×✕✖]/g,'x').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\b([cp])\/([a-z])/g, '$1/ $2').replace(/[^a-z0-9 .\/-]/g,' ').replace(/\s+/g,' ').trim(); }
 // Normaliza medidas compuestas: "3 x 1-1/2", "3x1.1/2", "1 1/2 x 1 1/2" -> "3x1-1/2", "1-1/2x1-1/2"
 function normMedida(s){
   let t = norm(s);
@@ -27,7 +27,9 @@ const SIZEQ = {
   '5/8':['5/8','16mm'], '16mm':['5/8','16mm'],
   '3/4':['3/4','20mm'], '20mm':['3/4','20mm'],
   '110v':['110v','120v'], '120v':['120v','110v'],
-  '3.60':['3.60','3.66'], '3.6':['3.6','3.60','3.66']
+  '3.60':['3.60','3.66','12'], '3.66':['3.66','3.60','12'], '3.6':['3.6','3.60','3.66','12'],
+  '3.05':['3.05','3.00','10'], '3.00':['3.00','3.05','10'], '3.0':['3.0','3.05','3.00','10'],
+  '2.44':['2.44','2.40','8'], '2.40':['2.40','2.44','8'], '2.4':['2.4','2.44','2.40','8']
 };
 // pulgadas -> mm en pares NxM: el catalogo etiqueta herreria en pulgadas (2X1) y estructural en mm (100X100)
 const INCH_MM = { '1':'25','2':'50','3':'75','4':'100','5':'125','6':'150' };
@@ -109,7 +111,6 @@ const SIN = {
   'pigmento en polvo para pisos':'polvo piso','pigmento para pisos':'polvo piso','pigmento para piso':'polvo piso','pigmento en polvo':'polvo piso','pigmentos para pisos':'polvo piso','pigmentos para piso':'polvo piso','pigmento piso':'polvo piso','pigmentos':'polvo piso','pigmento':'polvo piso',
   'cielo raso':'drywall','cielo razo':'drywall','cielorraso':'drywall',
   'canal cuadrado':'cuadrada','canales cuadrados':'cuadrada','canal redonda':'ondulada','canal redondo':'ondulada','canal ondulado':'ondulada','canales ondulados':'ondulada','de canal cuadrado':'cuadrada','de canal ondulado':'ondulada',
-  'pintadas':'','pintada':'','prepintadas':'','prepintada':'','prepintados':'','prepintado':'','de color':'','de colores':'',
   'serchas':'cercha','sercha':'cercha','serchita':'cercha','serchitas':'cercha',
   'cierra':'sierra','cierras':'sierra',
   'sinta':'cinta','sintas':'cinta',
@@ -142,6 +143,8 @@ const ALIAS = {
   'suiche':      ['suiche','switch','interruptor','apagador'],
   'suich':       ['suiche','switch','interruptor','apagador'], // singular() deja "suiches"->"suich"
   'switch':      ['switch','suiche','interruptor','apagador'],
+  'diamantado':  ['diamantado','segmentado','continuo','turbo'],
+  'segmentado':  ['segmentado','diamantado','continuo','turbo'],
   // la linea de Troen se escribe NORDIK; el cliente la pide como "nordico/nordica"
   'nordico':     ['nordik','nordico'],
   'nordica':     ['nordik','nordico'],
@@ -149,7 +152,25 @@ const ALIAS = {
   // Clases de pintura (A, B, C): en el catalogo conviven como "CLASE B", "TIPO B", "B GAL" (Floripaint), etc.
   'claseb':     ['clase b','tipo b','b gal','mar deco','vinilevery'],
   'clasea':     ['clase a','tipo a','a gal','sun deco'],
-  'clasec':     ['clase c','tipo c','c gal','rio deco']
+  'clasec':     ['clase c','tipo c','c gal','rio deco'],
+  // Perfiles y acabados de láminas de techo
+  'ondulada':       ['ondulada','ondulado','ondu','ond','canal redondo','canal redonda'],
+  'ondulado':       ['ondulado','ondulada','ondu','ond','canal redondo','canal redonda'],
+  'ondu':           ['ondu','ond','ondulada','ondulado'],
+  'ond':            ['ond','ondu','ondulada','ondulado'],
+  'redonda':        ['redonda','redondo','ondulada','ondulado','ondu','ond'],
+  'redondo':        ['redondo','redonda','ondulada','ondulado','ondu','ond'],
+  'cuadrada':       ['cuadrada','cuadrado','cuad','arquitectonica','canales','7 canales'],
+  'cuadrado':       ['cuadrado','cuadrada','cuad','arquitectonica','canales','7 canales'],
+  'cuad':           ['cuad','cuadrada','cuadrado','arquitectonica','canales'],
+  'arquitectonica': ['arquitectonica','arquitectonico','7 canales','canales','cuad','cuadrada','cuadrado'],
+  'arquitectonico': ['arquitectonica','arquitectonico','7 canales','canales','cuad','cuadrada','cuadrado'],
+  'prepintada':     ['prepintada','prepintado','rojo','roja','azul','verde','naranja','techolit','arquitectonica'],
+  'prepintado':     ['prepintado','prepintada','rojo','roja','azul','verde','naranja','techolit','arquitectonica'],
+  'prepintadas':    ['prepintada','prepintado','rojo','roja','azul','verde','naranja','techolit','arquitectonica'],
+  'prepintados':    ['prepintado','prepintada','rojo','roja','azul','verde','naranja','techolit','arquitectonica'],
+  'techolit':       ['techolit','techolits'],
+  'acerolit':       ['acerolit','acerolits']
 };
 const aliasDe = w => ALIAS[w] || [w];
 const ACCENTS = {
@@ -224,6 +245,10 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
   s = s.replace(/\b(pinturas?|caucho)\s+b\b/gi, '$1 claseb');
   s = s.replace(/\b(pinturas?|caucho)\s+a\b/gi, '$1 clasea');
   s = s.replace(/\b(pinturas?|caucho)\s+c\b/gi, '$1 clasec');
+  s = s.replace(/\b(de\s+colores?|de\s+color)\b/gi, 'prepintada');
+  s = s.replace(/\b(pintadas?|pintados?)\b/gi, 'prepintada');
+  s = s.replace(/\b(prepintadas?|prepintados?)\b/gi, 'lamina prepintada');
+  s = s.replace(/\blaminas?\s+lamina\b/gi, 'lamina');
   // SIN se aplica con LIMITE DE PALABRA, no como subcadena. Con split/join naive, una clave
   // que aparece DENTRO de otra palabra la destroza: "media"->"1/2" convertia "mediano" en
   // "1/2no", "zinc"->"lamina zinc" convertia "zincada" en "lamina zincada", y "riel" rompia
@@ -235,6 +260,8 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
     const re=new RegExp('(^|\\s)'+k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?=\\s|$)','g');
     s=s.replace(re,(m,pre)=>pre+SIN[k]);
   }
+  s = s.replace(/\blamina\s+(de\s+)?lamina\s+zinc\b/gi, 'lamina zinc');
+  s = s.replace(/\b(lamina\s+zinc|zinc)\s+lamina\b/gi, '$1');
   return s.replace(/\s+/g,' ').trim(); }
 // productos a granel (se venden por metro/kilo): su existencia es irreal, SIEMPRE disponibles
 function esGranel(desc){ const d=norm(desc); return /(^| )x ?(mtrs|mtr|mts|mt|metros|metro|kilos|kilo|kg|gr|ml)( |$)/.test(d) || / por metro( |$)/.test(d); }
@@ -290,6 +317,18 @@ async function getRecargo(){ try { const r = await axios.get(SB+'/rest/v1/presup
 async function getTasa(){ try { const r = await axios.get(SB+'/rest/v1/tazas?nombre=eq.actual&select=bcv_usd',{headers:H}); return r.data && r.data[0] && Number(r.data[0].bcv_usd); } catch(e){ return null; } }
 
 const { p_busqueda } = query;
+
+function triggerAutomejora(motivo, extra){
+  try {
+    axios.post('http://127.0.0.1:5678/webhook/automejora-busqueda', {
+      p_busqueda,
+      query_normalizada: typeof _pb !== 'undefined' ? _pb : p_busqueda,
+      motivo,
+      extra: extra || null,
+      timestamp: new Date().toISOString()
+    }, { timeout: 2000 }).catch(() => {});
+  } catch (e) {}
+}
 
 const IGNORED = new Set([
   'de', 'y', 'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'o', 'que', 'es', 'son', 'me', 'te', 'se', 'le', 'les', 'lo', 'mi', 'tu', 'su', 'ya', 'si', 'no', 'en', 'pero', 'aunque', 'entonces',
@@ -598,7 +637,10 @@ if (res.length===0){
       }
     }
   }
-  if (res.length===0) return JSON.stringify({ encontrados:0, instruccion:'NO encontre este producto. Tu UNICA respuesta valida ahora es el token [PEDIR_AYUDA] (escribelo solo, exactamente asi, sin saludo ni nada mas). PROHIBIDO sugerir alternativas, pedir que reformule o decir que no lo tenemos: un empleado lo elegira y se lo enviara al cliente.', mensaje:'No encontre "' + p_busqueda + '" en el catalogo.' });
+  if (res.length===0) {
+    triggerAutomejora('encontrados_cero');
+    return JSON.stringify({ encontrados:0, instruccion:'NO encontre este producto. Tu UNICA respuesta valida ahora es el token [PEDIR_AYUDA] (escribelo solo, exactamente asi, sin saludo ni nada mas). PROHIBIDO sugerir alternativas, pedir que reformule o decir que no lo tenemos: un empleado lo elegira y se lo enviara al cliente.', mensaje:'No encontre "' + p_busqueda + '" en el catalogo.' });
+  }
 }
 
 // PERIFRASIS: el cliente describe PARA QUE sirve en vez de nombrarlo ("lo que se usa para
@@ -792,6 +834,75 @@ for(const p of res){ if(!seen.has(p.codigo_interno)){ seen.add(p.codigo_interno)
   }
 }
 
+// Regla negocio LÁMINA: perfiles (ondulado/canal redondo, arquitectónica/7 canales/cuadrado), acabados (prepintada/color: rojo, azul, verde, naranja, techolit vs zinc natural/galvanizado), materiales (zinc, techolit, acerolit, pvc)
+{
+  const nbq = norm(_pb);
+  const isLamina = /\b(laminas?|techolit|acerolit|calamina)\b/.test(nbq) || qTokens.includes('lamina') || (qTokens.includes('techo') && /\b(zinc|ondulad|cuadrad|prepintad|canal|rojo|azul)\b/.test(nbq));
+  if (isLamina) {
+    const wantPrepintada = /\b(prepintad\w*|de\s+colores?|pintadas?)\b/.test(nbq);
+    const wantOndulada = /\b(ondulad\w*|ondu\b|ond\b|canal\s+redond\w*|canal\s+ondulad\w*|redond\w*)\b/.test(nbq);
+    const wantCuadrada = /\b(cuadrad\w*|cuad\b|canal\s+cuadrad\w*|arquitectonic\w*|7\s*canales?)\b/.test(nbq);
+    const wantTecholit = /\btecholit\b/.test(nbq);
+    const wantAcerolit = /\bacerolit\b/.test(nbq);
+    const wantPvc = /\bpvc\b/.test(nbq);
+    const wantZinc = /\b(zinc|sinz|zing)\b/.test(nbq);
+
+    const wantRojo = /\b(roj\w*|colonial|teja|terracota)\b/.test(nbq);
+    const wantAzul = /\b(azul\w*|asul\w*)\b/.test(nbq);
+    const wantVerde = /\bverde\w*\b/.test(nbq);
+    const wantNaranja = /\bnaranja\w*\b/.test(nbq);
+
+    const _esPrepintada = d => /\b(ROJO|ROJA|AZUL|VERDE|NARANJA|BLANCO|TECHOLIT|ARQUITECTONICA)\b/i.test(d) || /\bPVC\s+(?:AZUL|VERDE)/i.test(d);
+    const _esOndulada = d => /\b(ONDULAD\w*|ONDU\b|OND\b|CANAL\s+REDOND\w*|TECHOLIT|ACEROLIT)\b/i.test(d) || /\bPVC.*OND/i.test(d);
+    const _esCuadrada = d => /\b(CUADRAD\w*|CUAD\b|CANAL\s+CUADRAD\w*|ARQUITECTONICA|7\s*CANALES?|PERFIL\s+MCHO|CUAD\s+MACHO)\b/i.test(d);
+
+    let lf = unicos;
+
+    if (wantTecholit) {
+      const ft = lf.filter(p => /\bTECHOLIT\b/i.test(p.descripcion));
+      if (ft.length > 0) lf = ft;
+    } else if (wantAcerolit) {
+      const fa = lf.filter(p => /\bACEROLIT\b/i.test(p.descripcion));
+      if (fa.length > 0) lf = fa;
+    } else if (wantPvc) {
+      const fp = lf.filter(p => /\bPVC\b/i.test(p.descripcion));
+      if (fp.length > 0) lf = fp;
+    }
+
+    if (wantPrepintada) {
+      const fp = lf.filter(p => _esPrepintada(p.descripcion));
+      if (fp.length > 0) lf = fp;
+    }
+
+    if (wantRojo) {
+      const fr = lf.filter(p => /\b(ROJO|ROJA|TECHOLIT)\b/i.test(p.descripcion));
+      if (fr.length > 0) lf = fr;
+    } else if (wantAzul) {
+      const fa = lf.filter(p => /\bAZUL\b/i.test(p.descripcion));
+      if (fa.length > 0) lf = fa;
+    } else if (wantVerde) {
+      const fv = lf.filter(p => /\bVERDE\b/i.test(p.descripcion));
+      if (fv.length > 0) lf = fv;
+    } else if (wantNaranja) {
+      const fn = lf.filter(p => /\bNARANJA\b/i.test(p.descripcion));
+      if (fn.length > 0) lf = fn;
+    }
+
+    if (wantOndulada && !wantCuadrada) {
+      const fo = lf.filter(p => _esOndulada(p.descripcion));
+      if (fo.length > 0) lf = fo;
+    } else if (wantCuadrada && !wantOndulada) {
+      const fc = lf.filter(p => _esCuadrada(p.descripcion));
+      if (fc.length > 0) lf = fc;
+    }
+
+    if (lf.length > 0) {
+      unicos.length = 0;
+      for (const x of lf) unicos.push(x);
+    }
+  }
+}
+
 // Si pidio "por metro", prioriza los productos a granel (X MT)
 if (granelIntent){
   const g = unicos.filter(p => esGranel(p.descripcion));
@@ -910,6 +1021,7 @@ if (_rescate){
   _out.rescate = _rescate.categoria;
   _out.instruccion = 'OJO: el cliente NO uso las palabras del catalogo, asi que INTERPRETE que se refiere a "' + _rescate.categoria + '". Es una HIPOTESIS, no una certeza. Muestrale estas opciones PREGUNTANDOLE primero si a eso se referia (ej. "¿te refieres a ...?"). NO lo des por confirmado ni le cotices como si lo hubiera pedido asi. Si te dice que no es eso, responde SOLO con el token [PEDIR_AYUDA].';
 } else if (_weak){
+  triggerAutomejora('weak_match_otra_categoria', { unicos_top: unicos.slice(0, 3).map(u => u.descripcion) });
   if (await esNoVendido()) return NO_VENDIDO_JSON();
   _out.instruccion = 'Lo que encontré NO coincide con lo que pidió el cliente (es de OTRA categoría o medida; coincidió de casualidad). NO lo ofrezcas como si fuera lo que pidió ni sugieras otra cosa: responde SOLO con el token [PEDIR_AYUDA].';
 } else if (medMismatch){

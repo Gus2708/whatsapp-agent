@@ -1,10 +1,16 @@
 const fs = require('fs');
 const path = require('path');
+const envPath = path.join(__dirname, '..', '.env');
+const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
+
+const fs = require('fs');
+const path = require('path');
 
 const filePath = path.join(__dirname, '..', 'n8n_workflow.json');
 
 const BLOQUE_COMUN = `
-const SB = $env.SUPABASE_URL || 'https://rgniqjfooifchyctnbzu.supabase.co';
+const SB = $env.SUPABASE_URL || pick('SUPABASE_URL');
 const ANON = $env.SUPABASE_ANON_KEY;
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
 const RECARGO = 1.40;
