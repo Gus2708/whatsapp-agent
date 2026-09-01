@@ -160,10 +160,10 @@ export default function FlightDeckDashboard() {
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col h-full min-h-0 w-full max-w-full overflow-x-hidden">
       <HeaderNav activeTab={activeTab} onSelectTab={setActiveTab} />
 
-      <div ref={viewContainerRef} className="flex-1 min-h-0 flex flex-col">
+      <div ref={viewContainerRef} className="flex-1 min-h-0 flex flex-col w-full max-w-full overflow-x-hidden">
         {/* VIEW 1: FLIGHT DECK */}
         {activeTab === 'flight' && (
           <div className="space-y-6 overflow-y-auto pb-6">

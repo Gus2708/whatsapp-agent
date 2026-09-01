@@ -26,7 +26,7 @@ export default function RootLayout({
       <body className="bg-obsidian text-chalk antialiased selection:bg-compass-gold/30 selection:text-chalk h-screen overflow-x-hidden">
         <SoundProvider>
           <BlueprintCanvas />
-          <main className="relative z-10 max-w-[1580px] mx-auto px-3 sm:px-6 pt-3 pb-3 h-full flex flex-col">
+          <main className="relative z-10 max-w-[1580px] w-full mx-auto px-3 sm:px-6 pt-3 pb-3 h-full flex flex-col overflow-x-hidden">
             {children}
           </main>
         </SoundProvider>

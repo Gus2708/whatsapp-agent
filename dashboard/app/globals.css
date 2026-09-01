@@ -26,12 +26,14 @@
   -webkit-font-smoothing: antialiased;
 }
 
+html,
 body {
   background-color: var(--color-obsidian);
   color: var(--color-chalk);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  overflow-x: hidden;
-  min-height: 100vh;
+  overflow-x: hidden !important;
+  max-width: 100vw;
+  width: 100%;
   position: relative;
 }
 
