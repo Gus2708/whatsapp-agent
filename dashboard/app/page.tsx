@@ -55,8 +55,8 @@ export default function FlightDeckDashboard() {
     if (viewContainerRef.current) {
       gsap.fromTo(
         viewContainerRef.current,
-        { opacity: 0, y: 10 },
-        { opacity: 1, y: 0, duration: 0.3, ease: 'power2.out' }
+        { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.25, ease: 'power2.out' }
       );
     }
   }, [activeTab]);
@@ -98,7 +98,6 @@ export default function FlightDeckDashboard() {
       )
     );
 
-    // Sincronizar con Supabase chat_sessions
     try {
       await fetch('/api/conversations', {
         method: 'POST',
@@ -109,9 +108,7 @@ export default function FlightDeckDashboard() {
           silentMode: newSilentState,
         }),
       });
-    } catch {
-      // Ignorar error de sincronización
-    }
+    } catch {}
   };
 
   const handleSendMessage = async (convId: string, text: string) => {
@@ -139,7 +136,6 @@ export default function FlightDeckDashboard() {
 
     playPacket();
 
-    // Despachar a WhatsApp vía WAHA a través del túnel dinámico
     try {
       const res = await fetch('/api/conversations', {
         method: 'POST',
@@ -154,19 +150,17 @@ export default function FlightDeckDashboard() {
       if (res.ok) {
         playSuccess();
       }
-    } catch {
-      // Mensaje local reflejado en interfaz
-    }
+    } catch {}
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 w-full max-w-full overflow-x-hidden">
+    <div className="flex flex-col h-full min-h-0 w-full max-w-full overflow-hidden">
       <HeaderNav activeTab={activeTab} onSelectTab={setActiveTab} />
 
-      <div ref={viewContainerRef} className="flex-1 min-h-0 flex flex-col w-full max-w-full overflow-x-hidden">
+      <div ref={viewContainerRef} className="flex-1 min-h-0 flex flex-col w-full max-w-full overflow-hidden mt-2.5">
         {/* VIEW 1: FLIGHT DECK */}
         {activeTab === 'flight' && (
-          <div className="flex flex-col h-[calc(100vh-85px)] max-h-[calc(100vh-85px)] justify-between overflow-hidden gap-3 min-h-0 pb-1">
+          <div className="flex flex-col flex-1 min-h-0 justify-between overflow-hidden gap-3">
             <div className="flex-shrink-0">
               <span className="font-mono text-[10px] text-compass-gold uppercase tracking-wider block mb-0.5">
                 // GLOBAL TELEMETRY & FLIGHT RADAR
@@ -181,7 +175,7 @@ export default function FlightDeckDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 flex-1 min-h-0 overflow-hidden">
               {/* Architecture & Topology Card */}
               <CrosshairCard className="lg:col-span-7 p-4 bg-[#0c0c0c] flex flex-col justify-between h-full max-h-full min-h-0 overflow-hidden">
-                <div className="flex flex-col justify-between h-full">
+                <div className="flex flex-col justify-between h-full min-h-0">
                   <div>
                     <span className="font-mono text-[10px] uppercase tracking-wider text-compass-gold block mb-0.5">
                       // RESILIENCE & RUNTIME TOPOLOGY
@@ -245,7 +239,7 @@ export default function FlightDeckDashboard() {
 
         {/* VIEW 2: WHATSAPP CRM */}
         {activeTab === 'crm' && (
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 h-[calc(100vh-85px)] max-h-[calc(100vh-85px)] min-h-0 overflow-hidden">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 flex-1 min-h-0 overflow-hidden">
             <div className="md:col-span-4 lg:col-span-3 h-full max-h-full min-h-0 overflow-hidden flex flex-col">
               <ConversationList
                 conversations={conversations}
@@ -271,13 +265,25 @@ export default function FlightDeckDashboard() {
         )}
 
         {/* VIEW 3: RAG STUDIO */}
-        {activeTab === 'rag' && <RagStudio />}
+        {activeTab === 'rag' && (
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <RagStudio />
+          </div>
+        )}
 
         {/* VIEW 4: 33-NODE N8N */}
-        {activeTab === 'n8n' && <N8nVisualizer />}
+        {activeTab === 'n8n' && (
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <N8nVisualizer />
+          </div>
+        )}
 
         {/* VIEW 5: COMMAND CENTER */}
-        {activeTab === 'devops' && <DevOpsConsole />}
+        {activeTab === 'devops' && (
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <DevOpsConsole />
+          </div>
+        )}
       </div>
     </div>
   );
