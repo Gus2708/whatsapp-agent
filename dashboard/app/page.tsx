@@ -243,8 +243,8 @@ export default function FlightDeckDashboard() {
 
         {/* VIEW 2: WHATSAPP CRM */}
         {activeTab === 'crm' && (
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 h-[calc(100vh-95px)] min-h-0">
-            <div className="md:col-span-4 lg:col-span-3 h-full">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 h-[calc(100vh-85px)] max-h-[calc(100vh-85px)] min-h-0 overflow-hidden">
+            <div className="md:col-span-4 lg:col-span-3 h-full max-h-full min-h-0 overflow-hidden flex flex-col">
               <ConversationList
                 conversations={conversations}
                 selectedId={selectedConversation.id}
@@ -255,14 +255,14 @@ export default function FlightDeckDashboard() {
                 onFilterChange={setFilter}
               />
             </div>
-            <div className="md:col-span-8 lg:col-span-6 h-full">
+            <div className="md:col-span-8 lg:col-span-6 h-full max-h-full min-h-0 overflow-hidden flex flex-col">
               <ChatWindow
                 conversation={selectedConversation}
                 onToggleSilentMode={handleToggleSilentMode}
                 onSendMessage={handleSendMessage}
               />
             </div>
-            <div className="hidden lg:block lg:col-span-3 h-full">
+            <div className="hidden lg:flex lg:col-span-3 h-full max-h-full min-h-0 overflow-hidden flex-col">
               <LeadDetailsPane conversation={selectedConversation} />
             </div>
           </div>

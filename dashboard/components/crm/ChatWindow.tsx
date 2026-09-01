@@ -46,7 +46,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   };
 
   return (
-    <CrosshairCard className="flex flex-col bg-[#0a0a0a] overflow-hidden h-full min-h-0">
+    <CrosshairCard className="flex flex-col bg-[#0a0a0a] overflow-hidden h-full max-h-full min-h-0 flex-1">
       {/* Header */}
       <div className="p-3.5 bg-[#0e0e0e] border-b border-graphite flex justify-between items-center flex-shrink-0">
         <div>

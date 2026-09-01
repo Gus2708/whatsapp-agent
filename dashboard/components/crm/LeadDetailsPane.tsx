@@ -46,7 +46,7 @@ export const LeadDetailsPane: React.FC<LeadDetailsPaneProps> = ({ conversation }
   };
 
   return (
-    <CrosshairCard className="p-5 bg-[#0c0c0c] flex flex-col gap-5 overflow-y-auto h-full">
+    <CrosshairCard className="p-4 bg-[#0c0c0c] flex flex-col gap-3.5 overflow-y-auto h-full max-h-full min-h-0 flex-1">
       <div>
         <span className="font-mono text-[10.5px] uppercase tracking-wider text-compass-gold block mb-1">
           // QUALIFICATION ENGINE

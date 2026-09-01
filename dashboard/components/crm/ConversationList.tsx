@@ -46,7 +46,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   });
 
   return (
-    <CrosshairCard className="flex flex-col bg-[#0c0c0c] overflow-hidden h-full min-h-0">
+    <CrosshairCard className="flex flex-col bg-[#0c0c0c] overflow-hidden h-full max-h-full min-h-0 flex-1">
       {/* Search Bar */}
       <div className="p-3 border-b border-graphite bg-[#0e0e0e] flex items-center gap-2 flex-shrink-0">
         <Search className="h-4 w-4 text-smoke flex-shrink-0" />
