@@ -55,6 +55,7 @@ export const LiveLogStream: React.FC = () => {
     const selectedProd = sampleProducts[Math.floor(Math.random() * sampleProducts.length)];
     const phone = `+58 412-${Math.floor(100 + Math.random() * 900)}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+    // Pasos con cadencia pausada y elegante para demostración (~4.5s total)
     const steps = [
       {
         stageIndex: 0,
@@ -67,36 +68,36 @@ export const LiveLogStream: React.FC = () => {
         stageIndex: 1,
         tag: 'success' as const,
         tagLabel: '200 OK',
-        msg: `WAHA Webhook Ack <12ms · Payload verificado y deduplicado`,
-        delay: 250,
+        msg: `WAHA Webhook Ack <12ms · Payload verificado y deduplicado en Redis/Memory`,
+        delay: 750,
       },
       {
         stageIndex: 2,
         tag: 'info' as const,
         tagLabel: 'N8N DAG',
         msg: `Orquestador n8n: Enrutamiento en nodo #14 (Procesar Mensaje Cliente)`,
-        delay: 550,
+        delay: 1600,
       },
       {
         stageIndex: 3,
         tag: 'info' as const,
         tagLabel: 'LAYER 1 AST',
         msg: `Determinismo AST: Coincidencia exacta "${selectedProd.name}" (${selectedProd.sku}) en catálogo de 7.650 SKUs`,
-        delay: 900,
+        delay: 2500,
       },
       {
         stageIndex: 4,
         tag: 'info' as const,
         tagLabel: 'PYDANTIC',
         msg: `Validación de esquema JSON: cotización formateada con moneda USD ($${selectedProd.price})`,
-        delay: 1300,
+        delay: 3450,
       },
       {
         stageIndex: 5,
         tag: 'success' as const,
         tagLabel: 'DISPATCH',
         msg: `Respuesta final enviada a WhatsApp vía WAHA (${selectedProd.price} USD) · Latencia total: 42ms`,
-        delay: 1700,
+        delay: 4400,
       },
     ];
 
