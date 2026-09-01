@@ -31,8 +31,8 @@ const getEnvVar = (key: string, defaultValue: string = ''): string => {
   return defaultValue;
 };
 
-const SUPABASE_URL = getEnvVar('SUPABASE_URL', 'https://rgniqjfooifchyctnbzu.supabase.co');
-const SUPABASE_ANON_KEY = getEnvVar('SUPABASE_ANON_KEY', '');
+const SUPABASE_URL = getEnvVar('SUPABASE_URL');
+const SUPABASE_ANON_KEY = getEnvVar('SUPABASE_ANON_KEY');
 const OPENROUTER_API_KEY = getEnvVar('OPENROUTER_API_KEY', '');
 const OPENAI_API_KEY = getEnvVar('OPENAI_API_KEY', '');
 

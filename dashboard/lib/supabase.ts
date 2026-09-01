@@ -1,14 +1,40 @@
 import { createClient } from '@supabase/supabase-js';
+import fs from 'fs';
+import path from 'path';
 
-const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  process.env.SUPABASE_URL ||
-  'https://rgniqjfooifchyctnbzu.supabase.co';
+const getEnv = (key: string): string => {
+  if (process.env[key]) {
+    return process.env[key]!.trim();
+  }
+  if (process.env[`NEXT_PUBLIC_${key}`]) {
+    return process.env[`NEXT_PUBLIC_${key}`]!.trim();
+  }
 
-const supabaseAnonKey =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  process.env.SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbmlxamZvb2lmY2h5Y3RuYnp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEyMTcwMjUsImV4cCI6MjA1Njc5MzAyNX0.kOQzS_83X_q3x1Pj1p0Q2O1hC8L7B9N2M1K3V4X5Z6Y';
+  // Fallback buscando en archivos de entorno locales
+  try {
+    const candidates = [
+      path.resolve(process.cwd(), '.env.local'),
+      path.resolve(process.cwd(), '.env'),
+      path.resolve(process.cwd(), '..', '.env'),
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        const content = fs.readFileSync(p, 'utf8');
+        const match = content.match(new RegExp('^' + key + '=(.*)$', 'm'));
+        if (match && match[1]) {
+          return match[1].trim();
+        }
+      }
+    }
+  } catch {
+    // Suppress filesystem reading error
+  }
+
+  return '';
+};
+
+const supabaseUrl = getEnv('SUPABASE_URL');
+const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY');
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
