@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-obsidian: #0a0a0a;
+  --color-carbon: #101010;
+  --color-graphite: #212121;
+  --color-iron: #383838;
+  --color-ash: #474747;
+  --color-smoke: #8a8a8a;
+  --color-chalk: #f3f3f3;
+  --color-signal-white: #ffffff;
+  --color-compass-gold: #6f6759;
+  --color-gold-bright: #d4af37;
+  --color-pulse-green: #98ff38;
+  --color-neon-rose: #f43f5e;
+  --color-accent-orange: #f97316;
+  --color-cobalt: #3b82f6;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-color: var(--color-obsidian);
+  color: var(--color-chalk);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow-x: hidden;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* Custom Sleek Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #262626;
+  border-radius: 0px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-compass-gold);
+}
+
+/* 90-degree Sharp Corner Crosshair Base */
+.corner-cross {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  color: var(--color-iron);
+  pointer-events: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  opacity: 0.8;
+  transition: color 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 10;
+}
+
+.corner-cross.tl { top: -6px; left: -6px; }
+.corner-cross.tr { top: -6px; right: -6px; }
+.corner-cross.bl { bottom: -6px; left: -6px; }
+.corner-cross.br { bottom: -6px; right: -6px; }
+
+.blueprint-card:hover .corner-cross {
+  color: var(--color-compass-gold);
+  transform: rotate(90deg);
+}
+
+/* Terminal Syntax Tokens */
+.token-kw { color: #f472b6; }
+.token-fn { color: #60a5fa; }
+.token-str { color: #38bdf8; }
+.token-num { color: var(--color-pulse-green); }
+.token-comm { color: #52525b; }

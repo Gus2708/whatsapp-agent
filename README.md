@@ -45,6 +45,7 @@ graph TD
 | Base de datos | [Supabase](https://supabase.com/) (PostgreSQL + `pg_trgm` + `pgvector`) |
 | Embeddings | OpenAI `text-embedding-3-small` (opcional — ver nota abajo) |
 | Memoria a largo plazo | [Engram](https://github.com/EngineVault/engram) |
+| Flight Deck & CRM | [Next.js](https://nextjs.org/) (App Router + Tailwind + GSAP + [thinking-orbs](https://github.com/Jakubantalik/thinking-orbs)) |
 | Runtime | Node.js 18+ |
 
 ### Cómo encuentra un producto (cascada de 5 capas)
@@ -326,6 +327,27 @@ En la PC de la tienda el arranque y la resiliencia están automatizados con scri
 
 ---
 
+## 📊 Operational Flight Deck & CRM (Next.js)
+
+Consola de control y CRM interactivo para supervisar y operar el agente en tiempo real:
+
+```bash
+# Iniciar en modo desarrollo (puerto 3001)
+npm run dashboard
+
+# Compilar para producción
+npm run dashboard:build
+```
+
+### Módulos del Flight Deck:
+1. 📊 **Flight Deck Telemetry**: Métricas operativas en vivo (leads atendidos, exact recall 76.9%, SNR 0.123, costo promedio), estado de microservicios (WAHA, n8n, Supabase, Claude Sonnet 5) y log stream con inyector de eventos.
+2. 💬 **WhatsApp Lead CRM**: Panel de chats interactivo con lista filtrable, switch de **Silent Mode (IA / Atención Humana)** y detalle de perfil de cliente conectado a Supabase (`atenciones_pendientes`).
+3. ⚡ **RAG Studio (TUI)**: Consola de pruebas conectada directamente a Supabase con visualización paso a paso de la cascada de 5 capas y el componente oficial de orbes de pensamiento (**`thinking-orbs`**).
+4. 🔄 **33-Node n8n Visualizer**: Mapa de topología en 4 zonas con simulación de pulso de paquetes con GSAP.
+5. 🛠️ **Command Center & DevOps**: Terminales de ejecución para scripts de automatización (`catchup_serrucho.ps1`, `sanitize_output.js`, `auto_healing_sonnet.js`, `waha_watchdog.ps1`).
+
+---
+
 ## 👷 Apps de empleados (cola en Supabase)
 
 Cuando el bot no basta, encola al cliente y un empleado lo atiende desde una app que lee Supabase por Realtime:
@@ -352,6 +374,7 @@ Cuando el bot no basta, encola al cliente y un empleado lo atiende desde una app
 
 | Ruta | Contenido |
 | :--- | :--- |
+| `dashboard/` | **Flight Deck & CRM** en Next.js (App Router, Tailwind CSS, GSAP, `thinking-orbs`). |
 | `lib/serrucho-search.js` | **Fuente única** del matcher de búsqueda/cotización. |
 | `scratch_live/` | Dumps canónicos del workflow vivo (`live_buscar.js`, `live_presupuesto.js`, `live_systemMessage.txt`). |
 | `n8n_workflow.json` | Snapshot completo del flujo de n8n (importable / recuperación). |

@@ -816,7 +816,12 @@ async function buscar(consulta) {
     async get(u, cfg) { const r = await fetch(u, { headers: (cfg && cfg.headers) || {} }); return { data: await r.json() }; },
     async post(u, b, cfg) { const r = await fetch(u, { method: 'POST', headers: (cfg && cfg.headers) || {}, body: JSON.stringify(b) }); let d = null; try { d = await r.json(); } catch (x) {} return { data: d }; },
   };
-  const fakeEnv = { OPENROUTER_API_KEY: pick('OPENROUTER_API_KEY'), OPENAI_API_KEY: pick('OPENAI_API_KEY') };
+  const fakeEnv = {
+    SUPABASE_URL: SB,
+    SUPABASE_ANON_KEY: ANON,
+    OPENROUTER_API_KEY: pick('OPENROUTER_API_KEY'),
+    OPENAI_API_KEY: pick('OPENAI_API_KEY'),
+  };
   const run = new Function('query', 'require', '$env', '"use strict"; return (async () => {\n' + body + '\n})();');
   const spin = cargando();
   spin.paso('ejecutando matcher…');
