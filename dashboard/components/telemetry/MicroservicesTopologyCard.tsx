@@ -205,17 +205,17 @@ export const MicroservicesTopologyCard: React.FC = () => {
           }`}
         >
           <div className="font-mono text-[9px] uppercase tracking-wider text-compass-gold flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              {/* ThinkingOrb from library */}
-              <div className="h-6 w-6 flex items-center justify-center flex-shrink-0">
+            <div className="flex items-center gap-2">
+              {/* Compact 20px ThinkingOrb from library */}
+              <div className="h-5 w-5 flex items-center justify-center flex-shrink-0">
                 <ThinkingOrb
                   state={activeStage !== null ? 'searching_rag' : 'idle'}
                   currentScanningLayer={activeStage !== null ? (Math.min(5, activeStage + 1) as 1 | 2 | 3 | 4 | 5) : null}
-                  size={64}
+                  size={20}
                   showLabel={false}
                 />
               </div>
-              <span>Flujo de Ejecución de Eventos en Tiempo Real</span>
+              <span className="font-mono text-[9.5px]">Flujo de Ejecución de Eventos en Tiempo Real</span>
             </div>
             <span className={activeStage !== null ? 'text-pulse-green font-bold animate-pulse' : 'text-smoke'}>
               {activeStage !== null ? `Paso ${activeStage + 1}/6 en proceso...` : 'Latencia Total ~42ms'}
