@@ -1,9 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { TabType } from '@/lib/types';
 import { useSound } from '@/components/audio/SoundProvider';
-import { Volume2, VolumeX } from 'lucide-react';
+import { Volume2, VolumeX, Cloud } from 'lucide-react';
 import {
   MotionFlightIcon,
   MotionCrmIcon,
@@ -19,6 +19,31 @@ interface HeaderNavProps {
 
 export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) => {
   const { soundEnabled, toggleSound, playClick } = useSound();
+  const [tunnels, setTunnels] = useState<{
+    wahaOnline: boolean;
+    n8nOnline: boolean;
+  }>({ wahaOnline: false, n8nOnline: false });
+
+  useEffect(() => {
+    const fetchTunnels = async () => {
+      try {
+        const res = await fetch('/api/tunnel');
+        if (res.ok) {
+          const data = await res.json();
+          setTunnels({
+            wahaOnline: Boolean(data?.waha?.isOnline),
+            n8nOnline: Boolean(data?.n8n?.isOnline),
+          });
+        }
+      } catch {
+        // Suppress background poll errors
+      }
+    };
+
+    fetchTunnels();
+    const interval = setInterval(fetchTunnels, 20000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleTabClick = (tab: TabType) => {
     try {
@@ -53,7 +78,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) 
         </svg>
         <div>
           <div className="font-mono text-[13px] font-semibold uppercase tracking-wider text-chalk">
-            WHATSAPP AGENT - PERUCHO - FLIGHT DECK
+            HYPERSTUDIO // WHATSAPP AGENT FLIGHT DECK
           </div>
           <div className="font-mono text-[10px] text-smoke mt-0.5">
             TARGET: FERRETERÍA EL SERRUCHO · 33 NODES SYNCED · 7,650 SKUs
@@ -70,10 +95,11 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) 
               key={tab.id}
               type="button"
               onClick={() => handleTabClick(tab.id)}
-              className={`group flex items-center gap-2 px-3.5 py-1.5 font-mono text-xs transition-all duration-150 whitespace-nowrap cursor-pointer select-none ${isActive
+              className={`group flex items-center gap-2 px-3.5 py-1.5 font-mono text-xs transition-all duration-150 whitespace-nowrap cursor-pointer select-none ${
+                isActive
                   ? 'border border-signal-white bg-signal-white font-semibold text-obsidian shadow-[0_2px_8px_rgba(255,255,255,0.15)]'
                   : 'border border-transparent text-smoke hover:border-graphite hover:bg-white/[0.06] hover:text-chalk active:scale-95'
-                }`}
+              }`}
             >
               <span>{tab.icon}</span>
               <span>{tab.label}</span>
@@ -82,8 +108,33 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) 
         })}
       </nav>
 
-      {/* Controls & Live Badge */}
+      {/* Controls, Tunnels & Live Badge */}
       <div className="flex items-center gap-2.5">
+        {/* Dynamic Cloudflare Tunnel Status Indicator */}
+        <div
+          className="hidden sm:inline-flex items-center gap-2 border border-graphite bg-[#111111] px-2.5 py-1.5 font-mono text-[11px] text-smoke"
+          title="Túneles Cloudflare dinámicos consultados desde Supabase"
+        >
+          <Cloud className="h-3.5 w-3.5 text-compass-gold" />
+          <span className="flex items-center gap-1">
+            WAHA:
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                tunnels.wahaOnline ? 'bg-pulse-green' : 'bg-neon-rose'
+              }`}
+            />
+          </span>
+          <span>·</span>
+          <span className="flex items-center gap-1">
+            n8n:
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                tunnels.n8nOnline ? 'bg-pulse-green' : 'bg-neon-rose'
+              }`}
+            />
+          </span>
+        </div>
+
         <button
           type="button"
           onClick={toggleSound}

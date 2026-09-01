@@ -389,11 +389,6 @@ BEGIN
   END IF;
 END $$;
 
--- Política para empleados: solo si is_active_employee() existe.
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid
-             WHERE n.nspname = 'public' AND p.proname = 'is_active_employee')
   THEN
     DROP POLICY IF EXISTS "Empleados - gestionar push" ON public.push_subscriptions;
     CREATE POLICY "Empleados - gestionar push" ON public.push_subscriptions
@@ -402,3 +397,27 @@ BEGIN
     RAISE NOTICE 'Saltando política de empleados para push_subscriptions: is_active_employee() no existe todavía.';
   END IF;
 END $$;
+
+-- 14. Tabla de túneles dinámicos (Cloudflare Tunnels para n8n, WAHA y servicios)
+--     Al reiniciar la PC, los scripts locales actualizan aquí las URLs públicas activas.
+CREATE TABLE IF NOT EXISTS public.servidores_tuneles (
+    servicio       text PRIMARY KEY,                          -- 'waha', 'n8n', 'engram'
+    url_publica    text NOT NULL,                             -- 'https://xxx.trycloudflare.com'
+    url_local      text,                                      -- 'http://localhost:3000'
+    api_key        text,                                      -- Opcional / Token
+    status         text NOT NULL DEFAULT 'online',            -- 'online' | 'offline'
+    actualizado_en timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now())
+);
+COMMENT ON TABLE public.servidores_tuneles IS
+  'Registro dinámico de URLs de túneles Cloudflare para n8n y WAHA sincronizados al reiniciar el PC.';
+
+ALTER TABLE public.servidores_tuneles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Todos pueden leer tuneles" ON public.servidores_tuneles;
+CREATE POLICY "Todos pueden leer tuneles" ON public.servidores_tuneles
+  FOR SELECT TO anon, authenticated USING (true);
+
+DROP POLICY IF EXISTS "n8n y scripts pueden actualizar tuneles" ON public.servidores_tuneles;
+CREATE POLICY "n8n y scripts pueden actualizar tuneles" ON public.servidores_tuneles
+  FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
