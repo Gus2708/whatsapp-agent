@@ -1,4 +1,32 @@
 import { getTunnelUrl } from './tunnel';
+import fs from 'fs';
+import path from 'path';
+
+const getWahaApiKey = (): string => {
+  if (process.env.WAHA_API_KEY) {
+    return process.env.WAHA_API_KEY.trim();
+  }
+
+  // Fallback buscando en archivos de entorno locales
+  try {
+    const candidates = [
+      path.resolve(process.cwd(), '.env.local'),
+      path.resolve(process.cwd(), '.env'),
+      path.resolve(process.cwd(), '..', '.env'),
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        const content = fs.readFileSync(p, 'utf8');
+        const match = content.match(/^WAHA_API_KEY=(.*)$/m);
+        if (match && match[1]) {
+          return match[1].trim();
+        }
+      }
+    }
+  } catch {}
+
+  return 'perucho_waha_secret_2026';
+};
 
 export interface WahaChat {
   id: string;
@@ -22,6 +50,27 @@ export interface WahaMessage {
 }
 
 /**
+ * Verifica el estado del servidor de WAHA a través del túnel.
+ */
+export async function checkWahaStatus(): Promise<boolean> {
+  const wahaUrl = await getTunnelUrl('waha');
+  if (!wahaUrl) return false;
+
+  try {
+    const apiKey = getWahaApiKey();
+    const res = await fetch(`${wahaUrl}/api/server/status`, {
+      headers: {
+        'X-Api-Key': apiKey,
+      },
+      cache: 'no-store',
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Obtiene la lista de chats activos desde la instancia de WAHA a través del túnel dinámico.
  */
 export async function fetchWahaChats(): Promise<WahaChat[]> {
@@ -30,7 +79,7 @@ export async function fetchWahaChats(): Promise<WahaChat[]> {
     throw new Error('Túnel de WAHA no disponible o caído');
   }
 
-  const apiKey = process.env.WAHA_API_KEY || 'perucho_waha_secret_2026';
+  const apiKey = getWahaApiKey();
   const response = await fetch(`${wahaUrl}/api/default/chats`, {
     headers: {
       'X-Api-Key': apiKey,
@@ -55,7 +104,7 @@ export async function fetchWahaMessages(chatId: string, limit = 25): Promise<Wah
     throw new Error('Túnel de WAHA no disponible o caído');
   }
 
-  const apiKey = process.env.WAHA_API_KEY || 'perucho_waha_secret_2026';
+  const apiKey = getWahaApiKey();
   const response = await fetch(
     `${wahaUrl}/api/default/chats/${encodeURIComponent(chatId)}/messages?limit=${limit}&downloadMedia=false`,
     {
@@ -86,7 +135,7 @@ export async function sendWahaTextMessage(
     return { success: false, error: 'Túnel de WAHA no disponible o fuera de línea' };
   }
 
-  const apiKey = process.env.WAHA_API_KEY || 'perucho_waha_secret_2026';
+  const apiKey = getWahaApiKey();
   const cleanChatId = chatId.includes('@') ? chatId : `${chatId}@c.us`;
 
   try {

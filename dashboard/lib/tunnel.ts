@@ -66,7 +66,7 @@ export async function getTunnelConfig(servicio: 'n8n' | 'waha'): Promise<TunnelS
 
   const updatedAtTime = new Date(record.updated_at).getTime();
   const ageSeconds = Math.max(0, Math.floor((now - updatedAtTime) / 1000));
-  const isFresh = ageSeconds < 90;
+  const isFresh = ageSeconds < 300; // 5 minutos de tolerancia para heartbeats
   const isRunning = record.tunnel_state === 'running';
   const isOnline = isRunning && isFresh;
 
