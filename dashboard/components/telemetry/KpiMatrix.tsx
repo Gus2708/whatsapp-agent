@@ -11,7 +11,7 @@ import {
 
 export const KpiMatrix: React.FC = () => {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-3.5 flex-shrink-0">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-2.5 flex-shrink-0 p-1">
       {/* KPI 1 */}
       <CrosshairCard className="p-3.5 bg-[#0d0d0d]">
         <div className="flex justify-between items-center font-mono text-[10.5px] uppercase text-smoke mb-1">
