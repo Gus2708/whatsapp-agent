@@ -46,21 +46,21 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   });
 
   return (
-    <CrosshairCard className="flex flex-col bg-[#0c0c0c] overflow-hidden h-full">
+    <CrosshairCard className="flex flex-col bg-[#0c0c0c] overflow-hidden h-full min-h-0">
       {/* Search Bar */}
-      <div className="p-3.5 border-b border-graphite bg-[#0e0e0e] flex items-center gap-2">
+      <div className="p-3 border-b border-graphite bg-[#0e0e0e] flex items-center gap-2 flex-shrink-0">
         <Search className="h-4 w-4 text-smoke flex-shrink-0" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Buscar por teléfono o nombre..."
-          className="w-full bg-[#141414] border border-graphite text-chalk font-mono text-xs px-3 py-2 outline-none focus:border-compass-gold transition-colors"
+          className="w-full bg-[#141414] border border-graphite text-chalk font-mono text-xs px-3 py-1.5 outline-none focus:border-compass-gold transition-colors"
         />
       </div>
 
       {/* Filter Pills */}
-      <div className="flex gap-1 p-2.5 border-b border-graphite bg-[#0a0a0a] overflow-x-auto">
+      <div className="flex gap-1 p-2 border-b border-graphite bg-[#0a0a0a] overflow-x-auto flex-shrink-0">
         {[
           { id: 'all', label: `Todos (${conversations.length})` },
           { id: 'qualified', label: 'Calificados' },
@@ -69,8 +69,9 @@ export const ConversationList: React.FC<ConversationListProps> = ({
         ].map((btn) => (
           <button
             key={btn.id}
+            type="button"
             onClick={() => onFilterChange(btn.id)}
-            className={`font-mono text-[10.5px] px-2.5 py-1 whitespace-nowrap border transition-colors ${
+            className={`font-mono text-[10px] px-2.5 py-1 whitespace-nowrap border transition-colors cursor-pointer ${
               filter === btn.id
                 ? 'bg-signal-white text-obsidian border-signal-white font-semibold'
                 : 'bg-[#161616] text-smoke border-graphite hover:text-chalk'
@@ -81,8 +82,8 @@ export const ConversationList: React.FC<ConversationListProps> = ({
         ))}
       </div>
 
-      {/* Conversations Scroll */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Conversations Scrollable Container */}
+      <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-graphite/40">
         {filtered.map((c) => {
           const isSelected = c.id === selectedId;
           const lastMsg = c.messages[c.messages.length - 1];
@@ -90,20 +91,26 @@ export const ConversationList: React.FC<ConversationListProps> = ({
             <div
               key={c.id}
               onClick={() => onSelect(c.id)}
-              className={`p-3.5 border-b border-graphite cursor-pointer transition-colors ${
+              className={`p-3 cursor-pointer transition-colors ${
                 isSelected
                   ? 'bg-[#181818] border-l-2 border-l-signal-white'
                   : 'hover:bg-[#141414]'
               }`}
             >
-              <div className="flex justify-between items-center mb-1">
-                <span className="font-medium text-[13.5px] text-chalk">{c.name}</span>
-                <span className="font-mono text-[10.5px] text-smoke">{c.lastTime}</span>
+              <div className="flex justify-between items-center mb-0.5">
+                <span className="font-medium text-[13px] text-chalk truncate mr-2">
+                  {c.name}
+                </span>
+                <span className="font-mono text-[10px] text-smoke flex-shrink-0">
+                  {c.lastTime}
+                </span>
               </div>
-              <p className="text-xs text-smoke truncate mb-2">{lastMsg?.text}</p>
+              <p className="text-[11.5px] text-smoke truncate mb-1.5">
+                {lastMsg?.text}
+              </p>
               <div>
                 <span
-                  className={`font-mono text-[10px] px-1.5 py-0.5 border uppercase inline-block ${getBadgeStyle(
+                  className={`font-mono text-[9.5px] px-1.5 py-0.5 border uppercase inline-block ${getBadgeStyle(
                     c.status
                   )}`}
                 >
