@@ -5,39 +5,55 @@ import gsap from 'gsap';
 import { N8N_ZONES } from '@/lib/constants';
 import { CrosshairCard } from '@/components/hud/CrosshairCard';
 import { useSound } from '@/components/audio/SoundProvider';
-import { Zap, ExternalLink, Activity, Radio, Layout } from 'lucide-react';
+import { Zap, ExternalLink, Activity, CheckCircle2, Play, RefreshCw, GitBranch } from 'lucide-react';
+
+interface N8nWorkflow {
+  id: string;
+  name: string;
+  active: boolean;
+  updatedAt?: string;
+}
+
+interface N8nExecution {
+  id: string;
+  status: string;
+  startedAt: string;
+  stoppedAt: string;
+  workflowId: string;
+}
 
 export const N8nVisualizer: React.FC = () => {
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const [tunnelUrl, setTunnelUrl] = useState<string | null>(null);
-  const [tunnelState, setTunnelState] = useState<'running' | 'offline' | 'loading'>('loading');
-  const [viewMode, setViewMode] = useState<'topology' | 'iframe'>('topology');
+  const [workflows, setWorkflows] = useState<N8nWorkflow[]>([]);
+  const [executions, setExecutions] = useState<N8nExecution[]>([]);
+  const [isOnline, setIsOnline] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
   const { playPacket, playSuccess } = useSound();
   const timelineRef = useRef<gsap.core.Timeline | null>(null);
 
-  // Consultar el túnel dinámico de n8n desde Supabase
-  useEffect(() => {
-    const checkTunnel = async () => {
-      try {
-        const res = await fetch('/api/tunnel');
-        if (res.ok) {
-          const data = await res.json();
-          if (data?.n8n?.isOnline && data?.n8n?.url) {
-            setTunnelUrl(data.n8n.url);
-            setTunnelState('running');
-          } else {
-            setTunnelUrl(data?.n8n?.url || null);
-            setTunnelState(data?.n8n?.state === 'running' ? 'running' : 'offline');
-          }
-        }
-      } catch {
-        setTunnelState('offline');
+  const fetchN8nTelemetry = async () => {
+    try {
+      const res = await fetch('/api/n8n');
+      if (res.ok) {
+        const data = await res.json();
+        setIsOnline(Boolean(data.online));
+        setTunnelUrl(data.url || null);
+        setWorkflows(data.workflows || []);
+        setExecutions(data.executions || []);
       }
-    };
+    } catch {
+      setIsOnline(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    checkTunnel();
-    const interval = setInterval(checkTunnel, 15000);
+  useEffect(() => {
+    fetchN8nTelemetry();
+    const interval = setInterval(fetchN8nTelemetry, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -91,33 +107,30 @@ export const N8nVisualizer: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Header & Controls */}
       <div className="flex flex-wrap justify-between items-end gap-4 mb-4">
         <div>
           <span className="font-mono text-[11px] text-compass-gold uppercase tracking-wider block mb-1">
-            // PRODUCTION N8N TOPOLOGY & DYNAMIC TUNNEL
+            // LIVE CLOUDFLARE TUNNEL · N8N ORCHESTRATION ENGINE
           </span>
           <h2 className="text-2xl font-normal text-chalk tracking-tight">
-            Flujo de los 33 Nodos Dividido en 4 Zonas
+            Topología de 33 Nodos & Telemetría en Vivo
           </h2>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Dynamic Tunnel Badge */}
+          {/* Dynamic Tunnel Status Indicator */}
           <div className="flex items-center gap-2 border border-graphite bg-[#111111] px-3 py-1.5 font-mono text-xs">
             <span
               className={`h-2 w-2 rounded-full ${
-                tunnelState === 'running'
+                isOnline
                   ? 'bg-pulse-green shadow-[0_0_8px_var(--color-pulse-green)] animate-pulse'
                   : 'bg-neon-rose'
               }`}
             />
             <span className="text-smoke">TÚNEL n8n:</span>
-            <span
-              className={
-                tunnelState === 'running' ? 'text-pulse-green font-semibold' : 'text-smoke'
-              }
-            >
-              {tunnelState === 'running' ? 'ONLINE (Cloudflare)' : 'OFFLINE'}
+            <span className={isOnline ? 'text-pulse-green font-semibold' : 'text-smoke'}>
+              {isOnline ? 'ONLINE' : 'OFFLINE'}
             </span>
           </div>
 
@@ -126,20 +139,12 @@ export const N8nVisualizer: React.FC = () => {
               href={tunnelUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 font-mono text-xs border border-compass-gold text-compass-gold hover:bg-compass-gold/10 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 font-mono text-xs font-semibold border border-compass-gold bg-compass-gold/10 text-compass-gold hover:bg-compass-gold/20 transition-colors"
             >
-              <span>Abrir n8n</span>
-              <ExternalLink className="h-3 w-3" />
+              <span>Abrir Editor n8n</span>
+              <ExternalLink className="h-3.5 w-3.5" />
             </a>
           )}
-
-          <button
-            onClick={() => setViewMode(viewMode === 'topology' ? 'iframe' : 'topology')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 font-mono text-xs border border-graphite bg-[#111111] text-smoke hover:text-chalk transition-colors"
-          >
-            <Layout className="h-3 w-3" />
-            <span>{viewMode === 'topology' ? 'Ver n8n Embebido' : 'Ver Topología'}</span>
-          </button>
 
           <button
             onClick={simulatePacketPulse}
@@ -156,57 +161,136 @@ export const N8nVisualizer: React.FC = () => {
         </div>
       </div>
 
-      {viewMode === 'iframe' && tunnelUrl ? (
-        <CrosshairCard className="p-2 bg-[#080808] min-h-[650px] flex flex-col">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-graphite text-xs font-mono text-smoke">
-            <span>INSTANCIA EN VIVO: {tunnelUrl}</span>
-            <span className="text-pulse-green">● SINCRONIZADO</span>
+      {/* Live Workflows & Recent Executions Stream */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Active Workflows Panel */}
+        <CrosshairCard className="lg:col-span-6 p-5 bg-[#0a0a0a]">
+          <div className="flex items-center justify-between font-mono text-xs text-smoke uppercase tracking-wider mb-3 pb-2 border-b border-graphite">
+            <span className="flex items-center gap-1.5 text-chalk font-semibold">
+              <GitBranch className="h-3.5 w-3.5 text-compass-gold" />
+              <span>Workflows Activos en Instancia</span>
+            </span>
+            <span className="text-pulse-green">
+              {workflows.filter((w) => w.active).length} ACTIVOS
+            </span>
           </div>
-          <iframe
-            src={tunnelUrl}
-            className="w-full flex-1 min-h-[600px] border-0 bg-obsidian"
-            title="n8n Live Workflow Canvas"
-          />
-        </CrosshairCard>
-      ) : (
-        <CrosshairCard className="p-6 bg-[#080808] overflow-x-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 min-w-[880px]">
-            {N8N_ZONES.map((zone) => (
-              <div
-                key={zone.zone}
-                className="bg-[#0e0e0e] border border-graphite p-4 flex flex-col gap-2.5"
-              >
-                <div className="font-mono text-[11px] text-compass-gold uppercase tracking-wider border-b border-graphite pb-2 mb-1">
-                  {zone.title}
-                </div>
 
-                {zone.nodes.map((node) => {
-                  const isFiring = activeNodeId === node.id;
-                  return (
-                    <div
-                      key={node.id}
-                      className={`p-3 border flex items-center gap-2.5 text-xs text-chalk cursor-pointer transition-all duration-200 ${
-                        isFiring
-                          ? 'border-pulse-green bg-pulse-green/15 shadow-[0_0_14px_rgba(152,255,56,0.25)] scale-[1.02]'
-                          : 'border-graphite bg-[#141414] hover:border-ash hover:bg-[#1c1c1c]'
+          <div className="space-y-2">
+            {workflows.length > 0 ? (
+              workflows.map((wf) => (
+                <div
+                  key={wf.id}
+                  className="flex items-center justify-between p-2.5 border border-graphite bg-[#121212] font-mono text-xs"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        wf.active ? 'bg-pulse-green' : 'bg-smoke'
                       }`}
-                    >
-                      <span
-                        className={`h-2 w-2 rounded-full flex-shrink-0 transition-all ${
-                          isFiring
-                            ? 'bg-pulse-green shadow-[0_0_8px_var(--color-pulse-green)]'
-                            : 'bg-compass-gold'
-                        }`}
-                      />
-                      <span className="font-mono text-[11.5px] truncate">{node.name}</span>
-                    </div>
-                  );
-                })}
+                    />
+                    <span className="text-chalk truncate">{wf.name}</span>
+                  </div>
+                  <span className="text-[11px] text-smoke ml-2 flex-shrink-0">
+                    ID: {wf.id}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="p-4 text-center font-mono text-xs text-smoke">
+                {isLoading ? 'Conectando con n8n...' : 'Sin workflows detectados'}
               </div>
-            ))}
+            )}
           </div>
         </CrosshairCard>
-      )}
+
+        {/* Live Executions Panel */}
+        <CrosshairCard className="lg:col-span-6 p-5 bg-[#0a0a0a]">
+          <div className="flex items-center justify-between font-mono text-xs text-smoke uppercase tracking-wider mb-3 pb-2 border-b border-graphite">
+            <span className="flex items-center gap-1.5 text-chalk font-semibold">
+              <Activity className="h-3.5 w-3.5 text-pulse-green" />
+              <span>Últimas Ejecuciones en Tiempo Real</span>
+            </span>
+            <button
+              onClick={fetchN8nTelemetry}
+              className="text-smoke hover:text-chalk transition-colors"
+              title="Refrescar"
+            >
+              <RefreshCw className="h-3 w-3" />
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {executions.length > 0 ? (
+              executions.map((ex) => (
+                <div
+                  key={ex.id}
+                  className="flex items-center justify-between p-2.5 border border-graphite bg-[#121212] font-mono text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-pulse-green flex-shrink-0" />
+                    <span className="text-chalk">Ejecución #{ex.id}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-[11px] text-smoke">
+                    <span className="text-pulse-green font-semibold uppercase">
+                      {ex.status}
+                    </span>
+                    <span>
+                      {new Date(ex.startedAt).toLocaleTimeString('es-VE', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                      })}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-4 text-center font-mono text-xs text-smoke">
+                {isLoading ? 'Cargando telemetría de ejecuciones...' : 'Esperando ejecuciones...'}
+              </div>
+            )}
+          </div>
+        </CrosshairCard>
+      </div>
+
+      {/* 33-Node Visualizer Topology Grid */}
+      <CrosshairCard className="p-6 bg-[#080808] overflow-x-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 min-w-[880px]">
+          {N8N_ZONES.map((zone) => (
+            <div
+              key={zone.zone}
+              className="bg-[#0e0e0e] border border-graphite p-4 flex flex-col gap-2.5"
+            >
+              <div className="font-mono text-[11px] text-compass-gold uppercase tracking-wider border-b border-graphite pb-2 mb-1">
+                {zone.title}
+              </div>
+
+              {zone.nodes.map((node) => {
+                const isFiring = activeNodeId === node.id;
+                return (
+                  <div
+                    key={node.id}
+                    className={`p-3 border flex items-center gap-2.5 text-xs text-chalk cursor-pointer transition-all duration-200 ${
+                      isFiring
+                        ? 'border-pulse-green bg-pulse-green/15 shadow-[0_0_14px_rgba(152,255,56,0.25)] scale-[1.02]'
+                        : 'border-graphite bg-[#141414] hover:border-ash hover:bg-[#1c1c1c]'
+                    }`}
+                  >
+                    <span
+                      className={`h-2 w-2 rounded-full flex-shrink-0 transition-all ${
+                        isFiring
+                          ? 'bg-pulse-green shadow-[0_0_8px_var(--color-pulse-green)]'
+                          : 'bg-compass-gold'
+                      }`}
+                    />
+                    <span className="font-mono text-[11.5px] truncate">{node.name}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </CrosshairCard>
     </div>
   );
 };

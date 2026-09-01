@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import gsap from 'gsap';
-import { TabType, Conversation } from '@/lib/types';
+import { TabType, Conversation, ChatMessage } from '@/lib/types';
 import { INITIAL_CONVERSATIONS } from '@/lib/constants';
 import { HeaderNav } from '@/components/hud/HeaderNav';
 import { KpiMatrix } from '@/components/telemetry/KpiMatrix';
@@ -19,11 +19,36 @@ import { useSound } from '@/components/audio/SoundProvider';
 export default function FlightDeckDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('flight');
   const [conversations, setConversations] = useState<Conversation[]>(INITIAL_CONVERSATIONS);
-  const [selectedConversationId, setSelectedConversationId] = useState<string>('c1');
+  const [selectedConversationId, setSelectedConversationId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all');
-  const { toggleSound, playPacket } = useSound();
+  const { toggleSound, playPacket, playSuccess } = useSound();
   const viewContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Cargar conversaciones reales desde Supabase y WAHA
+  const fetchConversations = useCallback(async () => {
+    try {
+      const res = await fetch('/api/conversations');
+      if (res.ok) {
+        const data: Conversation[] = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setConversations(data);
+          setSelectedConversationId((prev) => {
+            if (prev && data.some((c) => c.id === prev)) return prev;
+            return data[0].id;
+          });
+        }
+      }
+    } catch {
+      // Usar datos locales si hay error de red
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchConversations();
+    const interval = setInterval(fetchConversations, 10000);
+    return () => clearInterval(interval);
+  }, [fetchConversations]);
 
   // GSAP tab switch animation
   useEffect(() => {
@@ -39,7 +64,6 @@ export default function FlightDeckDashboard() {
   // Global Keyboard Shortcuts (1-5 for tabs, M for mute)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger when typing in inputs
       if (
         ['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName) ||
         (e.target as HTMLElement).isContentEditable
@@ -60,20 +84,43 @@ export default function FlightDeckDashboard() {
   }, [toggleSound]);
 
   const selectedConversation =
-    conversations.find((c) => c.id === selectedConversationId) || conversations[0];
+    conversations.find((c) => c.id === selectedConversationId) || conversations[0] || INITIAL_CONVERSATIONS[0];
 
-  const handleToggleSilentMode = (convId: string) => {
+  const handleToggleSilentMode = async (convId: string) => {
+    const targetConv = conversations.find((c) => c.id === convId);
+    if (!targetConv) return;
+
+    const newSilentState = !targetConv.silentMode;
+
     setConversations((prev) =>
       prev.map((c) =>
-        c.id === convId ? { ...c, silentMode: !c.silentMode } : c
+        c.id === convId ? { ...c, silentMode: newSilentState } : c
       )
     );
+
+    // Sincronizar con Supabase chat_sessions
+    try {
+      await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'toggle_silent',
+          phone: targetConv.phone,
+          silentMode: newSilentState,
+        }),
+      });
+    } catch {
+      // Ignorar error de sincronización
+    }
   };
 
-  const handleSendMessage = (convId: string, text: string) => {
+  const handleSendMessage = async (convId: string, text: string) => {
+    const targetConv = conversations.find((c) => c.id === convId);
+    if (!targetConv) return;
+
     const now = new Date().toTimeString().slice(0, 5);
-    const clientMsg = {
-      sender: 'client' as const,
+    const clientMsg: ChatMessage = {
+      sender: 'client',
       text,
       time: now,
     };
@@ -90,33 +137,25 @@ export default function FlightDeckDashboard() {
       )
     );
 
-    // If Silent Mode is OFF, simulate AI Autonomous Agent Response
-    const conv = conversations.find((c) => c.id === convId);
-    if (conv && !conv.silentMode) {
-      setTimeout(() => {
-        playPacket();
-        const agentMsg = {
-          sender: 'agent' as const,
-          text: `[Perucho Agent]: Recibido tu mensaje "${text.slice(
-            0,
-            32
-          )}...". He consultado el catálogo de 7.650 SKUs y procesado la disponibilidad en tiempo real.`,
-          time: new Date().toTimeString().slice(0, 5),
-          latency: '24ms (pg_trgm Match)',
-          cost: '$0.0000',
-        };
+    playPacket();
 
-        setConversations((prev) =>
-          prev.map((c) =>
-            c.id === convId
-              ? {
-                  ...c,
-                  messages: [...c.messages, agentMsg],
-                }
-              : c
-          )
-        );
-      }, 550);
+    // Despachar a WhatsApp vía WAHA a través del túnel dinámico
+    try {
+      const res = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send_message',
+          phone: targetConv.phone,
+          message: clientMsg,
+        }),
+      });
+
+      if (res.ok) {
+        playSuccess();
+      }
+    } catch {
+      // Mensaje local reflejado en interfaz
     }
   };
 
@@ -208,7 +247,7 @@ export default function FlightDeckDashboard() {
             <div className="md:col-span-4 lg:col-span-3 h-full">
               <ConversationList
                 conversations={conversations}
-                selectedId={selectedConversationId}
+                selectedId={selectedConversation.id}
                 onSelect={setSelectedConversationId}
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}

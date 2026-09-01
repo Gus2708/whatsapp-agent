@@ -1,162 +1,227 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { INITIAL_CONVERSATIONS } from '@/lib/constants';
 import { supabase } from '@/lib/supabase';
-import { sendWahaTextMessage, fetchWahaChats } from '@/lib/waha-client';
+import { sendWahaTextMessage } from '@/lib/waha-client';
 import { Conversation, ChatMessage, LeadStatus } from '@/lib/types';
-
-let localConversations = [...INITIAL_CONVERSATIONS];
+import { INITIAL_CONVERSATIONS } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    // 1. Consultar sesiones activas y cola humana en Supabase
-    const { data: dbSessions } = await supabase
-      .from('chat_sessions')
-      .select('telefono, estado, msg_count, updated_at')
-      .order('updated_at', { ascending: false })
-      .limit(10);
-
+    // 1. Consultar cola de atenciones humanas en Supabase
     const { data: atenciones } = await supabase
       .from('atenciones_pendientes')
-      .select('telefono, nombre, motivo, status, creado_en')
-      .eq('status', 'pendiente');
+      .select('*')
+      .order('creado_en', { ascending: false })
+      .limit(15);
 
-    // 2. Consultar WAHA si el túnel está online
-    let wahaChatsMap: Record<string, any> = {};
-    try {
-      const chats = await fetchWahaChats();
-      if (Array.isArray(chats)) {
-        chats.forEach((c) => {
-          const tel = c.id.replace('@c.us', '');
-          wahaChatsMap[tel] = c;
+    // 2. Consultar sesiones activas de chat
+    const { data: sessions } = await supabase
+      .from('chat_sessions')
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .limit(15);
+
+    // 3. Consultar solicitudes de ayuda
+    const { data: ayudas } = await supabase
+      .from('solicitudes_ayuda')
+      .select('*')
+      .order('creado_en', { ascending: false })
+      .limit(10);
+
+    const conversationsMap: Map<string, Conversation> = new Map();
+
+    // Agregar atenciones pendientes primero (Prioridad Alta)
+    (atenciones || []).forEach((at, idx) => {
+      const cleanPhone = at.telefono.replace('@lid', '').replace('@c.us', '');
+      const isPending = at.status === 'pendiente';
+      const status: LeadStatus = isPending ? 'escalated' : 'closed';
+      const statusLabel = isPending ? 'Atención Requerida' : 'Atendido';
+
+      const msgs: ChatMessage[] = [
+        {
+          sender: 'client',
+          text: at.motivo || 'Hola, requiero comunicarme con un asesor de la ferretería.',
+          time: new Date(at.creado_en).toLocaleTimeString('es-VE', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+        },
+      ];
+
+      if (at.atendido_en) {
+        msgs.push({
+          sender: 'agent',
+          text: '👨🏻‍🔧 Atención tomada por el asesor de mostrador.',
+          time: new Date(at.atendido_en).toLocaleTimeString('es-VE', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          latency: '0.8s',
+          cost: '$0.0000',
         });
       }
-    } catch {
-      // WAHA tunnel offline o reiniciando, fallback transparente
-    }
 
-    // 3. Mapear o enriquecer conversaciones con tipado exacto
-    if (dbSessions && dbSessions.length > 0) {
-      const liveList: Conversation[] = dbSessions.map((s, idx) => {
-        const tel = s.telefono;
-        const matchingAtencion = atenciones?.find((a) => a.telefono === tel);
-        const wahaChat = wahaChatsMap[tel];
+      conversationsMap.set(cleanPhone, {
+        id: `atencion-${at.id || idx}`,
+        name: at.nombre || `Cliente (+${cleanPhone.slice(-4)})`,
+        phone: cleanPhone.startsWith('+') ? cleanPhone : `+${cleanPhone}`,
+        status,
+        statusLabel,
+        score: isPending ? 98 : 80,
+        silentMode: isPending,
+        lastTime: new Date(at.creado_en).toLocaleTimeString('es-VE', {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        intent: at.motivo?.includes('RESERVA')
+          ? 'Reserva de Material'
+          : 'Atención Personalizada en Mostrador',
+        budget: at.motivo?.includes('RESERVA') ? '$ Divisas / Bs.' : '$ —',
+        schedule: 'Retiro en Tienda (Mene Mauroa)',
+        messages: msgs,
+      });
+    });
 
-        const isManual = s.estado === 'manual' || Boolean(matchingAtencion);
-        const status: LeadStatus = isManual ? 'escalated' : 'in-progress';
-        const statusLabel = isManual ? 'Atención Humana' : 'En Atención (IA)';
-
+    // Agregar solicitudes de ayuda
+    (ayudas || []).forEach((ay) => {
+      const cleanPhone = ay.telefono.replace('@lid', '').replace('@c.us', '');
+      if (!conversationsMap.has(cleanPhone)) {
+        const isSent = ay.status === 'enviado';
         const msgs: ChatMessage[] = [
           {
             sender: 'client',
-            text: matchingAtencion?.motivo || wahaChat?.lastMessage?.body || 'Hola, buenos días',
-            time: new Date(s.updated_at).toLocaleTimeString('es-VE', {
+            text: ay.consulta || 'Consulta de inventario',
+            time: new Date(ay.creado_en).toLocaleTimeString('es-VE', {
               hour: '2-digit',
               minute: '2-digit',
             }),
-          },
-          {
-            sender: 'agent',
-            text: isManual
-              ? '👨🏻‍🔧 Un asesor de mostrador de Ferretería El Serrucho ha tomado tu chat.'
-              : '¡Hola! 👨🏻‍🔧 Te atiende Perucho de Ferretería El Serrucho. ¿En qué te puedo colaborar hoy?',
-            time: new Date(s.updated_at).toLocaleTimeString('es-VE', {
-              hour: '2-digit',
-              minute: '2-digit',
-            }),
-            latency: '1.2s',
-            cost: '$0.0000',
           },
         ];
 
-        return {
-          id: `conv-db-${idx + 1}`,
-          name: matchingAtencion?.nombre || wahaChat?.name || `Cliente (${tel.slice(-4)})`,
-          phone: tel.startsWith('+') ? tel : `+${tel}`,
-          status,
-          statusLabel,
-          score: isManual ? 95 : 75,
+        if (ay.enviado_en) {
+          msgs.push({
+            sender: 'agent',
+            text: '👨🏻‍🔧 ' + (ay.no_disponible ? 'El producto solicitado no está disponible.' : 'Cotización enviada al cliente.'),
+            time: new Date(ay.enviado_en).toLocaleTimeString('es-VE', {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+            latency: '1.4s',
+            cost: '$0.0000',
+          });
+        }
+
+        conversationsMap.set(cleanPhone, {
+          id: `ayuda-${ay.id}`,
+          name: ay.nombre || `Cliente (+${cleanPhone.slice(-4)})`,
+          phone: cleanPhone.startsWith('+') ? cleanPhone : `+${cleanPhone}`,
+          status: isSent ? 'in-progress' : 'escalated',
+          statusLabel: isSent ? 'Cotización Enviada' : 'Ayuda Solicitada',
+          score: 88,
+          silentMode: false,
+          lastTime: new Date(ay.creado_en).toLocaleTimeString('es-VE', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          intent: 'Consulta de Producto Especial',
+          budget: '$ —',
+          schedule: 'Retiro en Tienda',
+          messages: msgs,
+        });
+      }
+    });
+
+    // Agregar sesiones generales de chat
+    (sessions || []).forEach((s) => {
+      const cleanPhone = String(s.telefono || '').replace('@lid', '').replace('@c.us', '');
+      if (cleanPhone && cleanPhone !== 'undefined' && !conversationsMap.has(cleanPhone)) {
+        const isManual = s.estado === 'manual';
+        conversationsMap.set(cleanPhone, {
+          id: `session-${s.id || cleanPhone}`,
+          name: `Cliente (+${cleanPhone.slice(-4)})`,
+          phone: cleanPhone.startsWith('+') ? cleanPhone : `+${cleanPhone}`,
+          status: isManual ? 'escalated' : 'in-progress',
+          statusLabel: isManual ? 'Modo Manual' : 'IA Activa (Perucho)',
+          score: 75,
           silentMode: isManual,
           lastTime: new Date(s.updated_at).toLocaleTimeString('es-VE', {
             hour: '2-digit',
             minute: '2-digit',
           }),
-          intent: isManual ? 'Atención Humana Solicitada' : 'Consulta de Inventario y Precios',
+          intent: 'Consulta de Inventario y Precios',
           budget: '$ —',
-          schedule: 'Retiro en Tienda (Mene Mauroa)',
-          messages: msgs,
-        };
-      });
+          schedule: 'Retiro en Tienda',
+          messages: [
+            {
+              sender: 'client',
+              text: 'Buenas tardes, tienen disponibilidad de materiales?',
+              time: new Date(s.updated_at).toLocaleTimeString('es-VE', {
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+            },
+            {
+              sender: 'agent',
+              text: '¡Hola! 👨🏻‍🔧 Te atiende Perucho de Ferretería El Serrucho. Contamos con 7.650 SKUs en inventario. ¿Qué material necesitas cotizar?',
+              time: new Date(s.updated_at).toLocaleTimeString('es-VE', {
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+              latency: '0.9s',
+              cost: '$0.0000',
+            },
+          ],
+        });
+      }
+    });
 
-      return NextResponse.json(liveList);
+    const realList = Array.from(conversationsMap.values());
+    if (realList.length > 0) {
+      return NextResponse.json(realList);
     }
 
-    return NextResponse.json(localConversations);
-  } catch (error) {
-    return NextResponse.json(localConversations);
+    return NextResponse.json(INITIAL_CONVERSATIONS);
+  } catch (error: any) {
+    return NextResponse.json(INITIAL_CONVERSATIONS);
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { action, conversationId, message, phone, silentMode } = body;
+    const { action, phone, silentMode, message } = body;
 
-    // Alternar Silent Mode / Handoff Manual en Supabase
-    if (action === 'toggle_silent') {
-      const cleanPhone = String(phone || '').replace(/[^\d]/g, '');
-      if (cleanPhone) {
-        try {
-          await supabase.from('chat_sessions').upsert({
-            telefono: cleanPhone,
-            estado: silentMode ? 'manual' : 'automatico',
-            updated_at: new Date().toISOString(),
-          });
-        } catch {
-          // Ignorar error de red si Supabase está offline
-        }
-      }
+    const cleanPhone = String(phone || '').replace(/[^\d]/g, '');
 
-      localConversations = localConversations.map((c) =>
-        c.id === conversationId ? { ...c, silentMode: Boolean(silentMode) } : c
-      );
-      return NextResponse.json({ success: true, conversations: localConversations });
+    // 1. Alternar modo silencioso / manual en Supabase
+    if (action === 'toggle_silent' && cleanPhone) {
+      try {
+        await supabase.from('chat_sessions').upsert({
+          telefono: cleanPhone,
+          estado: silentMode ? 'manual' : 'automatico',
+          manual_since: silentMode ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
+        });
+      } catch {}
+
+      return NextResponse.json({ success: true, silentMode: Boolean(silentMode) });
     }
 
-    // Enviar mensaje real por WhatsApp vía túnel dinámico WAHA
-    if (action === 'send_message') {
-      let wahaDispatched = false;
-      const cleanPhone = String(phone || '').replace(/[^\d]/g, '');
-
-      if (cleanPhone && message?.text) {
-        const sendResult = await sendWahaTextMessage(cleanPhone, message.text);
-        wahaDispatched = sendResult.success;
-      }
-
-      localConversations = localConversations.map((c) => {
-        if (c.id === conversationId) {
-          const updatedMessages: ChatMessage[] = [...c.messages, message];
-          return {
-            ...c,
-            lastTime: message.time || 'Ahora',
-            messages: updatedMessages,
-          };
-        }
-        return c;
-      });
-
+    // 2. Enviar mensaje real a WhatsApp vía WAHA
+    if (action === 'send_message' && cleanPhone && message?.text) {
+      const sendResult = await sendWahaTextMessage(cleanPhone, message.text);
       return NextResponse.json({
-        success: true,
-        wahaDispatched,
-        conversations: localConversations,
+        success: sendResult.success,
+        wahaDispatched: sendResult.success,
+        error: sendResult.error,
       });
     }
 
-    return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+    return NextResponse.json({ error: 'Acción no reconocida' }, { status: 400 });
   } catch (error: any) {
     return NextResponse.json(
-      { error: 'Failed to process conversation update', details: error.message },
+      { error: 'Error procesando solicitud', details: error.message },
       { status: 500 }
     );
   }
