@@ -78,10 +78,10 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) 
         </svg>
         <div>
           <div className="font-mono text-[13px] font-semibold uppercase tracking-wider text-chalk">
-            HYPERSTUDIO // WHATSAPP AGENT FLIGHT DECK
+            {process.env.NEXT_PUBLIC_AGENT_NAME || 'PERUCHO'} // WHATSAPP AGENT FLIGHT DECK
           </div>
-          <div className="font-mono text-[10px] text-smoke mt-0.5">
-            TARGET: FERRETERÍA EL SERRUCHO · 33 NODES SYNCED · 7,650 SKUs
+          <div className="font-mono text-[10px] text-smoke mt-0.5 uppercase">
+            TARGET: {process.env.NEXT_PUBLIC_TARGET_NAME || 'FERRETERÍA EL SERRUCHO'} · 33 NODES SYNCED · 7,650 SKUs
           </div>
         </div>
       </div>

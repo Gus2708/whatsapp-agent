@@ -4,7 +4,7 @@ import { SoundProvider } from '@/components/audio/SoundProvider';
 import { BlueprintCanvas } from '@/components/hud/BlueprintCanvas';
 
 export const metadata: Metadata = {
-  title: 'WhatsApp Agent // Operational CRM & Control Flight Deck',
+  title: 'Perucho // WhatsApp CRM & Operational Flight Deck · Ferretería El Serrucho',
   description: 'Mission control, WhatsApp CRM, and RAG intelligence deck for Ferretería El Serrucho',
 };
 
