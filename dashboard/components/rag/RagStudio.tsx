@@ -439,8 +439,10 @@ export const RagStudio: React.FC = () => {
                   </div>
                 </div>
               ) : isLoading ? (
-                <div className="text-cyan-300 animate-pulse flex items-center gap-1.5 text-[10.5px]">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-cyan-400 animate-ping" />
+                <div className="text-cyan-300 animate-pulse flex items-center gap-2 text-[10.5px]">
+                  <div className="h-4 w-4 flex items-center justify-center flex-shrink-0">
+                    <ThinkingOrb state="searching_rag" size={64} showLabel={false} />
+                  </div>
                   <span>Evaluando capas en cascada secuencial...</span>
                 </div>
               ) : (

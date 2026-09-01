@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { CrosshairCard } from '@/components/hud/CrosshairCard';
+import { ThinkingOrb } from '@/components/orbs/ThinkingOrb';
 import {
   Server,
   Database,
@@ -204,17 +205,15 @@ export const MicroservicesTopologyCard: React.FC = () => {
           }`}
         >
           <div className="font-mono text-[9px] uppercase tracking-wider text-compass-gold flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {/* Tactical Orb Indicator (Larger & Glowing) */}
-              <div className="relative flex items-center justify-center h-4 w-4 flex-shrink-0">
-                {activeStage !== null ? (
-                  <>
-                    <span className="absolute inset-0 rounded-full bg-pulse-green/40 animate-ping" />
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-pulse-green shadow-[0_0_10px_rgba(152,255,56,0.9)] border border-white/70 animate-pulse" />
-                  </>
-                ) : (
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-compass-gold/50 border border-graphite" />
-                )}
+            <div className="flex items-center gap-2.5">
+              {/* ThinkingOrb from library */}
+              <div className="h-6 w-6 flex items-center justify-center flex-shrink-0">
+                <ThinkingOrb
+                  state={activeStage !== null ? 'searching_rag' : 'idle'}
+                  currentScanningLayer={activeStage !== null ? (Math.min(5, activeStage + 1) as 1 | 2 | 3 | 4 | 5) : null}
+                  size={64}
+                  showLabel={false}
+                />
               </div>
               <span>Flujo de Ejecución de Eventos en Tiempo Real</span>
             </div>

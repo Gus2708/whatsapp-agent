@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { ThinkingOrb } from '@/components/orbs/ThinkingOrb';
 import { LoginScreen } from './LoginScreen';
 
 interface AuthContextType {
@@ -77,11 +78,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSession(null);
   };
 
-  // Spinner de carga táctico perfectamente centrado en pantalla
+  // Carga táctica con ThinkingOrb de Jakub Antalik centrado en pantalla
   if (isLoading) {
     return (
-      <div className="flex-1 w-full h-full min-h-0 flex flex-col items-center justify-center gap-3 select-none">
-        <div className="h-9 w-9 rounded-full border-2 border-pulse-green/30 border-t-pulse-green animate-spin" />
+      <div className="flex-1 w-full h-full min-h-0 flex flex-col items-center justify-center gap-4 select-none">
+        <ThinkingOrb state="searching_rag" size={64} showLabel={false} />
         <div className="font-mono text-xs text-compass-gold tracking-widest uppercase animate-pulse">
           // VERIFICANDO CREDENCIALES SUPABASE AUTH...
         </div>

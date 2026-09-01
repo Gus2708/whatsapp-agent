@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { CrosshairCard } from '@/components/hud/CrosshairCard';
 import { useSound } from '@/components/audio/SoundProvider';
+import { ThinkingOrb } from '@/components/orbs/ThinkingOrb';
 import { Shield, Lock, Mail, Eye, EyeOff, ArrowRight, AlertTriangle, KeyRound } from 'lucide-react';
 
 interface LoginScreenProps {
@@ -153,10 +154,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               }`}
             >
               {isLoading ? (
-                <>
-                  <span className="inline-block h-3 w-3 rounded-full border-2 border-pulse-green border-t-transparent animate-spin" />
+                <div className="flex items-center gap-2">
+                  <div className="scale-50 origin-center -my-2 flex-shrink-0">
+                    <ThinkingOrb state="thinking_llm" size={64} showLabel={false} />
+                  </div>
                   <span>Verificando Credenciales...</span>
-                </>
+                </div>
               ) : (
                 <>
                   <span>Ingresar al Flight Deck</span>
