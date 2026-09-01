@@ -1,61 +1,114 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LogEntry } from '@/lib/types';
-import { INITIAL_LOGS } from '@/lib/constants';
 import { CrosshairCard } from '@/components/hud/CrosshairCard';
 import { useSound } from '@/components/audio/SoundProvider';
-import { Zap, Play } from 'lucide-react';
+import { Zap } from 'lucide-react';
 
 export const LiveLogStream: React.FC = () => {
-  const [logs, setLogs] = useState<LogEntry[]>(INITIAL_LOGS);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isInjecting, setIsInjecting] = useState(false);
-  const { playPacket, playSuccess } = useSound();
   const logContainerRef = useRef<HTMLDivElement | null>(null);
+  const { playPacket, playSuccess, playClick } = useSound();
+
+  useEffect(() => {
+    // Initial seeded logs
+    const initialLogs: LogEntry[] = [
+      {
+        id: '1',
+        time: '01:04:12',
+        tag: 'success',
+        tagLabel: '200 OK',
+        msg: 'Webhook ack <14ms · session: +584120938472',
+      },
+      {
+        id: '2',
+        time: '01:04:13',
+        tag: 'info',
+        tagLabel: 'LAYER 1',
+        msg: 'AST Regex matched: "Tornillo drywall 1/2" (SKU-4921)',
+      },
+      {
+        id: '3',
+        time: '01:04:13',
+        tag: 'success',
+        tagLabel: 'DISPATCH',
+        msg: 'Structured JSON validated with Pydantic · Dispatched via WAHA',
+      },
+    ];
+    setLogs(initialLogs);
+  }, []);
 
   const injectSimulatedEvent = () => {
     if (isInjecting) return;
     setIsInjecting(true);
+    playClick();
 
-    const phone = `+58 412-${Math.floor(100 + Math.random() * 900)}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const products = [
-      { name: 'Cemento Gris Tipo I 42.5kg', sku: 'SKU-1092', price: '$8.50' },
-      { name: 'Tornillo Drywall 1/2 Punta Broca', sku: 'SKU-4921', price: '$12.50' },
-      { name: 'Tubo Estructural 2x1 Calibre 16', sku: 'SKU-8812', price: '$14.20' },
-      { name: 'Protector de Voltaje Vitron 110V', sku: 'SKU-3011', price: '$28.00' },
+    const sampleProducts = [
+      { name: 'Tubo Estructural 2x1 Calibre 16', sku: 'SKU-8812', price: '14.20' },
+      { name: 'Cemento Gris Portland Tipo I (Saco 42.5kg)', sku: 'SKU-1049', price: '8.50' },
+      { name: 'Cabilla Estriada 1/2 pulgada (6m)', sku: 'SKU-3091', price: '7.80' },
+      { name: 'Pintura Caucho Blanco Mate Galón', sku: 'SKU-5540', price: '16.00' },
     ];
-    const selectedProd = products[Math.floor(Math.random() * products.length)];
+
+    const selectedProd = sampleProducts[Math.floor(Math.random() * sampleProducts.length)];
+    const phone = `+58 412-${Math.floor(100 + Math.random() * 900)}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const steps = [
       {
+        stageIndex: 0,
         tag: 'info' as const,
         tagLabel: 'INBOUND',
         msg: `Mensaje recibido de ${phone}: "¿Tienen disponible ${selectedProd.name}?"`,
         delay: 0,
       },
       {
+        stageIndex: 1,
         tag: 'success' as const,
         tagLabel: '200 OK',
         msg: `WAHA Webhook Ack <12ms · Payload verificado y deduplicado`,
-        delay: 200,
+        delay: 250,
       },
       {
+        stageIndex: 2,
+        tag: 'info' as const,
+        tagLabel: 'N8N DAG',
+        msg: `Orquestador n8n: Enrutamiento en nodo #14 (Procesar Mensaje Cliente)`,
+        delay: 550,
+      },
+      {
+        stageIndex: 3,
         tag: 'info' as const,
         tagLabel: 'LAYER 1 AST',
         msg: `Determinismo AST: Coincidencia exacta "${selectedProd.name}" (${selectedProd.sku}) en catálogo de 7.650 SKUs`,
-        delay: 500,
+        delay: 900,
       },
       {
+        stageIndex: 4,
+        tag: 'info' as const,
+        tagLabel: 'PYDANTIC',
+        msg: `Validación de esquema JSON: cotización formateada con moneda USD ($${selectedProd.price})`,
+        delay: 1300,
+      },
+      {
+        stageIndex: 5,
         tag: 'success' as const,
         tagLabel: 'DISPATCH',
-        msg: `JSON validado con Pydantic · Respuesta enviada a WhatsApp vía WAHA (${selectedProd.price} USD)`,
-        delay: 850,
+        msg: `Respuesta final enviada a WhatsApp vía WAHA (${selectedProd.price} USD) · Latencia total: 42ms`,
+        delay: 1700,
       },
     ];
 
     steps.forEach((step) => {
       setTimeout(() => {
         playPacket();
+
+        // Notificar al componente del flujo de ejecución (DAG)
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('pipeline-step', { detail: { stage: step.stageIndex } }));
+        }
+
         const now = new Date().toTimeString().slice(0, 8);
         const newLog: LogEntry = {
           id: `log-${Date.now()}-${Math.random()}`,
@@ -118,15 +171,15 @@ export const LiveLogStream: React.FC = () => {
       >
         {logs.map((log) => (
           <div key={log.id} className="flex items-start gap-3 border-b border-[#161616] pb-2 transition-all">
-            <span className="text-compass-gold flex-shrink-0 text-[11px]">{log.time}</span>
+            <span className="text-smoke/60 font-mono text-[11px] select-none">{log.time}</span>
             <span
-              className={`px-1.5 py-0.5 text-[9.5px] flex-shrink-0 font-medium ${getTagClass(
+              className={`font-mono text-[9px] uppercase px-1.5 py-0.5 flex-shrink-0 font-medium ${getTagClass(
                 log.tag
               )}`}
             >
               {log.tagLabel}
             </span>
-            <span className="text-[#d4d4d8] flex-1 break-words leading-relaxed">{log.msg}</span>
+            <span className="text-chalk font-mono text-[11.5px] leading-snug break-all">{log.msg}</span>
           </div>
         ))}
       </div>

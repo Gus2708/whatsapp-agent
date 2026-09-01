@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { CrosshairCard } from '@/components/hud/CrosshairCard';
 import {
   Server,
@@ -12,9 +12,38 @@ import {
   ShieldCheck,
   Radio,
   ArrowRight,
+  Sparkles,
 } from 'lucide-react';
 
 export const MicroservicesTopologyCard: React.FC = () => {
+  const [activeStage, setActiveStage] = useState<number | null>(null);
+
+  useEffect(() => {
+    let resetTimer: NodeJS.Timeout;
+
+    const handlePipelineStep = (e: Event) => {
+      const customEvent = e as CustomEvent<{ stage: number }>;
+      const stageIdx = customEvent.detail?.stage;
+      if (typeof stageIdx === 'number') {
+        setActiveStage(stageIdx);
+        clearTimeout(resetTimer);
+
+        if (stageIdx === 5) {
+          // Mantener iluminado el paso final y luego retornar a reposo
+          resetTimer = setTimeout(() => {
+            setActiveStage(null);
+          }, 3500);
+        }
+      }
+    };
+
+    window.addEventListener('pipeline-step', handlePipelineStep);
+    return () => {
+      window.removeEventListener('pipeline-step', handlePipelineStep);
+      clearTimeout(resetTimer);
+    };
+  }, []);
+
   const microservices = [
     {
       id: 'waha',
@@ -24,6 +53,7 @@ export const MicroservicesTopologyCard: React.FC = () => {
       latency: '<12ms Ack',
       detail: 'NOWEB Engine · Multi-Session',
       icon: Radio,
+      activeOnStages: [0, 5],
     },
     {
       id: 'n8n',
@@ -33,6 +63,7 @@ export const MicroservicesTopologyCard: React.FC = () => {
       latency: '4 Flujos Activos',
       detail: 'Deduplicación & Rate Limiter',
       icon: GitBranch,
+      activeOnStages: [1, 2],
     },
     {
       id: 'supabase',
@@ -42,6 +73,7 @@ export const MicroservicesTopologyCard: React.FC = () => {
       latency: '7.650 SKUs',
       detail: 'PostgreSQL 15 + pg_trgm GIN',
       icon: Database,
+      activeOnStages: [3],
     },
     {
       id: 'ai-engine',
@@ -51,6 +83,7 @@ export const MicroservicesTopologyCard: React.FC = () => {
       latency: 'Pydantic Output',
       detail: 'Recuperación de Fallos en Vivo',
       icon: BrainCircuit,
+      activeOnStages: [4],
     },
     {
       id: 'tunnels',
@@ -60,6 +93,7 @@ export const MicroservicesTopologyCard: React.FC = () => {
       latency: 'Heartbeat 30s',
       detail: 'Supabase tunnel_config Sync',
       icon: Cloud,
+      activeOnStages: [0, 1],
     },
     {
       id: 'catchup',
@@ -69,16 +103,17 @@ export const MicroservicesTopologyCard: React.FC = () => {
       latency: 'Zero Data Loss',
       detail: 'Tolerancia a Cortes Eléctricos',
       icon: Zap,
+      activeOnStages: [],
     },
   ];
 
   const pipelineStages = [
-    { label: 'WAHA Inbound', sub: 'Webhook' },
-    { label: 'Deduplicación', sub: '<12ms' },
-    { label: '33 Nodos n8n', sub: 'Pipeline' },
-    { label: 'RAG 5 Capas', sub: 'pgvector' },
-    { label: 'Pydantic Output', sub: 'JSON' },
-    { label: 'WAHA Dispatch', sub: 'WhatsApp' },
+    { label: 'WAHA Inbound', sub: 'Webhook', stageIdx: 0 },
+    { label: 'Deduplicación', sub: '<12ms', stageIdx: 1 },
+    { label: '33 Nodos n8n', sub: 'Pipeline', stageIdx: 2 },
+    { label: 'RAG 5 Capas', sub: 'pgvector', stageIdx: 3 },
+    { label: 'Pydantic Output', sub: 'JSON', stageIdx: 4 },
+    { label: 'WAHA Dispatch', sub: 'WhatsApp', stageIdx: 5 },
   ];
 
   return (
@@ -105,19 +140,33 @@ export const MicroservicesTopologyCard: React.FC = () => {
           {microservices.map((srv) => {
             const Icon = srv.icon;
             const isGold = srv.statusType === 'gold';
+            const isServicePulsing = activeStage !== null && srv.activeOnStages.includes(activeStage);
+
             return (
               <div
                 key={srv.id}
-                className="p-2.5 bg-[#080808] border border-graphite/80 hover:border-ash hover:bg-[#101010] transition-colors flex flex-col justify-between"
+                className={`p-2.5 border transition-all duration-300 flex flex-col justify-between ${
+                  isServicePulsing
+                    ? 'bg-pulse-green/15 border-pulse-green shadow-[0_0_16px_rgba(152,255,56,0.3)] ring-1 ring-pulse-green/50 scale-[1.02]'
+                    : 'bg-[#080808] border-graphite/80 hover:border-ash hover:bg-[#101010]'
+                }`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5 font-mono text-[9px] text-smoke uppercase truncate">
-                    <Icon className="h-3 w-3 text-compass-gold flex-shrink-0" />
-                    <span className="truncate">{srv.title}</span>
+                    <Icon
+                      className={`h-3 w-3 flex-shrink-0 ${
+                        isServicePulsing ? 'text-pulse-green animate-pulse' : 'text-compass-gold'
+                      }`}
+                    />
+                    <span className={`truncate ${isServicePulsing ? 'text-chalk font-semibold' : ''}`}>
+                      {srv.title}
+                    </span>
                   </div>
                   <span
-                    className={`font-mono text-[9px] px-1 py-0.2 border flex-shrink-0 ${
-                      isGold
+                    className={`font-mono text-[9px] px-1 py-0.2 border flex-shrink-0 transition-colors ${
+                      isServicePulsing
+                        ? 'text-pulse-green border-pulse-green bg-pulse-green/20 font-bold animate-pulse'
+                        : isGold
                         ? 'text-gold-bright border-gold-bright/30 bg-gold-bright/10'
                         : 'text-pulse-green border-pulse-green/30 bg-pulse-green/10'
                     }`}
@@ -129,7 +178,11 @@ export const MicroservicesTopologyCard: React.FC = () => {
                 <div>
                   <div
                     className={`text-[11.5px] font-medium truncate ${
-                      isGold ? 'text-compass-gold' : 'text-pulse-green'
+                      isServicePulsing
+                        ? 'text-pulse-green font-semibold'
+                        : isGold
+                        ? 'text-compass-gold'
+                        : 'text-pulse-green'
                     }`}
                   >
                     {srv.status}
@@ -144,28 +197,64 @@ export const MicroservicesTopologyCard: React.FC = () => {
         </div>
 
         {/* Interactive Linear DAG Pipeline Flow */}
-        <div className="p-2.5 bg-[#080808] border border-graphite flex flex-col gap-1.5 flex-shrink-0">
+        <div
+          className={`p-2.5 border transition-all duration-300 flex flex-col gap-1.5 flex-shrink-0 ${
+            activeStage !== null
+              ? 'bg-[#0e0e0e] border-compass-gold/60 shadow-[0_0_20px_rgba(212,175,55,0.15)]'
+              : 'bg-[#080808] border-graphite'
+          }`}
+        >
           <div className="font-mono text-[9px] uppercase tracking-wider text-compass-gold flex items-center justify-between">
-            <span>Flujo de Ejecución de Eventos en Tiempo Real</span>
-            <span className="text-smoke">Latencia Total ~42ms</span>
+            <span className="flex items-center gap-1.5">
+              {activeStage !== null && <Sparkles className="h-3 w-3 text-pulse-green animate-spin" />}
+              <span>Flujo de Ejecución de Eventos en Tiempo Real</span>
+            </span>
+            <span className={activeStage !== null ? 'text-pulse-green font-bold animate-pulse' : 'text-smoke'}>
+              {activeStage !== null ? `Paso ${activeStage + 1}/6 en proceso...` : 'Latencia Total ~42ms'}
+            </span>
           </div>
 
           <div className="flex items-center justify-between gap-1 overflow-x-auto py-1">
-            {pipelineStages.map((stage, idx) => (
-              <React.Fragment key={stage.label}>
-                <div className="flex flex-col items-center bg-[#141414] border border-graphite px-2 py-1 flex-1 min-w-[70px] text-center">
-                  <span className="font-mono text-[9.5px] text-chalk font-medium truncate w-full">
-                    {stage.label}
-                  </span>
-                  <span className="font-mono text-[8.5px] text-pulse-green truncate">
-                    {stage.sub}
-                  </span>
-                </div>
-                {idx < pipelineStages.length - 1 && (
-                  <ArrowRight className="h-2.5 w-2.5 text-smoke flex-shrink-0" />
-                )}
-              </React.Fragment>
-            ))}
+            {pipelineStages.map((stage, idx) => {
+              const isStageActive = activeStage === stage.stageIdx;
+              const isStagePassed = activeStage !== null && activeStage > stage.stageIdx;
+
+              return (
+                <React.Fragment key={stage.label}>
+                  <div
+                    className={`flex flex-col items-center px-2 py-1 flex-1 min-w-[70px] text-center border transition-all duration-200 ${
+                      isStageActive
+                        ? 'bg-pulse-green/20 border-pulse-green text-pulse-green shadow-[0_0_16px_rgba(152,255,56,0.35)] scale-105 font-semibold ring-1 ring-pulse-green'
+                        : isStagePassed
+                        ? 'bg-emerald-950/30 border-emerald-800 text-emerald-300'
+                        : 'bg-[#141414] border-graphite text-chalk'
+                    }`}
+                  >
+                    <span
+                      className={`font-mono text-[9.5px] font-medium truncate w-full ${
+                        isStageActive ? 'text-pulse-green font-bold' : isStagePassed ? 'text-emerald-300' : 'text-chalk'
+                      }`}
+                    >
+                      {stage.label}
+                    </span>
+                    <span
+                      className={`font-mono text-[8.5px] truncate ${
+                        isStageActive ? 'text-pulse-green font-bold animate-pulse' : isStagePassed ? 'text-emerald-400' : 'text-pulse-green'
+                      }`}
+                    >
+                      {stage.sub}
+                    </span>
+                  </div>
+                  {idx < pipelineStages.length - 1 && (
+                    <ArrowRight
+                      className={`h-2.5 w-2.5 flex-shrink-0 transition-colors ${
+                        isStageActive || isStagePassed ? 'text-pulse-green animate-pulse' : 'text-smoke'
+                      }`}
+                    />
+                  )}
+                </React.Fragment>
+              );
+            })}
           </div>
         </div>
 
