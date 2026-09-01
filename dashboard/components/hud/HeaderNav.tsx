@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { TabType } from '@/lib/types';
 import { useSound } from '@/components/audio/SoundProvider';
-import { Volume2, VolumeX, Cloud } from 'lucide-react';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { Volume2, VolumeX, Cloud, LogOut, User as UserIcon } from 'lucide-react';
 import {
   MotionFlightIcon,
   MotionCrmIcon,
@@ -19,6 +20,7 @@ interface HeaderNavProps {
 
 export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) => {
   const { soundEnabled, toggleSound, playClick } = useSound();
+  const { user, signOut } = useAuth();
   const [tunnels, setTunnels] = useState<{
     wahaOnline: boolean;
     n8nOnline: boolean;
@@ -48,10 +50,15 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) 
   const handleTabClick = (tab: TabType) => {
     try {
       playClick();
-    } catch {
-      // Audio never blocks tab switching
-    }
+    } catch {}
     onSelectTab(tab);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      playClick();
+      await signOut();
+    } catch {}
   };
 
   const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
@@ -63,11 +70,11 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) 
   ];
 
   return (
-    <header className="sticky top-4 z-50 mb-6 flex flex-wrap items-center justify-between gap-4 border border-graphite bg-[#0e0e0e]/95 p-4 backdrop-blur-xl pointer-events-auto">
+    <header className="sticky top-2 z-50 mb-3 flex flex-wrap items-center justify-between gap-3 border border-graphite bg-[#0e0e0e]/95 px-3.5 py-2.5 backdrop-blur-xl pointer-events-auto">
       {/* Brand & Mission Status */}
-      <div className="flex items-center gap-3.5 select-none">
+      <div className="flex items-center gap-3 select-none">
         <svg
-          className="h-[18px] w-[18px] animate-slow-spin text-compass-gold"
+          className="h-[18px] w-[18px] animate-slow-spin text-compass-gold flex-shrink-0"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -77,11 +84,11 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) 
           <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
         </svg>
         <div>
-          <div className="font-mono text-[13px] font-semibold uppercase tracking-wider text-chalk">
+          <div className="font-mono text-[12.5px] font-semibold uppercase tracking-wider text-chalk">
             {process.env.NEXT_PUBLIC_AGENT_NAME || 'PERUCHO'} // WHATSAPP AGENT FLIGHT DECK
           </div>
-          <div className="font-mono text-[10px] text-smoke mt-0.5 uppercase">
-            TARGET: {process.env.NEXT_PUBLIC_TARGET_NAME || 'FERRETERÍA EL SERRUCHO'} · 33 NODES SYNCED · 7,650 SKUs
+          <div className="font-mono text-[9.5px] text-smoke uppercase">
+            TARGET: {process.env.NEXT_PUBLIC_TARGET_NAME || 'FERRETERÍA EL SERRUCHO'} · 33 NODES · 7,650 SKUs
           </div>
         </div>
       </div>
@@ -95,7 +102,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) 
               key={tab.id}
               type="button"
               onClick={() => handleTabClick(tab.id)}
-              className={`group flex items-center gap-2 px-3.5 py-1.5 font-mono text-xs transition-all duration-150 whitespace-nowrap cursor-pointer select-none ${
+              className={`group flex items-center gap-1.5 px-3 py-1 font-mono text-xs transition-all duration-150 whitespace-nowrap cursor-pointer select-none ${
                 isActive
                   ? 'border border-signal-white bg-signal-white font-semibold text-obsidian shadow-[0_2px_8px_rgba(255,255,255,0.15)]'
                   : 'border border-transparent text-smoke hover:border-graphite hover:bg-white/[0.06] hover:text-chalk active:scale-95'
@@ -108,14 +115,14 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) 
         })}
       </nav>
 
-      {/* Controls, Tunnels & Live Badge */}
-      <div className="flex items-center gap-2.5">
-        {/* Dynamic Cloudflare Tunnel Status Indicator */}
+      {/* Controls, Tunnels, User Profile & Live Badge */}
+      <div className="flex items-center gap-2">
+        {/* Dynamic Cloudflare Tunnel Status */}
         <div
-          className="hidden sm:inline-flex items-center gap-2 border border-graphite bg-[#111111] px-2.5 py-1.5 font-mono text-[11px] text-smoke"
+          className="hidden xl:inline-flex items-center gap-1.5 border border-graphite bg-[#111111] px-2 py-1 font-mono text-[10.5px] text-smoke"
           title="Túneles Cloudflare dinámicos consultados desde Supabase"
         >
-          <Cloud className="h-3.5 w-3.5 text-compass-gold" />
+          <Cloud className="h-3 w-3 text-compass-gold" />
           <span className="flex items-center gap-1">
             WAHA:
             <span
@@ -135,28 +142,47 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) 
           </span>
         </div>
 
+        {/* Audio Toggle */}
         <button
           type="button"
           onClick={toggleSound}
-          className="flex items-center gap-1.5 border border-graphite bg-[#141414] px-2.5 py-1.5 font-mono text-[11px] text-smoke transition-colors hover:border-ash hover:text-chalk cursor-pointer"
+          className="flex items-center gap-1 border border-graphite bg-[#141414] px-2 py-1 font-mono text-[10.5px] text-smoke transition-colors hover:border-ash hover:text-chalk cursor-pointer"
           title="Alternar sintetizador de sonido"
         >
           {soundEnabled ? (
             <>
-              <Volume2 className="h-3.5 w-3.5 text-pulse-green" />
-              <span>AUDIO: ON</span>
+              <Volume2 className="h-3 w-3 text-pulse-green" />
+              <span className="hidden sm:inline">AUDIO</span>
             </>
           ) : (
             <>
-              <VolumeX className="h-3.5 w-3.5 text-smoke" />
-              <span>AUDIO: MUTED</span>
+              <VolumeX className="h-3 w-3 text-smoke" />
+              <span className="hidden sm:inline">MUTED</span>
             </>
           )}
         </button>
 
-        <div className="inline-flex items-center gap-1.5 border border-pulse-green/25 bg-pulse-green/[0.08] px-2 py-1 font-mono text-[11px] text-pulse-green select-none">
+        {/* User Session & Logout */}
+        {user && (
+          <div className="flex items-center gap-1.5 border border-graphite bg-[#111111] px-2 py-1 font-mono text-[10.5px]">
+            <UserIcon className="h-3 w-3 text-compass-gold flex-shrink-0" />
+            <span className="text-chalk max-w-[120px] truncate hidden md:inline" title={user.email}>
+              {user.email?.split('@')[0]}
+            </span>
+            <button
+              onClick={handleSignOut}
+              className="text-smoke hover:text-neon-rose ml-1 transition-colors cursor-pointer"
+              title="Cerrar sesión de Supabase Auth"
+            >
+              <LogOut className="h-3 w-3" />
+            </button>
+          </div>
+        )}
+
+        {/* Live Badge */}
+        <div className="inline-flex items-center gap-1.5 border border-pulse-green/25 bg-pulse-green/[0.08] px-2 py-1 font-mono text-[10.5px] text-pulse-green select-none">
           <span className="h-1.5 w-1.5 rounded-full bg-pulse-green shadow-[0_0_8px_var(--color-pulse-green)] animate-pulse-glow" />
-          <span>LIVE RUNTIME</span>
+          <span>LIVE</span>
         </div>
       </div>
     </header>

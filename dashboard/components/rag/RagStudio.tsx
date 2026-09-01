@@ -151,7 +151,7 @@ export const RagStudio: React.FC = () => {
         )
       );
     } catch {
-      setOrbState('alert');
+      setOrbState('error');
       setHistoryItems((prev) =>
         prev.map((item) => (item.id === itemId ? { ...item, status: 'error' } : item))
       );
