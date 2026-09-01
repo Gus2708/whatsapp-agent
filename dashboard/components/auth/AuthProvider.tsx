@@ -10,6 +10,8 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   isLoading: boolean;
+  isDemoMode: boolean;
+  enterDemoMode: () => void;
   signOut: () => Promise<void>;
 }
 
@@ -17,6 +19,8 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
   isLoading: true,
+  isDemoMode: false,
+  enterDemoMode: () => {},
   signOut: async () => {},
 });
 
@@ -26,9 +30,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
+
+    // Verificar si el usuario estaba previamente en modo demo
+    if (typeof window !== 'undefined') {
+      const savedDemo = localStorage.getItem('perucho_demo_mode');
+      if (savedDemo === 'true') {
+        setIsDemoMode(true);
+        const demoUser: User = {
+          id: 'demo-guest-recruiter',
+          app_metadata: {},
+          user_metadata: { full_name: 'Recruiter / Tech Lead Guest' },
+          aud: 'authenticated',
+          created_at: new Date().toISOString(),
+          email: 'recruiter@demo.guest',
+        };
+        setUser(demoUser);
+        setSession({
+          access_token: 'demo-token',
+          refresh_token: 'demo-refresh',
+          expires_in: 86400,
+          token_type: 'bearer',
+          user: demoUser,
+        });
+        setIsLoading(false);
+        return;
+      }
+    }
 
     // Timeout de seguridad: Nunca congelar la pantalla más de 600ms
     const safetyTimer = setTimeout(() => {
@@ -58,8 +89,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!isMounted) return;
-      setSession(session);
-      setUser(session?.user ?? null);
+      if (!isDemoMode) {
+        setSession(session);
+        setUser(session?.user ?? null);
+      }
       setIsLoading(false);
     });
 
@@ -68,9 +101,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [isDemoMode]);
+
+  const enterDemoMode = () => {
+    setIsDemoMode(true);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('perucho_demo_mode', 'true');
+    }
+    const demoUser: User = {
+      id: 'demo-guest-recruiter',
+      app_metadata: {},
+      user_metadata: { full_name: 'Recruiter / Tech Lead Guest' },
+      aud: 'authenticated',
+      created_at: new Date().toISOString(),
+      email: 'recruiter@demo.guest',
+    };
+    setUser(demoUser);
+    setSession({
+      access_token: 'demo-token',
+      refresh_token: 'demo-refresh',
+      expires_in: 86400,
+      token_type: 'bearer',
+      user: demoUser,
+    });
+  };
 
   const signOut = async () => {
+    if (isDemoMode) {
+      setIsDemoMode(false);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('perucho_demo_mode');
+      }
+      setUser(null);
+      setSession(null);
+      return;
+    }
     try {
       await supabase.auth.signOut();
     } catch {}
@@ -78,7 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSession(null);
   };
 
-  // Carga táctica con ThinkingOrb de Jakub Antalik centrado en pantalla
+  // Carga táctica con ThinkingOrb centrado en pantalla
   if (isLoading) {
     return (
       <div className="flex-1 w-full h-full min-h-0 flex flex-col items-center justify-center gap-4 select-none">
@@ -90,17 +155,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   }
 
-  // Si no hay sesión activa, renderizar la pantalla de login centrada
-  if (!session || !user) {
+  // Si no hay sesión activa ni modo demo, renderizar la pantalla de login
+  if ((!session || !user) && !isDemoMode) {
     return (
       <div className="flex-1 w-full h-full min-h-0 flex flex-col items-center justify-center">
-        <LoginScreen />
+        <LoginScreen onEnterDemo={enterDemoMode} />
       </div>
     );
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, isLoading, signOut }}>
+    <AuthContext.Provider value={{ user, session, isLoading, isDemoMode, enterDemoMode, signOut }}>
       {children}
     </AuthContext.Provider>
   );

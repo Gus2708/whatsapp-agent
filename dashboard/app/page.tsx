@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import gsap from 'gsap';
 import { TabType, Conversation, ChatMessage } from '@/lib/types';
 import { INITIAL_CONVERSATIONS } from '@/lib/constants';
+import { DEMO_CONVERSATIONS } from '@/lib/demoData';
 import { HeaderNav } from '@/components/hud/HeaderNav';
 import { KpiMatrix } from '@/components/telemetry/KpiMatrix';
 import { LiveLogStream } from '@/components/telemetry/LiveLogStream';
@@ -14,20 +15,34 @@ import { LeadDetailsPane } from '@/components/crm/LeadDetailsPane';
 import { RagStudio } from '@/components/rag/RagStudio';
 import { N8nVisualizer } from '@/components/n8n/N8nVisualizer';
 import { DevOpsConsole } from '@/components/devops/DevOpsConsole';
-import { CrosshairCard } from '@/components/hud/CrosshairCard';
 import { useSound } from '@/components/audio/SoundProvider';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 export default function FlightDeckDashboard() {
+  const { isDemoMode } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('flight');
-  const [conversations, setConversations] = useState<Conversation[]>(INITIAL_CONVERSATIONS);
-  const [selectedConversationId, setSelectedConversationId] = useState<string>('');
+  const [conversations, setConversations] = useState<Conversation[]>(
+    isDemoMode ? DEMO_CONVERSATIONS : INITIAL_CONVERSATIONS
+  );
+  const [selectedConversationId, setSelectedConversationId] = useState<string>(
+    isDemoMode ? DEMO_CONVERSATIONS[0].id : INITIAL_CONVERSATIONS[0]?.id || ''
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const { toggleSound, playPacket, playSuccess } = useSound();
   const viewContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Cargar conversaciones reales desde Supabase y WAHA
+  // Sincronizar datos si cambia el estado de Demo Mode
+  useEffect(() => {
+    if (isDemoMode) {
+      setConversations(DEMO_CONVERSATIONS);
+      setSelectedConversationId(DEMO_CONVERSATIONS[0].id);
+    }
+  }, [isDemoMode]);
+
+  // Cargar conversaciones reales desde Supabase y WAHA si no está en modo demo
   const fetchConversations = useCallback(async () => {
+    if (isDemoMode) return;
     try {
       const res = await fetch('/api/conversations');
       if (res.ok) {
@@ -43,7 +58,7 @@ export default function FlightDeckDashboard() {
     } catch {
       // Usar datos locales si hay error de red
     }
-  }, []);
+  }, [isDemoMode]);
 
   useEffect(() => {
     fetchConversations();
@@ -85,7 +100,9 @@ export default function FlightDeckDashboard() {
   }, [toggleSound]);
 
   const selectedConversation =
-    conversations.find((c) => c.id === selectedConversationId) || conversations[0] || INITIAL_CONVERSATIONS[0];
+    conversations.find((c) => c.id === selectedConversationId) ||
+    conversations[0] ||
+    DEMO_CONVERSATIONS[0];
 
   const handleToggleSilentMode = async (convId: string) => {
     const targetConv = conversations.find((c) => c.id === convId);
@@ -98,6 +115,8 @@ export default function FlightDeckDashboard() {
         c.id === convId ? { ...c, silentMode: newSilentState } : c
       )
     );
+
+    if (isDemoMode) return;
 
     try {
       await fetch('/api/conversations', {
@@ -136,6 +155,37 @@ export default function FlightDeckDashboard() {
     );
 
     playPacket();
+
+    // En Modo Demo: simular respuesta del agente Perucho en ~600ms
+    if (isDemoMode) {
+      setTimeout(() => {
+        const botResponses = [
+          '¡Con gusto! El producto solicitado se encuentra disponible en inventario para entrega inmediata. Aceptamos Pago Móvil a tasa BCV, Zelle y transferencias.',
+          'Entendido. He registrado tu pedido en el sistema. ¿Deseas coordinar el retiro en tienda física o despacho en camión?',
+          'Cotización verificada en catálogo de 7.650 SKUs. Precios exactos de base de datos sin recargos sorpresa.',
+        ];
+        const randomResp = botResponses[Math.floor(Math.random() * botResponses.length)];
+        const botMsg: ChatMessage = {
+          sender: 'agent',
+          text: randomResp,
+          time: new Date().toTimeString().slice(0, 5),
+          latency: '14ms',
+          cost: '$0.0000',
+        };
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === convId
+              ? {
+                  ...c,
+                  messages: [...c.messages, botMsg],
+                }
+              : c
+          )
+        );
+        playSuccess();
+      }, 600);
+      return;
+    }
 
     try {
       const res = await fetch('/api/conversations', {

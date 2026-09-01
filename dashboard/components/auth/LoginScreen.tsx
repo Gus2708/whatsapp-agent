@@ -9,9 +9,10 @@ import { Shield, Lock, Mail, Eye, EyeOff, ArrowRight, AlertTriangle, KeyRound } 
 
 interface LoginScreenProps {
   onLoginSuccess?: () => void;
+  onEnterDemo?: () => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onEnterDemo }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -169,8 +170,39 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             </button>
           </form>
 
+          {/* Recruiter / Tech Lead Direct Demo Access */}
+          {onEnterDemo && (
+            <div className="mt-5 pt-4 border-t border-graphite/60 flex flex-col gap-2">
+              <div className="flex items-center justify-between font-mono text-[9px] text-smoke uppercase">
+                <span className="text-compass-gold flex items-center gap-1">
+                  <span>⚡</span> RECRUITER / TECH EVALUATOR
+                </span>
+                <span className="text-emerald-400">1-CLICK ACCESS</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  playSuccess();
+                  onEnterDemo();
+                }}
+                className="w-full py-2 px-3 bg-[#111111] hover:bg-[#181818] border border-compass-gold/50 hover:border-compass-gold text-compass-gold hover:text-chalk font-mono text-[11px] font-semibold uppercase tracking-wider flex items-center justify-between transition-all shadow-[0_0_15px_rgba(212,175,55,0.1)] group cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-pulse-green animate-pulse" />
+                  <span>Explorar Modo Demo Interactivo</span>
+                </div>
+                <span className="text-[10px] text-smoke group-hover:text-pulse-green transition-colors">
+                  [ SIN CREDENCIALES ] →
+                </span>
+              </button>
+              <p className="font-mono text-[8.5px] text-smoke/70 text-center leading-tight">
+                Datos anonimizados · 5 Capas RAG · 33 Nodos n8n · Telemetría en Vivo
+              </p>
+            </div>
+          )}
+
           {/* Footer Security Notice */}
-          <div className="mt-6 pt-4 border-t border-graphite/40 flex items-center justify-between font-mono text-[9.5px] text-smoke">
+          <div className="mt-4 pt-3 border-t border-graphite/30 flex items-center justify-between font-mono text-[9.5px] text-smoke">
             <span className="flex items-center gap-1.5">
               <Lock className="h-3 w-3 text-compass-gold" />
               <span>TLS 1.3 / JWT Encrypted</span>
