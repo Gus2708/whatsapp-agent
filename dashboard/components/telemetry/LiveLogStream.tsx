@@ -93,15 +93,15 @@ export const LiveLogStream: React.FC = () => {
   };
 
   return (
-    <CrosshairCard className="p-6 bg-[#0c0c0c]">
-      <div className="flex justify-between items-center mb-3">
-        <span className="font-mono text-[11px] uppercase tracking-wider text-compass-gold">
+    <CrosshairCard className="p-4 bg-[#0c0c0c] h-full max-h-full min-h-0 flex flex-col flex-1">
+      <div className="flex justify-between items-center mb-2.5 flex-shrink-0">
+        <span className="font-mono text-[10.5px] uppercase tracking-wider text-compass-gold">
           // RUNTIME LOG STREAM
         </span>
         <button
           onClick={injectSimulatedEvent}
           disabled={isInjecting}
-          className={`inline-flex items-center gap-1.5 border px-3 py-1 font-mono text-[10.5px] uppercase font-semibold transition-all cursor-pointer ${
+          className={`inline-flex items-center gap-1.5 border px-2.5 py-0.5 font-mono text-[10px] uppercase font-semibold transition-all cursor-pointer ${
             isInjecting
               ? 'border-pulse-green bg-pulse-green/15 text-pulse-green animate-pulse'
               : 'border-compass-gold/50 bg-compass-gold/10 text-compass-gold hover:bg-compass-gold/20 hover:border-compass-gold'
@@ -114,7 +114,7 @@ export const LiveLogStream: React.FC = () => {
 
       <div
         ref={logContainerRef}
-        className="h-[360px] overflow-y-auto bg-[#080808] border border-graphite p-3.5 font-mono text-xs flex flex-col gap-2.5 scrollbar-thin"
+        className="flex-1 overflow-y-auto bg-[#080808] border border-graphite p-3 font-mono text-xs flex flex-col gap-2 min-h-0"
       >
         {logs.map((log) => (
           <div key={log.id} className="flex items-start gap-3 border-b border-[#161616] pb-2 transition-all">

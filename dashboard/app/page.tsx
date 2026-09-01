@@ -166,75 +166,77 @@ export default function FlightDeckDashboard() {
       <div ref={viewContainerRef} className="flex-1 min-h-0 flex flex-col w-full max-w-full overflow-x-hidden">
         {/* VIEW 1: FLIGHT DECK */}
         {activeTab === 'flight' && (
-          <div className="space-y-6 overflow-y-auto pb-6">
-            <div className="mb-4">
-              <span className="font-mono text-[11px] text-compass-gold uppercase tracking-wider block mb-1">
+          <div className="flex flex-col h-[calc(100vh-85px)] max-h-[calc(100vh-85px)] justify-between overflow-hidden gap-3 min-h-0 pb-1">
+            <div className="flex-shrink-0">
+              <span className="font-mono text-[10px] text-compass-gold uppercase tracking-wider block mb-0.5">
                 // GLOBAL TELEMETRY & FLIGHT RADAR
               </span>
-              <h2 className="text-2xl font-normal text-chalk tracking-tight">
+              <h2 className="text-xl font-normal text-chalk tracking-tight">
                 Métricas Operativas del Agente en Producción
               </h2>
             </div>
 
             <KpiMatrix />
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 flex-1 min-h-0 overflow-hidden">
               {/* Architecture & Topology Card */}
-              <CrosshairCard className="lg:col-span-7 p-6 bg-[#0c0c0c] flex flex-col justify-between">
-                <div>
-                  <span className="font-mono text-[10.5px] uppercase tracking-wider text-compass-gold block mb-1">
-                    // RESILIENCE & RUNTIME TOPOLOGY
-                  </span>
-                  <h3 className="text-lg font-normal text-chalk mb-3">
-                    Topología de Microservicios en Producción
-                  </h3>
+              <CrosshairCard className="lg:col-span-7 p-4 bg-[#0c0c0c] flex flex-col justify-between h-full max-h-full min-h-0 overflow-hidden">
+                <div className="flex flex-col justify-between h-full">
+                  <div>
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-compass-gold block mb-0.5">
+                      // RESILIENCE & RUNTIME TOPOLOGY
+                    </span>
+                    <h3 className="text-[15px] font-normal text-chalk mb-2">
+                      Topología de Microservicios en Producción
+                    </h3>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 my-4">
-                    <div className="p-3 bg-[#080808] border border-graphite">
-                      <div className="font-mono text-[10px] text-smoke">
-                        PASARELA WHATSAPP (WAHA)
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 my-2">
+                      <div className="p-2.5 bg-[#080808] border border-graphite">
+                        <div className="font-mono text-[9.5px] text-smoke uppercase">
+                          PASARELA WHATSAPP (WAHA)
+                        </div>
+                        <div className="text-[12.5px] text-pulse-green font-medium mt-0.5">
+                          Docker / Healthy (Port 3000)
+                        </div>
                       </div>
-                      <div className="text-[13.5px] text-pulse-green font-medium mt-0.5">
-                        Docker / Healthy (Port 3000)
+                      <div className="p-2.5 bg-[#080808] border border-graphite">
+                        <div className="font-mono text-[9.5px] text-smoke uppercase">
+                          ORQUESTADOR N8N
+                        </div>
+                        <div className="text-[12.5px] text-pulse-green font-medium mt-0.5">
+                          33 Nodos / Zero-Desync
+                        </div>
                       </div>
-                    </div>
-                    <div className="p-3 bg-[#080808] border border-graphite">
-                      <div className="font-mono text-[10px] text-smoke">
-                        ORQUESTADOR N8N
+                      <div className="p-2.5 bg-[#080808] border border-graphite">
+                        <div className="font-mono text-[9.5px] text-smoke uppercase">
+                          BASE VECTORIAL (SUPABASE)
+                        </div>
+                        <div className="text-[12.5px] text-chalk font-medium mt-0.5">
+                          pgvector / HNSW Cosine
+                        </div>
                       </div>
-                      <div className="text-[13.5px] text-pulse-green font-medium mt-0.5">
-                        33 Nodos / Zero-Desync
-                      </div>
-                    </div>
-                    <div className="p-3 bg-[#080808] border border-graphite">
-                      <div className="font-mono text-[10px] text-smoke">
-                        BASE VECTORIAL (SUPABASE)
-                      </div>
-                      <div className="text-[13.5px] text-chalk font-medium mt-0.5">
-                        pgvector / HNSW Cosine
-                      </div>
-                    </div>
-                    <div className="p-3 bg-[#080808] border border-graphite">
-                      <div className="font-mono text-[10px] text-smoke">
-                        AUTONOMOUS SELF-HEAL
-                      </div>
-                      <div className="text-[13.5px] text-compass-gold font-medium mt-0.5">
-                        Claude Sonnet 5 Active
+                      <div className="p-2.5 bg-[#080808] border border-graphite">
+                        <div className="font-mono text-[9.5px] text-smoke uppercase">
+                          AUTONOMOUS SELF-HEAL
+                        </div>
+                        <div className="text-[12.5px] text-compass-gold font-medium mt-0.5">
+                          Claude Sonnet 5 Active
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <p className="text-xs text-smoke leading-relaxed">
+                  <p className="text-[11.5px] text-smoke leading-relaxed mt-2 border-t border-graphite/40 pt-2">
                     Sistema diseñado para operar de forma ininterrumpida frente a cortes de
                     energía eléctrica y latencias de inferencia mediante scripts automatizados en
-                    PowerShell (<code className="text-chalk">catchup_serrucho.ps1</code>) y
+                    PowerShell (<code className="text-chalk font-mono">catchup_serrucho.ps1</code>) y
                     desacoplamiento con colas asíncronas.
                   </p>
                 </div>
               </CrosshairCard>
 
               {/* Log Stream */}
-              <div className="lg:col-span-5">
+              <div className="lg:col-span-5 h-full max-h-full min-h-0 flex flex-col overflow-hidden">
                 <LiveLogStream />
               </div>
             </div>
