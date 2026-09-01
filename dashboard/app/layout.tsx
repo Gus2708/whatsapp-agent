@@ -7,6 +7,14 @@ import { BlueprintCanvas } from '@/components/hud/BlueprintCanvas';
 export const metadata: Metadata = {
   title: 'Perucho // WhatsApp CRM & Operational Flight Deck · Ferretería El Serrucho',
   description: 'Mission control, WhatsApp CRM, and RAG intelligence deck for Ferretería El Serrucho',
+  icons: {
+    icon: [
+      { url: '/crmlogo.svg', type: 'image/svg+xml' },
+      { url: '/crmlogo.png', type: 'image/png' },
+    ],
+    shortcut: '/crmlogo.png',
+    apple: '/crmlogo.png',
+  },
 };
 
 export default function RootLayout({
@@ -17,6 +25,8 @@ export default function RootLayout({
   return (
     <html lang="es" className="dark">
       <head>
+        <link rel="icon" href="/crmlogo.svg" type="image/svg+xml" />
+        <link rel="alternate icon" href="/crmlogo.png" type="image/png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

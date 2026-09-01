@@ -68,12 +68,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             </span>
           </div>
 
-          {/* Title & Description */}
-          <div className="mb-6">
+          {/* Logo, Title & Description */}
+          <div className="mb-6 flex flex-col items-center text-center">
+            <img
+              src="/crmlogo.svg"
+              alt="Perucho CRM Logo"
+              className="h-12 w-auto object-contain mb-3"
+            />
             <h1 className="text-xl font-normal text-chalk tracking-tight mb-1">
               Ferretería El Serrucho
             </h1>
-            <p className="text-xs font-mono text-smoke leading-relaxed">
+            <p className="text-xs font-mono text-smoke leading-relaxed max-w-xs">
               Flight Deck CRM & Telemetría Operativa. Ingrese con un usuario registrado en el sistema.
             </p>
           </div>

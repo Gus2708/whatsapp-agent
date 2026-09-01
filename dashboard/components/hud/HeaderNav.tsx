@@ -72,20 +72,17 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) 
   return (
     <header className="sticky top-2 z-50 mb-3 flex flex-wrap items-center justify-between gap-3 border border-graphite bg-[#0e0e0e]/95 px-3.5 py-2.5 backdrop-blur-xl pointer-events-auto">
       {/* Brand & Mission Status */}
-      <div className="flex items-center gap-3 select-none">
-        <svg
-          className="h-[18px] w-[18px] animate-slow-spin text-compass-gold flex-shrink-0"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-        >
-          <circle cx="12" cy="12" r="10"></circle>
-          <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
-        </svg>
+      <div className="flex items-center gap-2.5 select-none">
+        <img
+          src="/crmlogo.svg"
+          alt="CRM Logo"
+          className="h-6 w-auto object-contain flex-shrink-0"
+        />
         <div>
-          <div className="font-mono text-[12.5px] font-semibold uppercase tracking-wider text-chalk">
-            {process.env.NEXT_PUBLIC_AGENT_NAME || 'PERUCHO'} // WHATSAPP AGENT FLIGHT DECK
+          <div className="font-mono text-[12.5px] font-semibold uppercase tracking-wider text-chalk flex items-center gap-1.5">
+            <span>{process.env.NEXT_PUBLIC_AGENT_NAME || 'PERUCHO'}</span>
+            <span className="text-compass-gold">//</span>
+            <span className="text-smoke">WHATSAPP CRM FLIGHT DECK</span>
           </div>
           <div className="font-mono text-[9.5px] text-smoke uppercase">
             TARGET: {process.env.NEXT_PUBLIC_TARGET_NAME || 'FERRETERÍA EL SERRUCHO'} · 33 NODES · 7,650 SKUs
