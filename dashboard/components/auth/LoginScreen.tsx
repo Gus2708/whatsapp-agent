@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { CrosshairCard } from '@/components/hud/CrosshairCard';
 import { useSound } from '@/components/audio/SoundProvider';
 import { ThinkingOrb } from '@/components/orbs/ThinkingOrb';
-import { Shield, Lock, Mail, Eye, EyeOff, ArrowRight, AlertTriangle, KeyRound } from 'lucide-react';
+import { Shield, Lock, Mail, Eye, EyeOff, ArrowRight, AlertTriangle, KeyRound, Sparkles, Zap } from 'lucide-react';
 
 interface LoginScreenProps {
   onLoginSuccess?: () => void;
@@ -174,29 +174,32 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onEnte
           {onEnterDemo && (
             <div className="mt-5 pt-4 border-t border-graphite/60 flex flex-col gap-2">
               <div className="flex items-center justify-between font-mono text-[9px] text-smoke uppercase">
-                <span className="text-compass-gold flex items-center gap-1">
-                  <span>⚡</span> RECRUITER / TECH EVALUATOR
+                <span className="text-compass-gold flex items-center gap-1.5 font-semibold">
+                  <Zap className="h-3 w-3 text-pulse-green flex-shrink-0" />
+                  <span>// ACCESO EVALUADORES TÉCNICOS</span>
                 </span>
-                <span className="text-emerald-400">1-CLICK ACCESS</span>
+                <span className="px-1.5 py-0.2 bg-pulse-green/10 border border-pulse-green/30 text-pulse-green text-[8.5px] font-semibold">
+                  1-CLICK GUEST
+                </span>
               </div>
+
               <button
                 type="button"
                 onClick={() => {
                   playSuccess();
                   onEnterDemo();
                 }}
-                className="w-full py-2 px-3 bg-[#111111] hover:bg-[#181818] border border-compass-gold/50 hover:border-compass-gold text-compass-gold hover:text-chalk font-mono text-[11px] font-semibold uppercase tracking-wider flex items-center justify-between transition-all shadow-[0_0_15px_rgba(212,175,55,0.1)] group cursor-pointer"
+                className="w-full py-2.5 px-3.5 bg-[#121212] hover:bg-[#181818] border border-graphite hover:border-compass-gold text-chalk hover:text-compass-gold font-mono text-xs font-semibold uppercase tracking-wider flex items-center justify-between transition-all shadow-[0_0_15px_rgba(0,0,0,0.6)] cursor-pointer group"
               >
                 <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-pulse-green animate-pulse" />
+                  <Sparkles className="h-3.5 w-3.5 text-pulse-green group-hover:animate-pulse flex-shrink-0" />
                   <span>Explorar Modo Demo Interactivo</span>
                 </div>
-                <span className="text-[10px] text-smoke group-hover:text-pulse-green transition-colors">
-                  [ SIN CREDENCIALES ] →
-                </span>
+                <ArrowRight className="h-3.5 w-3.5 text-smoke group-hover:text-compass-gold group-hover:translate-x-0.5 transition-all flex-shrink-0" />
               </button>
-              <p className="font-mono text-[8.5px] text-smoke/70 text-center leading-tight">
-                Datos anonimizados · 5 Capas RAG · 33 Nodos n8n · Telemetría en Vivo
+
+              <p className="font-mono text-[9px] text-smoke/70 text-center leading-tight">
+                Datos sanitizados · 5 Capas RAG · 33 Nodos n8n · Telemetría en Vivo
               </p>
             </div>
           )}
