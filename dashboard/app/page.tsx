@@ -160,13 +160,13 @@ export default function FlightDeckDashboard() {
   };
 
   return (
-    <div>
+    <div className="flex flex-col h-full min-h-0">
       <HeaderNav activeTab={activeTab} onSelectTab={setActiveTab} />
 
-      <div ref={viewContainerRef}>
+      <div ref={viewContainerRef} className="flex-1 min-h-0 flex flex-col">
         {/* VIEW 1: FLIGHT DECK */}
         {activeTab === 'flight' && (
-          <div className="space-y-6">
+          <div className="space-y-6 overflow-y-auto pb-6">
             <div className="mb-4">
               <span className="font-mono text-[11px] text-compass-gold uppercase tracking-wider block mb-1">
                 // GLOBAL TELEMETRY & FLIGHT RADAR
@@ -243,7 +243,7 @@ export default function FlightDeckDashboard() {
 
         {/* VIEW 2: WHATSAPP CRM */}
         {activeTab === 'crm' && (
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-5 h-[calc(100vh-190px)] min-h-[640px]">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 h-[calc(100vh-95px)] min-h-0">
             <div className="md:col-span-4 lg:col-span-3 h-full">
               <ConversationList
                 conversations={conversations}

@@ -23,10 +23,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-obsidian text-chalk antialiased selection:bg-compass-gold/30 selection:text-chalk min-h-screen">
+      <body className="bg-obsidian text-chalk antialiased selection:bg-compass-gold/30 selection:text-chalk h-screen overflow-x-hidden">
         <SoundProvider>
           <BlueprintCanvas />
-          <main className="relative z-10 max-w-[1480px] mx-auto p-4 sm:p-6 lg:p-8 pb-20">
+          <main className="relative z-10 max-w-[1580px] mx-auto px-3 sm:px-6 pt-3 pb-3 h-full flex flex-col">
             {children}
           </main>
         </SoundProvider>
