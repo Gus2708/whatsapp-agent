@@ -262,7 +262,7 @@ export const RagStudio: React.FC = () => {
                 </h3>
               </div>
               <div className="scale-75 origin-right">
-                <ThinkingOrb state={orbState} currentScanningLayer={currentLayer} size={48} />
+                <ThinkingOrb state={orbState} currentScanningLayer={currentLayer} size={64} showLabel={false} />
               </div>
             </div>
 

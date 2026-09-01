@@ -1,15 +1,39 @@
 'use client';
 
-import React from 'react';
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { ThinkingOrb as OfficialOrb, OrbState as OfficialOrbState } from 'thinking-orbs';
 import { OrbState } from '@/lib/types';
 
 interface ThinkingOrbProps {
   state?: OrbState;
   currentScanningLayer?: 1 | 2 | 3 | 4 | 5 | null;
-  size?: 64 | 20;
+  size?: number;
   label?: string;
   className?: string;
+  showLabel?: boolean;
+}
+
+class OrbErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode; fallback?: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(_: Error) {
+    return { hasError: true };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.warn('Orb rendering error caught by boundary:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="h-10 w-10 rounded-full border border-pulse-green/40 bg-pulse-green/10 flex items-center justify-center animate-pulse">
+          <span className="h-2 w-2 rounded-full bg-pulse-green" />
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 export const ThinkingOrb: React.FC<ThinkingOrbProps> = ({
@@ -18,6 +42,7 @@ export const ThinkingOrb: React.FC<ThinkingOrbProps> = ({
   size = 64,
   label,
   className = '',
+  showLabel = true,
 }) => {
   let officialState: OfficialOrbState = 'breathing';
 
@@ -59,13 +84,16 @@ export const ThinkingOrb: React.FC<ThinkingOrbProps> = ({
     ? layerLabels[currentScanningLayer]
     : label || stateLabels[state];
 
+  // Map to supported official sizes: 64 or 20
+  const validSize: 64 | 20 = size < 40 ? 20 : 64;
+
   return (
     <div className={`flex flex-col items-center justify-center ${className}`}>
       {/* Frameless, clean orb presentation */}
-      <div className="relative flex items-center justify-center my-1">
-        {/* Very subtle ambient glow */}
+      <div className="relative flex items-center justify-center my-0.5">
+        {/* Ambient glow */}
         <div
-          className={`absolute inset-0 pointer-events-none rounded-full opacity-[0.06] blur-2xl transition-all duration-500 scale-150 ${
+          className={`absolute inset-0 pointer-events-none rounded-full opacity-[0.08] blur-xl transition-all duration-500 scale-125 ${
             currentScanningLayer === 1
               ? 'bg-pulse-green'
               : currentScanningLayer === 2
@@ -82,38 +110,48 @@ export const ThinkingOrb: React.FC<ThinkingOrbProps> = ({
           }`}
         />
 
-        {/* Official ThinkingOrb Canvas from Jakub Antalik */}
-        <div className="relative z-10 scale-125">
-          <OfficialOrb state={officialState} size={size} theme="dark" speed={1.1} />
+        {/* Official ThinkingOrb with Error Boundary */}
+        <div className="relative z-10">
+          <OrbErrorBoundary>
+            <OfficialOrb
+              key={`orb-${officialState}-${validSize}`}
+              state={officialState}
+              size={validSize}
+              theme="dark"
+              speed={1.0}
+            />
+          </OrbErrorBoundary>
         </div>
       </div>
 
-      {/* State & Layer Label */}
-      <div className="mt-3 text-center max-w-[280px]">
-        <div className="font-mono text-[10px] text-smoke uppercase tracking-wider mb-0.5">
-          STATE: <span className="text-chalk font-semibold">{officialState}</span>
+      {/* State & Layer Label (Optional) */}
+      {showLabel && (
+        <div className="mt-2 text-center max-w-[280px]">
+          <div className="font-mono text-[9.5px] text-smoke uppercase tracking-wider mb-0.5">
+            STATE: <span className="text-chalk font-semibold">{officialState}</span>
+          </div>
+          <span
+            className={`font-mono text-[10.5px] uppercase tracking-wider font-semibold ${
+              currentScanningLayer === 1
+                ? 'text-pulse-green'
+                : currentScanningLayer === 2
+                ? 'text-amber-400'
+                : currentScanningLayer === 3
+                ? 'text-cyan-400'
+                : currentScanningLayer === 4
+                ? 'text-purple-400'
+                : currentScanningLayer === 5
+                ? 'text-neon-rose'
+                : state === 'searching_rag'
+                ? 'text-cyan-300'
+                : 'text-compass-gold'
+            }`}
+          >
+            {currentScanningLayer ? `[L0${currentScanningLayer}] ` : ''}
+            {currentLabel}
+          </span>
         </div>
-        <span
-          className={`font-mono text-[11px] uppercase tracking-wider font-semibold ${
-            currentScanningLayer === 1
-              ? 'text-pulse-green'
-              : currentScanningLayer === 2
-              ? 'text-amber-400'
-              : currentScanningLayer === 3
-              ? 'text-cyan-400'
-              : currentScanningLayer === 4
-              ? 'text-purple-400'
-              : currentScanningLayer === 5
-              ? 'text-neon-rose'
-              : state === 'searching_rag'
-              ? 'text-cyan-300'
-              : 'text-compass-gold'
-          }`}
-        >
-          {currentScanningLayer ? `[L0${currentScanningLayer}] ` : ''}
-          {currentLabel}
-        </span>
-      </div>
+      )}
     </div>
   );
 };
