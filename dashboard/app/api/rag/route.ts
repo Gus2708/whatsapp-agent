@@ -3,19 +3,38 @@ import fs from 'fs';
 import path from 'path';
 import { RagResult } from '@/lib/types';
 
-const ROOT = path.resolve(process.cwd(), '..');
-const envPath = path.join(ROOT, '.env');
-const envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+// Leer variables de entorno desde process.env (Vercel) o desde .env local
+const getEnvVar = (key: string, defaultValue: string = ''): string => {
+  if (process.env[key]) {
+    return process.env[key]!.trim();
+  }
 
-const pick = (k: string) => {
-  const m = envContent.match(new RegExp('^' + k + '=(.*)$', 'm'));
-  return (m && m[1] ? m[1] : process.env[k] || '').trim();
+  // Fallback local buscando .env en root o en dashboard
+  try {
+    const candidates = [
+      path.resolve(process.cwd(), '.env'),
+      path.resolve(process.cwd(), '..', '.env'),
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        const content = fs.readFileSync(p, 'utf8');
+        const match = content.match(new RegExp('^' + key + '=(.*)$', 'm'));
+        if (match && match[1]) {
+          return match[1].trim();
+        }
+      }
+    }
+  } catch {
+    // Suppress filesystem reading error
+  }
+
+  return defaultValue;
 };
 
-const SUPABASE_URL = pick('SUPABASE_URL') || 'https://rgniqjfooifchyctnbzu.supabase.co';
-const SUPABASE_ANON_KEY = pick('SUPABASE_ANON_KEY');
-const OPENROUTER_API_KEY = pick('OPENROUTER_API_KEY');
-const OPENAI_API_KEY = pick('OPENAI_API_KEY');
+const SUPABASE_URL = getEnvVar('SUPABASE_URL', 'https://rgniqjfooifchyctnbzu.supabase.co');
+const SUPABASE_ANON_KEY = getEnvVar('SUPABASE_ANON_KEY', '');
+const OPENROUTER_API_KEY = getEnvVar('OPENROUTER_API_KEY', '');
+const OPENAI_API_KEY = getEnvVar('OPENAI_API_KEY', '');
 
 const axiosAdapter = {
   async get(url: string, cfg: any) {
@@ -36,6 +55,24 @@ const axiosAdapter = {
   },
 };
 
+const getLiveBuscarCode = (): string | null => {
+  const candidatePaths = [
+    path.join(process.cwd(), 'lib', 'live_buscar.js'),
+    path.join(process.cwd(), 'dashboard', 'lib', 'live_buscar.js'),
+    path.join(process.cwd(), '..', 'scratch_live', 'live_buscar.js'),
+    path.join(process.cwd(), 'scratch_live', 'live_buscar.js'),
+  ];
+
+  for (const p of candidatePaths) {
+    try {
+      if (fs.existsSync(p)) {
+        return fs.readFileSync(p, 'utf8');
+      }
+    } catch {}
+  }
+  return null;
+};
+
 export async function POST(req: NextRequest) {
   const t0 = Date.now();
   try {
@@ -47,9 +84,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Query vacía' }, { status: 400 });
     }
 
-    const liveBuscarPath = path.join(ROOT, 'scratch_live', 'live_buscar.js');
-    if (fs.existsSync(liveBuscarPath)) {
-      const rawCode = fs.readFileSync(liveBuscarPath, 'utf8');
+    const rawCode = getLiveBuscarCode();
+    if (rawCode) {
       const code = rawCode.replace("const axios = require('axios');", '');
       const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
       const fn = new AsyncFunction('query', 'axios', '$env', code);
@@ -65,17 +101,17 @@ export async function POST(req: NextRequest) {
       const rawResult = typeof resultStr === 'string' ? JSON.parse(resultStr) : resultStr;
       const latencyMs = Date.now() - t0;
 
-      const prods = rawResult.productos || [];
+      const prods = rawResult?.productos || [];
       const firstProd = prods[0] || null;
 
-      // Determinación precisa y limpia de la capa que resolvió
+      // Determinación precisa de la capa que resolvió
       let hitLayer: 1 | 2 | 3 | 4 | 5 = 1;
       let layerName = 'Capa 1: Parser Determinístico AST';
       let cost = '$0.0000 (Local Deterministic)';
       let method = 'Exact / Dimension Match';
 
       // 1. Rescate semántico LLM (Capa 5)
-      if (rawResult.rescate || rawResult.instruccion?.includes('INTERPRETE')) {
+      if (rawResult?.rescate || rawResult?.instruccion?.includes('INTERPRETE')) {
         hitLayer = 5;
         layerName = 'Capa 5: Rescate LLM con Guardrails';
         cost = '$0.00035 (Claude Sonnet 5 Rescue)';
@@ -83,7 +119,7 @@ export async function POST(req: NextRequest) {
       }
       // 2. Vector Embeddings (Capa 4 - pgvector HNSW)
       else if (
-        rawResult.vectorial ||
+        rawResult?.vectorial ||
         qLower.includes('para tapar') ||
         qLower.includes('gotera') ||
         qLower.includes('filtracion') ||
@@ -98,8 +134,8 @@ export async function POST(req: NextRequest) {
       }
       // 3. Similitud de Trigramas pg_trgm (Capa 3)
       else if (
-        rawResult.fuzzy ||
-        rawResult.instruccion?.includes('APROXIMADOS') ||
+        rawResult?.fuzzy ||
+        rawResult?.instruccion?.includes('APROXIMADOS') ||
         qLower.includes('bonder') ||
         qLower.includes('cemento csc')
       ) {
@@ -152,7 +188,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'live_buscar.js no encontrado en el workspace' },
+      { error: 'live_buscar.js no encontrado en el runtime' },
       { status: 500 }
     );
   } catch (err: any) {
