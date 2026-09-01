@@ -54,7 +54,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="flex-1 min-h-0 flex items-center justify-center p-4">
+    <div className="w-full flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <CrosshairCard className="p-7 bg-[#0c0c0c] border border-graphite shadow-[0_0_50px_rgba(0,0,0,0.8)]">
           {/* Top Ingress Tag */}

@@ -27,37 +27,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Obtener sesión activa inicial
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setIsLoading(false);
-    });
+    let isMounted = true;
+
+    // Timeout de seguridad: Nunca congelar la pantalla más de 600ms
+    const safetyTimer = setTimeout(() => {
+      if (isMounted && isLoading) {
+        setIsLoading(false);
+      }
+    }, 600);
+
+    // 1. Obtener sesión activa inicial de Supabase Auth
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (!isMounted) return;
+        clearTimeout(safetyTimer);
+        setSession(session);
+        setUser(session?.user ?? null);
+        setIsLoading(false);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        clearTimeout(safetyTimer);
+        setIsLoading(false);
+      });
 
     // 2. Escuchar cambios de estado de autenticación (Login, Logout, Token Refresh)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
     });
 
     return () => {
+      isMounted = false;
+      clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {}
     setUser(null);
     setSession(null);
   };
 
-  // Spinner de carga táctico inicial mientras se verifica la sesión en Supabase
+  // Spinner de carga táctico perfectamente centrado en pantalla
   if (isLoading) {
     return (
-      <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-3">
+      <div className="flex-1 w-full h-full min-h-0 flex flex-col items-center justify-center gap-3 select-none">
         <div className="h-9 w-9 rounded-full border-2 border-pulse-green/30 border-t-pulse-green animate-spin" />
         <div className="font-mono text-xs text-compass-gold tracking-widest uppercase animate-pulse">
           // VERIFICANDO CREDENCIALES SUPABASE AUTH...
@@ -66,9 +89,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   }
 
-  // Si no hay sesión iniciada, mostrar la pantalla de Login táctico
+  // Si no hay sesión activa, renderizar la pantalla de login centrada
   if (!session || !user) {
-    return <LoginScreen />;
+    return (
+      <div className="flex-1 w-full h-full min-h-0 flex flex-col items-center justify-center">
+        <LoginScreen />
+      </div>
+    );
   }
 
   return (

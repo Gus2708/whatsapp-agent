@@ -24,14 +24,13 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-obsidian text-chalk antialiased selection:bg-compass-gold/30 selection:text-chalk h-screen overflow-x-hidden">
+      <body className="bg-obsidian text-chalk antialiased selection:bg-compass-gold/30 selection:text-chalk h-screen overflow-hidden">
         <SoundProvider>
-          <AuthProvider>
-            <BlueprintCanvas />
-            <main className="relative z-10 max-w-[1580px] w-full mx-auto px-3 sm:px-6 pt-3 pb-3 h-full flex flex-col overflow-x-hidden">
-              {children}
-            </main>
-          </AuthProvider>
+          {/* Blueprint Radar Canvas ALWAYS active across all views and auth states */}
+          <BlueprintCanvas />
+          <main className="relative z-10 max-w-[1580px] w-full mx-auto px-3 sm:px-6 pt-3 pb-3 h-full flex flex-col overflow-hidden">
+            <AuthProvider>{children}</AuthProvider>
+          </main>
         </SoundProvider>
       </body>
     </html>
