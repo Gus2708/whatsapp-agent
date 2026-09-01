@@ -125,7 +125,7 @@ export const RagStudio: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full max-h-full min-h-0 justify-between overflow-hidden gap-2.5">
+    <div className="flex flex-col h-full max-h-full min-h-0 justify-between gap-2 p-1">
       {/* Header */}
       <div className="flex flex-wrap justify-between items-center gap-2 flex-shrink-0">
         <div>
@@ -142,8 +142,8 @@ export const RagStudio: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 flex-1 min-h-0 overflow-hidden">
+      {/* Main Grid with perimeter clearance */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 flex-1 min-h-0 p-1.5">
         {/* Left: Terminal Console */}
         <CrosshairCard className="lg:col-span-7 p-4 bg-[#050505] flex flex-col justify-between h-full max-h-full min-h-0 flex-1">
           <div className="flex flex-col justify-between h-full min-h-0">
