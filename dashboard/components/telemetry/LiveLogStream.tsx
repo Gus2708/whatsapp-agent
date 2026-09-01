@@ -1,28 +1,82 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { LogEntry } from '@/lib/types';
 import { INITIAL_LOGS } from '@/lib/constants';
 import { CrosshairCard } from '@/components/hud/CrosshairCard';
 import { useSound } from '@/components/audio/SoundProvider';
-import { Zap } from 'lucide-react';
+import { Zap, Play } from 'lucide-react';
 
 export const LiveLogStream: React.FC = () => {
   const [logs, setLogs] = useState<LogEntry[]>(INITIAL_LOGS);
-  const { playPacket } = useSound();
+  const [isInjecting, setIsInjecting] = useState(false);
+  const { playPacket, playSuccess } = useSound();
+  const logContainerRef = useRef<HTMLDivElement | null>(null);
 
   const injectSimulatedEvent = () => {
-    playPacket();
+    if (isInjecting) return;
+    setIsInjecting(true);
+
     const phone = `+58 412-${Math.floor(100 + Math.random() * 900)}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const now = new Date().toTimeString().slice(0, 8);
-    const newLog: LogEntry = {
-      id: `log-${Date.now()}`,
-      time: now,
-      tag: 'info',
-      tagLabel: 'INBOUND',
-      msg: `Nuevo mensaje recibido desde ${phone} · Disparando pipeline n8n...`,
-    };
-    setLogs((prev) => [newLog, ...prev.slice(0, 19)]);
+    const products = [
+      { name: 'Cemento Gris Tipo I 42.5kg', sku: 'SKU-1092', price: '$8.50' },
+      { name: 'Tornillo Drywall 1/2 Punta Broca', sku: 'SKU-4921', price: '$12.50' },
+      { name: 'Tubo Estructural 2x1 Calibre 16', sku: 'SKU-8812', price: '$14.20' },
+      { name: 'Protector de Voltaje Vitron 110V', sku: 'SKU-3011', price: '$28.00' },
+    ];
+    const selectedProd = products[Math.floor(Math.random() * products.length)];
+
+    const steps = [
+      {
+        tag: 'info' as const,
+        tagLabel: 'INBOUND',
+        msg: `Mensaje recibido de ${phone}: "¿Tienen disponible ${selectedProd.name}?"`,
+        delay: 0,
+      },
+      {
+        tag: 'success' as const,
+        tagLabel: '200 OK',
+        msg: `WAHA Webhook Ack <12ms · Payload verificado y deduplicado`,
+        delay: 200,
+      },
+      {
+        tag: 'info' as const,
+        tagLabel: 'LAYER 1 AST',
+        msg: `Determinismo AST: Coincidencia exacta "${selectedProd.name}" (${selectedProd.sku}) en catálogo de 7.650 SKUs`,
+        delay: 500,
+      },
+      {
+        tag: 'success' as const,
+        tagLabel: 'DISPATCH',
+        msg: `JSON validado con Pydantic · Respuesta enviada a WhatsApp vía WAHA (${selectedProd.price} USD)`,
+        delay: 850,
+      },
+    ];
+
+    steps.forEach((step) => {
+      setTimeout(() => {
+        playPacket();
+        const now = new Date().toTimeString().slice(0, 8);
+        const newLog: LogEntry = {
+          id: `log-${Date.now()}-${Math.random()}`,
+          time: now,
+          tag: step.tag,
+          tagLabel: step.tagLabel,
+          msg: step.msg,
+        };
+
+        setLogs((prev) => [newLog, ...prev.slice(0, 29)]);
+
+        if (logContainerRef.current) {
+          logContainerRef.current.scrollTop = 0;
+        }
+
+        if (step.tagLabel === 'DISPATCH') {
+          setIsInjecting(false);
+          playSuccess();
+        }
+      }, step.delay);
+    });
   };
 
   const getTagClass = (tag: LogEntry['tag']) => {
@@ -46,25 +100,33 @@ export const LiveLogStream: React.FC = () => {
         </span>
         <button
           onClick={injectSimulatedEvent}
-          className="inline-flex items-center gap-1 border border-graphite bg-transparent px-2 py-1 font-mono text-[10px] text-chalk uppercase hover:border-ash hover:bg-white/[0.05] transition-colors"
+          disabled={isInjecting}
+          className={`inline-flex items-center gap-1.5 border px-3 py-1 font-mono text-[10.5px] uppercase font-semibold transition-all cursor-pointer ${
+            isInjecting
+              ? 'border-pulse-green bg-pulse-green/15 text-pulse-green animate-pulse'
+              : 'border-compass-gold/50 bg-compass-gold/10 text-compass-gold hover:bg-compass-gold/20 hover:border-compass-gold'
+          }`}
         >
           <Zap className="h-3 w-3 text-pulse-green" />
-          <span>Inyectar Evento</span>
+          <span>{isInjecting ? 'Procesando Flujo...' : 'Inyectar Evento'}</span>
         </button>
       </div>
 
-      <div className="h-[360px] overflow-y-auto bg-[#080808] border border-graphite p-3.5 font-mono text-xs flex flex-col gap-2.5">
+      <div
+        ref={logContainerRef}
+        className="h-[360px] overflow-y-auto bg-[#080808] border border-graphite p-3.5 font-mono text-xs flex flex-col gap-2.5 scrollbar-thin"
+      >
         {logs.map((log) => (
-          <div key={log.id} className="flex items-start gap-3 border-b border-[#161616] pb-2">
-            <span className="text-compass-gold flex-shrink-0">{log.time}</span>
+          <div key={log.id} className="flex items-start gap-3 border-b border-[#161616] pb-2 transition-all">
+            <span className="text-compass-gold flex-shrink-0 text-[11px]">{log.time}</span>
             <span
-              className={`px-1.5 py-0.5 text-[10px] flex-shrink-0 font-medium ${getTagClass(
+              className={`px-1.5 py-0.5 text-[9.5px] flex-shrink-0 font-medium ${getTagClass(
                 log.tag
               )}`}
             >
               {log.tagLabel}
             </span>
-            <span className="text-[#d4d4d8] flex-1 break-all">{log.msg}</span>
+            <span className="text-[#d4d4d8] flex-1 break-words leading-relaxed">{log.msg}</span>
           </div>
         ))}
       </div>
