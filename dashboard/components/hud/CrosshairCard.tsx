@@ -36,7 +36,7 @@ export const CrosshairCard: React.FC<CrosshairCardProps> = ({
     const crosses = cardRef.current.querySelectorAll('.corner-cross');
     gsap.to(crosses, {
       rotation: 0,
-      color: '#383838',
+      color: '#404040',
       scale: 1.0,
       duration: 0.25,
       ease: 'power2.inOut',
@@ -55,22 +55,22 @@ export const CrosshairCard: React.FC<CrosshairCardProps> = ({
       )}
       {...props}
     >
-      {/* 4 Corner Crosshairs */}
-      <svg className="corner-cross tl" viewBox="0 0 24 24">
-        <line x1="12" y1="5" x2="12" y2="19"></line>
-        <line x1="5" y1="12" x2="19" y2="12"></line>
+      {/* 4 Precision Corner Crosshairs (Centered on 4 vertices) */}
+      <svg className="corner-cross tl" viewBox="0 0 10 10">
+        <line x1="5" y1="0" x2="5" y2="10" stroke="currentColor" strokeWidth="1.5" />
+        <line x1="0" y1="5" x2="10" y2="5" stroke="currentColor" strokeWidth="1.5" />
       </svg>
-      <svg className="corner-cross tr" viewBox="0 0 24 24">
-        <line x1="12" y1="5" x2="12" y2="19"></line>
-        <line x1="5" y1="12" x2="19" y2="12"></line>
+      <svg className="corner-cross tr" viewBox="0 0 10 10">
+        <line x1="5" y1="0" x2="5" y2="10" stroke="currentColor" strokeWidth="1.5" />
+        <line x1="0" y1="5" x2="10" y2="5" stroke="currentColor" strokeWidth="1.5" />
       </svg>
-      <svg className="corner-cross bl" viewBox="0 0 24 24">
-        <line x1="12" y1="5" x2="12" y2="19"></line>
-        <line x1="5" y1="12" x2="19" y2="12"></line>
+      <svg className="corner-cross bl" viewBox="0 0 10 10">
+        <line x1="5" y1="0" x2="5" y2="10" stroke="currentColor" strokeWidth="1.5" />
+        <line x1="0" y1="5" x2="10" y2="5" stroke="currentColor" strokeWidth="1.5" />
       </svg>
-      <svg className="corner-cross br" viewBox="0 0 24 24">
-        <line x1="12" y1="5" x2="12" y2="19"></line>
-        <line x1="5" y1="12" x2="19" y2="12"></line>
+      <svg className="corner-cross br" viewBox="0 0 10 10">
+        <line x1="5" y1="0" x2="5" y2="10" stroke="currentColor" strokeWidth="1.5" />
+        <line x1="0" y1="5" x2="10" y2="5" stroke="currentColor" strokeWidth="1.5" />
       </svg>
 
       {children}

@@ -54,28 +54,43 @@ body {
   background: var(--color-compass-gold);
 }
 
-/* 90-degree Sharp Corner Crosshair Base */
+/* 90-degree Sharp Corner Crosshair Base (Centered on Vertices) */
 .corner-cross {
   position: absolute;
-  width: 12px;
-  height: 12px;
-  color: var(--color-iron);
+  width: 10px;
+  height: 10px;
+  color: #383838;
   pointer-events: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  opacity: 0.8;
-  transition: color 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  z-index: 10;
+  z-index: 30;
+  transition: color 0.25s ease, transform 0.25s ease;
 }
 
-.corner-cross.tl { top: -6px; left: -6px; }
-.corner-cross.tr { top: -6px; right: -6px; }
-.corner-cross.bl { bottom: -6px; left: -6px; }
-.corner-cross.br { bottom: -6px; right: -6px; }
+.corner-cross.tl {
+  top: -1px;
+  left: -1px;
+  transform: translate(-50%, -50%);
+}
+
+.corner-cross.tr {
+  top: -1px;
+  right: -1px;
+  transform: translate(50%, -50%);
+}
+
+.corner-cross.bl {
+  bottom: -1px;
+  left: -1px;
+  transform: translate(-50%, 50%);
+}
+
+.corner-cross.br {
+  bottom: -1px;
+  right: -1px;
+  transform: translate(50%, 50%);
+}
 
 .blueprint-card:hover .corner-cross {
   color: var(--color-compass-gold);
-  transform: rotate(90deg);
 }
 
 /* Terminal Syntax Tokens */
