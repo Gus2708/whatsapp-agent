@@ -189,12 +189,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onEnte
                   playSuccess();
                   onEnterDemo();
                 }}
-                className="w-full py-2.5 px-3.5 bg-[#121212] hover:bg-[#181818] border border-graphite hover:border-compass-gold text-chalk hover:text-compass-gold font-mono text-xs font-semibold uppercase tracking-wider flex items-center justify-between transition-all shadow-[0_0_15px_rgba(0,0,0,0.6)] cursor-pointer group"
+                className="w-full py-2.5 px-4 bg-[#121212] hover:bg-[#181818] border border-graphite hover:border-compass-gold text-chalk hover:text-compass-gold font-mono text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2.5 transition-all shadow-[0_0_15px_rgba(0,0,0,0.6)] cursor-pointer group"
               >
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-3.5 w-3.5 text-pulse-green group-hover:animate-pulse flex-shrink-0" />
-                  <span>Explorar Modo Demo Interactivo</span>
-                </div>
+                <Sparkles className="h-3.5 w-3.5 text-pulse-green group-hover:animate-pulse flex-shrink-0" />
+                <span>Explorar Modo Demo Interactivo</span>
                 <ArrowRight className="h-3.5 w-3.5 text-smoke group-hover:text-compass-gold group-hover:translate-x-0.5 transition-all flex-shrink-0" />
               </button>
 
