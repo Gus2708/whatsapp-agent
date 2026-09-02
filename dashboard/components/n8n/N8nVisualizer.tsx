@@ -108,6 +108,13 @@ export const N8nVisualizer: React.FC = () => {
           onStart: () => {
             setActiveNodeId(nodeId);
             playPacket();
+            // Auto-scroll to the active node so animation is visible on mobile
+            requestAnimationFrame(() => {
+              const el = document.querySelector(`[data-node-id="${nodeId}"]`);
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              }
+            });
           },
         }
       );
@@ -115,7 +122,7 @@ export const N8nVisualizer: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 pb-8">
+    <div className="space-y-4 sm:space-y-6 pb-8 overflow-x-hidden">
       {/* Header & Controls */}
       <div className="flex flex-wrap justify-between items-start sm:items-end gap-3 mb-2 sm:mb-4">
         <div>
@@ -189,17 +196,17 @@ export const N8nVisualizer: React.FC = () => {
               workflows.map((wf) => (
                 <div
                   key={wf.id}
-                  className="flex items-center justify-between p-2 sm:p-2.5 border border-graphite bg-[#121212] font-mono text-[11.5px] sm:text-xs"
+                  className="flex items-center justify-between p-2 sm:p-2.5 border border-graphite bg-[#121212] font-mono text-[11.5px] sm:text-xs min-w-0"
                 >
-                  <div className="flex items-center gap-2 truncate">
+                  <div className="flex items-center gap-2 truncate min-w-0">
                     <span
-                      className={`h-1.5 w-1.5 rounded-full ${
+                      className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${
                         wf.active ? 'bg-pulse-green' : 'bg-smoke'
                       }`}
                     />
                     <span className="text-chalk truncate">{wf.name}</span>
                   </div>
-                  <span className="text-[10.5px] sm:text-[11px] text-smoke ml-2 flex-shrink-0">
+                  <span className="text-[10.5px] sm:text-[11px] text-smoke ml-2 flex-shrink-0 max-w-[120px] truncate">
                     ID: {wf.id}
                   </span>
                 </div>
@@ -313,6 +320,7 @@ export const N8nVisualizer: React.FC = () => {
                   return (
                     <div
                       key={node.id}
+                      data-node-id={node.id}
                       className={`p-2.5 sm:p-3 border flex items-center gap-2 sm:gap-2.5 text-xs text-chalk cursor-pointer transition-all duration-200 min-h-[38px] ${
                         isFiring
                           ? 'border-pulse-green bg-pulse-green/15 shadow-[0_0_14px_rgba(152,255,56,0.25)] scale-[1.02]'
