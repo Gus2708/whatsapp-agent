@@ -203,9 +203,9 @@ export const RagStudio: React.FC = () => {
       </div>
 
       {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-3.5 flex-1 min-h-0 p-0.5">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-3.5 lg:flex-1 lg:min-h-0 p-0.5">
         {/* Left: Terminal Console */}
-        <CrosshairCard className="lg:col-span-7 p-3 sm:p-4 bg-[#050505] flex flex-col justify-between min-h-[420px] lg:min-h-0 flex-1">
+        <CrosshairCard className="lg:col-span-7 p-3 sm:p-4 bg-[#050505] flex flex-col justify-between lg:min-h-0 lg:flex-1">
           <div className="flex flex-col justify-between h-full min-h-0 gap-2">
             <div>
               {/* HUD Blueprint Terminal Banner */}
