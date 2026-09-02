@@ -104,7 +104,7 @@ export const LeadDetailsPane: React.FC<LeadDetailsPaneProps> = ({ conversation }
         <div className="py-2.5 flex flex-col gap-1">
           <div className="flex items-center gap-1.5 font-mono text-[10.5px] text-smoke uppercase">
             <CheckCircle2 className="h-3 w-3 text-pulse-green" />
-            <span>Pydantic Validation</span>
+            <span>Validación de esquema</span>
           </div>
           <div className="text-[12.5px] text-pulse-green font-mono">
             ✓ 100% Validated (JSON Schema)

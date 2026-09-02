@@ -100,7 +100,7 @@ export const DevOpsConsole: React.FC = () => {
             ...prev.autoheal,
             output:
               prev.autoheal.output +
-              "→ Analizando log de 0 matches de las últimas 24h con Claude Sonnet 5...\n→ Término detectado: 'pega loca' (Jerga regional).\n→ Inyectando sinónimo a catalogo_vocabulario -> SKU-1082 (Cianoacrilato).\n",
+              "→ Analizando log de 0 matches de las últimas 24h con Luna...\n→ Término detectado: 'pega loca' (Jerga regional).\n→ Inyectando sinónimo a catalogo_vocabulario -> SKU-1082 (Cianoacrilato).\n",
           },
         }));
       }, 400);
@@ -160,7 +160,7 @@ export const DevOpsConsole: React.FC = () => {
       id: 'autoheal',
       tag: 'AI CONTINUOUS IMPROVEMENT',
       name: 'auto_healing_sonnet.js',
-      desc: 'Claude Sonnet 5 diagnostica búsquedas fallidas de 0 matches y auto-registra sinónimos en catalogo_vocabulario.',
+      desc: 'Luna diagnostica búsquedas fallidas de 0 matches y auto-registra sinónimos en catalogo_vocabulario.',
     },
     {
       id: 'watchdog',

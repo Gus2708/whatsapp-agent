@@ -13,7 +13,7 @@ export async function GET() {
       { name: 'PASARELA WHATSAPP (WAHA)', status: 'Healthy (Docker Port 3000)', healthy: true },
       { name: 'ORQUESTADOR N8N', status: '33 Nodos / Zero-Desync', healthy: true },
       { name: 'BASE VECTORIAL (SUPABASE)', status: 'pgvector / HNSW Cosine', healthy: true },
-      { name: 'AUTONOMOUS SELF-HEAL', status: 'Claude Sonnet 5 Active', healthy: true },
+      { name: 'AUTONOMOUS SELF-HEAL', status: 'OpenRouter · gpt-5.6-luna', healthy: true },
     ],
   };
 

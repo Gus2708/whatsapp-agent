@@ -114,8 +114,8 @@ export async function POST(req: NextRequest) {
       if (rawResult?.rescate || rawResult?.instruccion?.includes('INTERPRETE')) {
         hitLayer = 5;
         layerName = 'Capa 5: Rescate LLM con Guardrails';
-        cost = '$0.00035 (Claude Sonnet 5 Rescue)';
-        method = `Rescate Semántico: ${rawResult.rescate || 'Sonnet 5'}`;
+        cost = '$0.00035 (Rescate Luna)';
+        method = `Rescate Semántico: ${rawResult.rescate || 'Luna'}`;
       }
       // 2. Vector Embeddings (Capa 4 - pgvector HNSW)
       else if (

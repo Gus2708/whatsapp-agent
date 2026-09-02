@@ -78,9 +78,9 @@ export const MicroservicesTopologyCard: React.FC = () => {
     {
       id: 'ai-engine',
       title: 'AUTONOMOUS SELF-HEAL',
-      status: 'Claude Sonnet 5 Active',
+      status: 'OpenRouter · gpt-5.6-luna',
       statusType: 'gold',
-      latency: 'Pydantic Output',
+      latency: 'JSON estructurado',
       detail: 'Recuperación de Fallos en Vivo',
       icon: BrainCircuit,
       activeOnStages: [4],
@@ -112,7 +112,7 @@ export const MicroservicesTopologyCard: React.FC = () => {
     { label: 'Deduplicación', sub: '<12ms', stageIdx: 1 },
     { label: '33 Nodos n8n', sub: 'Pipeline', stageIdx: 2 },
     { label: 'RAG 5 Capas', sub: 'pgvector', stageIdx: 3 },
-    { label: 'Pydantic Output', sub: 'JSON', stageIdx: 4 },
+    { label: 'JSON estructurado', sub: 'JSON', stageIdx: 4 },
     { label: 'WAHA Dispatch', sub: 'WhatsApp', stageIdx: 5 },
   ];
 
@@ -218,7 +218,7 @@ export const MicroservicesTopologyCard: React.FC = () => {
               <span className="font-mono text-[9.5px]">Flujo de Ejecución de Eventos en Tiempo Real</span>
             </div>
             <span className={activeStage !== null ? 'text-pulse-green font-bold animate-pulse' : 'text-smoke'}>
-              {activeStage !== null ? `Paso ${activeStage + 1}/6 en proceso...` : 'Latencia Total ~42ms'}
+              {activeStage !== null ? `Paso ${activeStage + 1}/6 en proceso...` : 'Latencia Total ~700ms'}
             </span>
           </div>
 

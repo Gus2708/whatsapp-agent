@@ -34,7 +34,7 @@ export const LiveLogStream: React.FC = () => {
         time: '01:04:13',
         tag: 'success',
         tagLabel: 'DISPATCH',
-        msg: 'Structured JSON validated with Pydantic · Dispatched via WAHA',
+        msg: 'JSON estructurado validado en n8n · Enviado vía WAHA',
       },
     ];
     setLogs(initialLogs);
@@ -88,7 +88,7 @@ export const LiveLogStream: React.FC = () => {
       {
         stageIndex: 4,
         tag: 'info' as const,
-        tagLabel: 'PYDANTIC',
+        tagLabel: 'SCHEMA',
         msg: `Validación de esquema JSON: cotización formateada con moneda USD ($${selectedProd.price})`,
         delay: 3450,
       },
@@ -96,7 +96,7 @@ export const LiveLogStream: React.FC = () => {
         stageIndex: 5,
         tag: 'success' as const,
         tagLabel: 'DISPATCH',
-        msg: `Respuesta final enviada a WhatsApp vía WAHA (${selectedProd.price} USD) · Latencia total: 42ms`,
+        msg: `Respuesta final enviada a WhatsApp vía WAHA (${selectedProd.price} USD) · Latencia total: ~700ms`,
         delay: 4400,
       },
     ];

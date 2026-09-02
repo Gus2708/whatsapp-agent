@@ -32,7 +32,7 @@ export const KpiMatrix: React.FC = () => {
         </div>
         <div className="text-2xl font-light tracking-tight text-chalk">76.9%</div>
         <div className="font-mono text-[10px] text-pulse-green mt-0.5">
-          +4.7% sobre vector puro
+          +2.2 pts vs sin vector (A/B)
         </div>
       </CrosshairCard>
 
@@ -56,7 +56,7 @@ export const KpiMatrix: React.FC = () => {
         </div>
         <div className="text-2xl font-light tracking-tight text-chalk">$0.00008</div>
         <div className="font-mono text-[10px] text-pulse-green mt-0.5">
-          70% resuelto en Capa 1 a $0
+          La consulta común resuelve en Capa 1 a $0
         </div>
       </CrosshairCard>
     </div>

@@ -56,7 +56,7 @@ export async function GET() {
             sender: 'agent',
             text: 'Perfecto Carlos. Te he reservado la orden #4921 con presupuesto de $530.00 USD para las 2:00 PM. Un asesor de mostrador tendrá los materiales listos.',
             time: '13:02',
-            latency: '42ms (Structured Output)',
+            latency: '~700ms (consulta común)',
             cost: '$0.00012',
           },
         ],

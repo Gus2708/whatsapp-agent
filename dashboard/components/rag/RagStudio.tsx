@@ -84,7 +84,7 @@ export const RagStudio: React.FC = () => {
     {
       num: 5,
       name: 'Rescate Semántico LLM',
-      tech: 'Claude Sonnet 5 + Guardrails',
+      tech: 'gpt-5.6-luna + Guardrails',
       lat: '~ 850 ms',
       cost: '$0.00035',
       icon: BrainCircuit,

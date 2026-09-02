@@ -39,7 +39,7 @@ export const INITIAL_CONVERSATIONS: Conversation[] = [
         sender: "agent",
         text: "Perfecto Carlos. Te he reservado la orden #4921 con presupuesto de $850.00 USD para las 2:00 PM. Un asesor de mostrador tendrá los materiales listos.",
         time: "13:02",
-        latency: "42ms (Structured Output)",
+        latency: "~700ms (consulta común)",
         cost: "$0.00012"
       }
     ]
@@ -153,7 +153,7 @@ export const INITIAL_LOGS: LogEntry[] = [
     time: "01:04:13",
     tag: "success",
     tagLabel: "DISPATCH",
-    msg: "Structured JSON validated with Pydantic · Dispatched via WAHA"
+    msg: "JSON estructurado validado en n8n · Enviado vía WAHA"
   }
 ];
 
@@ -188,14 +188,14 @@ export const N8N_ZONES = [
       { id: "node-layer1-ast", name: "Capa 1: AST Parser Determinístico" },
       { id: "node-layer3-trgm", name: "Capa 3: pg_trgm Fuzzy GIN" },
       { id: "node-layer4-vector", name: "Capa 4: pgvector Embedding" },
-      { id: "node-sonnet-heal", name: "Claude Sonnet 5 Self-Healing" }
+      { id: "node-sonnet-heal", name: "Auto-recuperación (Luna)" }
     ]
   },
   {
     zone: 4,
     title: "ZONA 04: STRUCTURED DISPATCH & CRM",
     nodes: [
-      { id: "node-pydantic-val", name: "Pydantic Schema Validator" },
+      { id: "node-pydantic-val", name: "Validador de esquema JSON" },
       { id: "node-sanitize-output", name: "Output Markdown Sanitizer" },
       { id: "node-crm-dispatch", name: "Supabase CRM (atenciones_pendientes)" },
       { id: "node-waha-send", name: "Send Message (WAHA HTTP)" },

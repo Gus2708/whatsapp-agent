@@ -47,12 +47,12 @@ export const DEMO_ARCHITECTURE_PILLARS: RecruiterArchitectureMetric[] = [
     ],
   },
   {
-    title: 'Pydantic Structured Outputs',
+    title: 'Salida JSON estructurada',
     value: '80.6% Resolución Autónoma',
     badge: 'Enterprise Grade',
     description: 'Validación estricta de esquemas para cotizaciones, métodos de pago y políticas de retiro en tienda.',
     technicalDetails: [
-      'Esquemas Pydantic para precios exactos sin IVA adicional inventado',
+      'Esquema JSON estricto para precios exactos sin IVA inventado',
       'Políticas de atención: Pago Móvil, Zelle, Transferencia Banesco/Mercantil',
       'Detección automática de intención de compra vs. soporte técnico',
       'Transferencia a agente humano ante consultas fuera de inventario',

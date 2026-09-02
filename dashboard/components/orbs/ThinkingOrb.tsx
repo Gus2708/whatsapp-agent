@@ -69,13 +69,13 @@ export const ThinkingOrb: React.FC<ThinkingOrbProps> = ({
     2: 'CAPA 2: DICCIONARIO & JERGA REGIONAL',
     3: 'CAPA 3: SIMILITUD TRIGRAMAS (PG_TRGM)',
     4: 'CAPA 4: EMBEDDINGS HNSW (PGVECTOR)',
-    5: 'CAPA 5: RESCATE SEMÁNTICO (SONNET 5)',
+    5: 'CAPA 5: RESCATE SEMÁNTICO (LUNA)',
   };
 
   const stateLabels: Record<OrbState, string> = {
     idle: 'COGNITIVE ENGINE IDLE',
     searching_rag: 'INICIALIZANDO MOTOR RAG (7.650 SKUs)...',
-    thinking_llm: 'SONNET 5 REASONING...',
+    thinking_llm: 'LUNA REASONING...',
     dispatched: 'MATCH ENCONTRADO EN BASE DE DATOS',
     error: 'ERROR EN CONSULTA',
   };
