@@ -209,7 +209,7 @@ export default function FlightDeckDashboard() {
       <div ref={viewContainerRef} className="flex-1 min-h-0 flex flex-col w-full max-w-full p-1.5 overflow-hidden mt-1">
         {/* VIEW 1: FLIGHT DECK */}
         {activeTab === 'flight' && (
-          <div className="flex flex-col flex-1 min-h-0 gap-3 p-1 overflow-y-auto lg:overflow-hidden lg:justify-between">
+          <div className="crosshair-safe flex flex-col flex-1 min-h-0 gap-3 py-1 overflow-y-auto lg:overflow-hidden lg:justify-between">
             <div className="flex-shrink-0">
               <span className="font-mono text-[10px] text-gold-bright uppercase tracking-wider block mb-0.5 font-medium">
                 // GLOBAL TELEMETRY & FLIGHT RADAR
@@ -252,21 +252,21 @@ export default function FlightDeckDashboard() {
 
         {/* VIEW 3: RAG STUDIO */}
         {activeTab === 'rag' && (
-          <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden flex flex-col p-1">
+          <div className="crosshair-safe flex-1 min-h-0 overflow-y-auto lg:overflow-hidden flex flex-col py-1">
             <RagStudio />
           </div>
         )}
 
         {/* VIEW 4: 33-NODE N8N */}
         {activeTab === 'n8n' && (
-          <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="crosshair-safe flex-1 min-h-0 overflow-y-auto">
             <N8nVisualizer />
           </div>
         )}
 
         {/* VIEW 5: COMMAND CENTER */}
         {activeTab === 'devops' && (
-          <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="crosshair-safe flex-1 min-h-0 overflow-y-auto">
             <DevOpsConsole />
           </div>
         )}

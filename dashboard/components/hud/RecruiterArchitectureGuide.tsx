@@ -49,7 +49,7 @@ export const RecruiterArchitectureGuide: React.FC<RecruiterArchitectureGuideProp
                   <span className="font-mono text-[9.5px] sm:text-[10px] uppercase tracking-wider text-gold-bright font-bold">
                     // RECRUITER & TECH LEAD BRIEFING
                   </span>
-                  <span className="px-1.5 sm:px-2 py-0.2 bg-pulse-green/10 border border-pulse-green/40 text-pulse-green font-mono text-[8.5px] sm:text-[9px] font-semibold">
+                  <span className="px-1.5 sm:px-2 py-0.5 bg-pulse-green/10 border border-pulse-green/40 text-pulse-green font-mono text-[10px] font-semibold">
                     ENTERPRISE ARCHITECTURE
                   </span>
                 </div>
@@ -121,7 +121,7 @@ export const RecruiterArchitectureGuide: React.FC<RecruiterArchitectureGuideProp
                             {pillar.title}
                           </span>
                         </div>
-                        <span className="text-[8.5px] sm:text-[9px] px-1.5 py-0.2 bg-pulse-green/10 border border-pulse-green/30 text-pulse-green font-medium">
+                        <span className="text-[10px] px-1.5 py-0.5 bg-pulse-green/10 border border-pulse-green/30 text-pulse-green font-medium">
                           {pillar.badge}
                         </span>
                       </div>
@@ -157,19 +157,19 @@ export const RecruiterArchitectureGuide: React.FC<RecruiterArchitectureGuideProp
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[10px]">
                 <div className="p-2 bg-[#121212] border border-graphite/60 flex flex-col gap-0.5">
-                  <span className="text-smoke uppercase text-[8.5px] sm:text-[9px]">Latencia Mediana (p50)</span>
+                  <span className="text-smoke uppercase text-[10px]">Latencia Mediana (p50)</span>
                   <span className="text-pulse-green font-bold text-xs">14ms (AST Match)</span>
-                  <span className="text-smoke/60 text-[8px] sm:text-[8.5px]">vs ~1.800ms llamada LLM</span>
+                  <span className="text-smoke text-[9.5px]">vs ~1.800ms llamada LLM</span>
                 </div>
                 <div className="p-2 bg-[#121212] border border-graphite/60 flex flex-col gap-0.5">
-                  <span className="text-smoke uppercase text-[8.5px] sm:text-[9px]">Tasa de Alucinación</span>
+                  <span className="text-smoke uppercase text-[10px]">Tasa de Alucinación</span>
                   <span className="text-pulse-green font-bold text-xs">0.00% en Precios</span>
-                  <span className="text-smoke/60 text-[8px] sm:text-[8.5px]">vs 8.4% en RAG simple</span>
+                  <span className="text-smoke text-[9.5px]">vs 8.4% en RAG simple</span>
                 </div>
                 <div className="p-2 bg-[#121212] border border-graphite/60 flex flex-col gap-0.5">
-                  <span className="text-smoke uppercase text-[8.5px] sm:text-[9px]">Consumo de Tokens</span>
+                  <span className="text-smoke uppercase text-[10px]">Consumo de Tokens</span>
                   <span className="text-pulse-green font-bold text-xs">80.6% Token Zero</span>
-                  <span className="text-smoke/60 text-[8px] sm:text-[8.5px]">Resuelto antes de capa 5</span>
+                  <span className="text-smoke text-[9.5px]">Resuelto antes de capa 5</span>
                 </div>
               </div>
             </div>

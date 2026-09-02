@@ -360,28 +360,28 @@ export const RagStudio: React.FC = () => {
                         {/* Title & Tech */}
                         <div className="min-w-0">
                           <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
-                            <span className="font-mono text-[8.5px] sm:text-[9px] font-semibold text-gold-bright">
+                            <span className="font-mono text-[10px] font-semibold text-gold-bright">
                               CAPA 0{layer.num}
                             </span>
                             {isResolvedHit && (
-                              <span className="inline-flex items-center gap-0.5 font-mono text-[8px] sm:text-[8.5px] text-pulse-green font-bold bg-pulse-green/10 px-1 py-0.2 border border-pulse-green/40">
+                              <span className="inline-flex items-center gap-0.5 font-mono text-[9.5px] text-pulse-green font-bold bg-pulse-green/10 px-1 py-0.5 border border-pulse-green/40">
                                 <CheckCircle2 className="h-2.5 w-2.5" />
                                 MATCH HIT
                               </span>
                             )}
                             {isScanning && (
-                              <span className="font-mono text-[8px] sm:text-[8.5px] text-cyan-300 font-medium bg-cyan-400/10 px-1 py-0.2 border border-cyan-400/40 animate-pulse">
+                              <span className="font-mono text-[9.5px] text-cyan-300 font-medium bg-cyan-400/10 px-1 py-0.5 border border-cyan-400/40 animate-pulse">
                                 ESCANEANDO...
                               </span>
                             )}
                             {isEvaluatedMiss && (
-                              <span className="inline-flex items-center gap-0.5 font-mono text-[8px] sm:text-[8.5px] text-smoke bg-[#181818] px-1 py-0.2 border border-graphite">
+                              <span className="inline-flex items-center gap-0.5 font-mono text-[9.5px] text-smoke bg-[#181818] px-1 py-0.5 border border-graphite">
                                 <XCircle className="h-2.5 w-2.5" />
                                 FALLÓ
                               </span>
                             )}
                             {isBypassed && (
-                              <span className="font-mono text-[8px] sm:text-[8.5px] text-smoke/60">
+                              <span className="font-mono text-[9.5px] text-smoke">
                                 [BYPASS $0]
                               </span>
                             )}
@@ -398,7 +398,7 @@ export const RagStudio: React.FC = () => {
                           <Clock className="h-2.5 w-2.5 text-smoke" />
                           <span>{layer.lat}</span>
                         </div>
-                        <div className="font-mono text-[8.5px] sm:text-[9px] text-smoke">
+                        <div className="font-mono text-[10px] text-smoke">
                           {layer.cost}
                         </div>
                       </div>
@@ -407,7 +407,7 @@ export const RagStudio: React.FC = () => {
                     {/* Cascading Directional Arrow between layers */}
                     {idx < layersInfo.length - 1 && (
                       <div className="flex items-center justify-center -my-0.5">
-                        <div className="flex items-center gap-1 text-smoke/40 font-mono text-[8px]">
+                        <div className="flex items-center gap-1 text-smoke font-mono text-[9.5px]">
                           <div className="h-2 sm:h-2.5 w-[1px] bg-graphite" />
                           <ArrowDown className="h-2 sm:h-2.5 w-2 sm:w-2.5 text-graphite" />
                         </div>

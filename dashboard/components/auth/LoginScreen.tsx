@@ -179,7 +179,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onEnte
                   <Zap className="h-3 w-3 text-pulse-green flex-shrink-0" />
                   <span>// ACCESO EVALUADORES TÉCNICOS</span>
                 </span>
-                <span className="px-1.5 py-0.2 bg-pulse-green/10 border border-pulse-green/30 text-pulse-green text-[8.5px] font-semibold">
+                <span className="px-1.5 py-0.5 bg-pulse-green/10 border border-pulse-green/30 text-pulse-green text-[10px] font-semibold">
                   1-CLICK GUEST
                 </span>
               </div>
@@ -197,7 +197,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onEnte
                 <ArrowRight className="h-3.5 w-3.5 text-smoke group-hover:text-gold-bright group-hover:translate-x-0.5 transition-all flex-shrink-0" />
               </button>
 
-              <p className="font-mono text-[9px] text-smoke/70 text-center leading-tight">
+              <p className="font-mono text-[9.5px] text-smoke text-center leading-tight">
                 Datos sanitizados · 5 Capas RAG · 33 Nodos n8n · Telemetría en Vivo
               </p>
             </div>

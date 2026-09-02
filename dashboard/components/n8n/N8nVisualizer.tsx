@@ -108,12 +108,19 @@ export const N8nVisualizer: React.FC = () => {
           onStart: () => {
             setActiveNodeId(nodeId);
             playPacket();
-            // Auto-scroll to the active node so animation is visible on mobile
+            // Auto-scroll to the active node so the animation is visible on mobile.
+            // The global `scroll-behavior: auto` rule does NOT affect the
+            // `behavior` option passed here, so reduced motion is checked directly.
             requestAnimationFrame(() => {
               const el = document.querySelector(`[data-node-id="${nodeId}"]`);
-              if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-              }
+              if (!el) return;
+              const prefersReduced = window.matchMedia(
+                '(prefers-reduced-motion: reduce)'
+              ).matches;
+              el.scrollIntoView({
+                behavior: prefersReduced ? 'auto' : 'smooth',
+                block: 'nearest',
+              });
             });
           },
         }
@@ -122,7 +129,7 @@ export const N8nVisualizer: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 pb-8 overflow-x-hidden">
+    <div className="crosshair-safe space-y-4 sm:space-y-6 pb-8 overflow-x-hidden">
       {/* Header & Controls */}
       <div className="flex flex-wrap justify-between items-start sm:items-end gap-3 mb-2 sm:mb-4">
         <div>
@@ -230,7 +237,8 @@ export const N8nVisualizer: React.FC = () => {
               <span className="font-mono text-[10px] text-smoke hidden sm:inline">Click para simular</span>
               <button
                 onClick={fetchN8nTelemetry}
-                className="text-smoke hover:text-chalk transition-colors cursor-pointer p-1"
+                className="hud-tap-target flex items-center justify-center text-smoke transition-colors hover:text-chalk cursor-pointer p-1"
+                aria-label="Refrescar telemetria de n8n"
                 title="Refrescar"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
@@ -272,7 +280,7 @@ export const N8nVisualizer: React.FC = () => {
                           e.stopPropagation();
                           simulatePacketPulse(ex.id);
                         }}
-                        className="flex items-center gap-1 font-mono text-[9.5px] sm:text-[10px] uppercase font-semibold px-2 py-0.5 border border-compass-gold/40 text-gold-bright bg-compass-gold/10 hover:bg-compass-gold/25 transition-colors"
+                        className="hud-tap-target flex items-center justify-center gap-1 font-mono text-[10px] uppercase font-semibold px-2 py-0.5 border border-compass-gold/40 text-gold-bright bg-compass-gold/10 hover:bg-compass-gold/25 transition-colors"
                       >
                         <Play className="h-2.5 w-2.5 fill-current" />
                         <span>Simular</span>

@@ -174,7 +174,7 @@ export const LiveLogStream: React.FC = () => {
           <div key={log.id} className="flex items-start gap-2 sm:gap-3 border-b border-[#161616] pb-2 transition-all">
             <span className="text-smoke/60 font-mono text-[10px] sm:text-[11px] select-none flex-shrink-0">{log.time}</span>
             <span
-              className={`font-mono text-[8.5px] sm:text-[9px] uppercase px-1.5 py-0.5 flex-shrink-0 font-medium ${getTagClass(
+              className={`font-mono text-[9.5px] uppercase px-1.5 py-0.5 flex-shrink-0 font-medium ${getTagClass(
                 log.tag
               )}`}
             >

@@ -71,11 +71,11 @@ export const CrmWorkspace: React.FC<CrmWorkspaceProps> = ({
   }, [isLeadOpen]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden md:grid md:grid-cols-12 md:gap-3 lg:gap-4">
+    <div className="crosshair-safe flex min-h-0 flex-1 flex-col gap-3 md:grid md:grid-cols-12 md:gap-3 lg:gap-4">
       {/* Pane 1: conversation list */}
       <section
         aria-label="Lista de conversaciones"
-        className={`min-h-0 flex-1 flex-col overflow-hidden md:col-span-5 md:flex md:h-full md:max-h-full lg:col-span-3 ${
+        className={`min-h-0 flex-1 flex-col md:col-span-5 md:flex md:h-full md:max-h-full lg:col-span-3 ${
           pane === 'list' ? 'flex' : 'hidden'
         }`}
       >
@@ -93,7 +93,7 @@ export const CrmWorkspace: React.FC<CrmWorkspaceProps> = ({
       {/* Pane 2: chat */}
       <section
         aria-label="Conversación activa"
-        className={`min-h-0 flex-1 flex-col overflow-hidden md:col-span-7 md:flex md:h-full md:max-h-full lg:col-span-6 ${
+        className={`min-h-0 flex-1 flex-col md:col-span-7 md:flex md:h-full md:max-h-full lg:col-span-6 ${
           pane === 'chat' ? 'flex' : 'hidden'
         }`}
       >
@@ -109,7 +109,7 @@ export const CrmWorkspace: React.FC<CrmWorkspaceProps> = ({
       {/* Pane 3: lead profile, permanent only from lg up */}
       <section
         aria-label="Perfil del lead"
-        className="hidden min-h-0 overflow-hidden lg:col-span-3 lg:flex lg:h-full lg:max-h-full lg:flex-col"
+        className="hidden min-h-0 lg:col-span-3 lg:flex lg:h-full lg:max-h-full lg:flex-col"
       >
         <LeadDetailsPane conversation={selectedConversation} />
       </section>

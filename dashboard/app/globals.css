@@ -79,7 +79,14 @@ body {
   background: var(--color-compass-gold);
 }
 
-/* 90-degree Sharp Corner Crosshair Base (Centered on Vertices) */
+/*
+ * 90-degree Sharp Corner Crosshairs, centred on each vertex.
+ *
+ * Each mark deliberately overhangs its card by CROSSHAIR_OVERHANG (6px: half of
+ * the 10px box plus the 1px offset). Any ancestor that clips — including
+ * `overflow-y: auto`, which forces the horizontal axis to clip as well — must
+ * therefore reserve at least that much inner padding, or it slices the marks.
+ */
 .corner-cross {
   position: absolute;
   width: 10px;
@@ -112,6 +119,15 @@ body {
   bottom: -1px;
   right: -1px;
   transform: translate(50%, 50%);
+}
+
+/*
+ * Reserves the crosshair overhang for any container that clips its children.
+ * Apply to scroll wrappers and `overflow-hidden` boxes that host CrosshairCards.
+ */
+.crosshair-safe {
+  padding-left: 7px;
+  padding-right: 7px;
 }
 
 .blueprint-card:hover .corner-cross {
@@ -173,7 +189,7 @@ body {
   display: none;
 }
 
-@media (min-width: 640px) and (min-height: 561px) {
+@media (min-height: 561px) {
   .hud-header-brand {
     display: block;
   }
@@ -183,4 +199,16 @@ body {
 .scroll-fade-x {
   -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
   mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+}
+
+/*
+ * Touch devices get real hit areas on icon-only actions; pointer devices keep
+ * the compact HUD chrome. A 12x12 icon button is not hittable on a phone, and
+ * one of these signs the user out.
+ */
+@media (pointer: coarse) {
+  .hud-tap-target {
+    min-width: 40px;
+    min-height: 40px;
+  }
 }

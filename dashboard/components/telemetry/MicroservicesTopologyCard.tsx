@@ -163,7 +163,7 @@ export const MicroservicesTopologyCard: React.FC = () => {
                     </span>
                   </div>
                   <span
-                    className={`font-mono text-[9px] px-1 py-0.2 border flex-shrink-0 transition-colors ${
+                    className={`font-mono text-[9px] px-1 py-0.5 border flex-shrink-0 transition-colors ${
                       isServicePulsing
                         ? 'text-pulse-green border-pulse-green bg-pulse-green/20 font-bold animate-pulse'
                         : isGold
@@ -239,14 +239,14 @@ export const MicroservicesTopologyCard: React.FC = () => {
                     }`}
                   >
                     <span
-                      className={`font-mono text-[8.5px] lg:text-[9px] font-medium truncate w-full ${
+                      className={`font-mono text-[10px] font-medium truncate w-full ${
                         isStageActive ? 'text-pulse-green font-bold' : isStagePassed ? 'text-emerald-300' : 'text-chalk'
                       }`}
                     >
                       {stage.label}
                     </span>
                     <span
-                      className={`font-mono text-[7.5px] lg:text-[8px] truncate mt-0.5 ${
+                      className={`font-mono text-[9.5px] truncate mt-0.5 ${
                         isStageActive ? 'text-pulse-green font-bold animate-pulse' : isStagePassed ? 'text-emerald-400' : 'text-pulse-green'
                       }`}
                     >
@@ -283,14 +283,14 @@ export const MicroservicesTopologyCard: React.FC = () => {
                   }`}
                 >
                   <span
-                    className={`font-mono text-[8.5px] font-medium truncate w-full ${
+                    className={`font-mono text-[10px] font-medium truncate w-full ${
                       isStageActive ? 'text-pulse-green font-bold' : isStagePassed ? 'text-emerald-300' : 'text-chalk'
                     }`}
                   >
                     0{stage.stageIdx + 1} {stage.label}
                   </span>
                   <span
-                    className={`font-mono text-[8px] truncate mt-0.5 ${
+                    className={`font-mono text-[9.5px] truncate mt-0.5 ${
                       isStageActive ? 'text-pulse-green font-bold animate-pulse' : isStagePassed ? 'text-emerald-400' : 'text-pulse-green'
                     }`}
                   >

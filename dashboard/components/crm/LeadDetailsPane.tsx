@@ -50,7 +50,7 @@ export const LeadDetailsPane: React.FC<LeadDetailsPaneProps> = ({
   const dashOffset = GAUGE_CIRCUMFERENCE * (1 - score / 100);
 
   return (
-    <CrosshairCard className="flex h-full max-h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#0c0c0c]">
+    <CrosshairCard className="flex h-full max-h-full min-h-0 flex-1 flex-col bg-[#0c0c0c]">
       {/* Header */}
       <div className="flex flex-shrink-0 items-start justify-between gap-2 border-b border-graphite bg-[#0e0e0e] px-4 py-3">
         <div>
@@ -109,7 +109,7 @@ export const LeadDetailsPane: React.FC<LeadDetailsPaneProps> = ({
               >
                 {score}
               </span>
-              <span className="mt-0.5 font-mono text-[8.5px] uppercase tracking-wider text-smoke">
+              <span className="mt-0.5 font-mono text-[9.5px] uppercase tracking-wider text-smoke">
                 Score
               </span>
             </div>
