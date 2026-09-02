@@ -73,21 +73,21 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) 
 
   return (
     <>
-      <header className="sticky top-2 z-50 mb-3 flex flex-wrap items-center justify-between gap-3 border border-graphite bg-[#0e0e0e]/95 px-3.5 py-2.5 backdrop-blur-xl pointer-events-auto">
+      <header className="hud-header pointer-events-auto sticky top-0 z-50 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border border-graphite bg-[#0e0e0e]/95 backdrop-blur-xl sm:top-2">
         {/* Brand & Mission Status */}
-        <div className="flex items-center gap-2.5 select-none">
+        <div className="flex min-w-0 select-none items-center gap-2.5">
           <img
             src="/crmlogo.svg"
             alt="CRM Logo"
             className="h-6 w-auto object-contain flex-shrink-0"
           />
-          <div>
-            <div className="font-mono text-[12.5px] font-semibold uppercase tracking-wider text-chalk flex items-center gap-1.5">
+          <div className="hud-header-brand min-w-0">
+            <div className="flex items-center gap-1.5 truncate font-mono text-[12.5px] font-semibold uppercase tracking-wider text-chalk">
               <span>{process.env.NEXT_PUBLIC_AGENT_NAME || 'PERUCHO'}</span>
-              <span className="text-compass-gold">//</span>
-              <span className="text-smoke">WHATSAPP CRM FLIGHT DECK</span>
+              <span className="hidden text-gold-bright md:inline">//</span>
+              <span className="hidden text-smoke md:inline">WHATSAPP CRM FLIGHT DECK</span>
             </div>
-            <div className="font-mono text-[9.5px] text-smoke uppercase">
+            <div className="hidden truncate font-mono text-[9.5px] uppercase text-smoke sm:block">
               TARGET: {process.env.NEXT_PUBLIC_TARGET_NAME || 'FERRETERÍA EL SERRUCHO'} · 33 NODES · 7,650 SKUs
             </div>
           </div>
@@ -95,7 +95,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) 
 
         {/* Segmented Navigation Capsule */}
         <nav
-          className="flex items-center gap-1 rounded-full border border-graphite bg-[#111111]/90 p-1 backdrop-blur-md"
+          className="order-3 flex w-full items-center gap-1 overflow-x-auto rounded-full border border-graphite bg-[#111111]/90 p-1 backdrop-blur-md sm:order-none sm:w-auto"
           role="tablist"
         >
           {tabs.map((tab) => {
@@ -105,8 +105,10 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) 
                 key={tab.id}
                 role="tab"
                 aria-selected={isActive}
+                aria-label={tab.label}
+                title={tab.label}
                 onClick={() => handleTabClick(tab.id)}
-                className={`relative flex items-center gap-2 rounded-full px-3 py-1.5 font-mono text-[11px] font-medium uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+                className={`relative flex min-h-[44px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-full px-3 py-1.5 font-mono text-[11px] font-medium uppercase tracking-wider transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-compass-gold sm:min-h-0 sm:flex-none ${
                   isActive
                     ? 'bg-compass-gold/15 text-compass-gold ring-1 ring-compass-gold/40 shadow-[0_0_12px_rgba(212,175,55,0.2)]'
                     : 'text-smoke hover:bg-graphite/40 hover:text-chalk'
@@ -115,7 +117,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) 
                 <span className={isActive ? 'text-compass-gold' : 'text-smoke'}>
                   {tab.icon}
                 </span>
-                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="hidden lg:inline">{tab.label}</span>
                 {isActive && (
                   <span className="h-1 w-1 rounded-full bg-compass-gold animate-pulse" />
                 )}
@@ -125,18 +127,18 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) 
         </nav>
 
         {/* Right Status Capsule: Recruiter Guide + Tunnels + User + Sound */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-1.5 sm:gap-2">
           {/* Recruiter Guide CTA Button */}
           <button
             onClick={() => {
               playSuccess();
               setIsGuideOpen(true);
             }}
-            className="flex items-center gap-1.5 border border-compass-gold/50 bg-compass-gold/10 hover:bg-compass-gold/20 hover:border-compass-gold px-2.5 py-1 font-mono text-[10.5px] text-compass-gold font-semibold uppercase tracking-wider transition-all shadow-[0_0_10px_rgba(212,175,55,0.15)] cursor-pointer"
+            className="flex min-h-[32px] cursor-pointer items-center gap-1.5 border border-compass-gold/50 bg-compass-gold/10 px-2.5 py-1 font-mono text-[10.5px] font-semibold uppercase tracking-wider text-gold-bright shadow-[0_0_10px_rgba(212,175,55,0.15)] transition-all hover:border-compass-gold hover:bg-compass-gold/20"
             title="Abrir resumen arquitectónico para evaluadores técnicos"
           >
             <Sparkles className="h-3 w-3 text-pulse-green animate-pulse" />
-            <span className="hidden md:inline">GUÍA ARQUITECTURA</span>
+            <span className="hud-guide-label">GUÍA ARQUITECTURA</span>
           </button>
 
           {/* Cloudflare Tunnel Status Badge */}
@@ -184,7 +186,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) 
           {/* User Session & Logout */}
           {user && (
             <div className="flex items-center gap-1.5 border border-graphite bg-[#111111] px-2 py-1 font-mono text-[10.5px]">
-              <UserIcon className="h-3 w-3 text-compass-gold flex-shrink-0" />
+              <UserIcon className="h-3 w-3 flex-shrink-0 text-gold-bright" />
               <span className="text-chalk max-w-[120px] truncate hidden md:inline" title={user.email}>
                 {isDemoMode ? 'RECRUITER DEMO' : user.email?.split('@')[0]}
               </span>

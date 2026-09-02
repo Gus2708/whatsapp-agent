@@ -115,21 +115,21 @@ export const N8nVisualizer: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="space-y-4 sm:space-y-6 pb-8">
       {/* Header & Controls */}
-      <div className="flex flex-wrap justify-between items-end gap-4 mb-4">
+      <div className="flex flex-wrap justify-between items-start sm:items-end gap-3 mb-2 sm:mb-4">
         <div>
-          <span className="font-mono text-[11px] text-compass-gold uppercase tracking-wider block mb-1">
+          <span className="font-mono text-[10px] sm:text-[11px] text-gold-bright uppercase tracking-wider block mb-1 font-medium">
             // LIVE CLOUDFLARE TUNNEL · N8N ORCHESTRATION ENGINE
           </span>
-          <h2 className="text-2xl font-normal text-chalk tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-normal text-chalk tracking-tight">
             Topología de 33 Nodos & Telemetría en Vivo
           </h2>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {/* Dynamic Tunnel Status Indicator */}
-          <div className="flex items-center gap-2 border border-graphite bg-[#111111] px-3 py-1.5 font-mono text-xs">
+          <div className="flex items-center gap-2 border border-graphite bg-[#111111] px-2.5 sm:px-3 py-1.5 font-mono text-[11px] sm:text-xs">
             <span
               className={`h-2 w-2 rounded-full ${
                 isOnline
@@ -137,7 +137,7 @@ export const N8nVisualizer: React.FC = () => {
                   : 'bg-neon-rose'
               }`}
             />
-            <span className="text-smoke">TÚNEL n8n:</span>
+            <span className="text-smoke">TÚNEL:</span>
             <span className={isOnline ? 'text-pulse-green font-semibold' : 'text-smoke'}>
               {isOnline ? 'ONLINE' : 'OFFLINE'}
             </span>
@@ -148,9 +148,9 @@ export const N8nVisualizer: React.FC = () => {
               href={tunnelUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 font-mono text-xs font-semibold border border-compass-gold bg-compass-gold/10 text-compass-gold hover:bg-compass-gold/20 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 font-mono text-[11px] sm:text-xs font-semibold border border-compass-gold bg-compass-gold/10 text-gold-bright hover:bg-compass-gold/20 transition-colors min-h-[36px] sm:min-h-0"
             >
-              <span>Abrir Editor n8n</span>
+              <span>Editor n8n</span>
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
           )}
@@ -158,7 +158,7 @@ export const N8nVisualizer: React.FC = () => {
           <button
             onClick={() => simulatePacketPulse()}
             disabled={isSimulating}
-            className={`inline-flex items-center gap-2 px-4 py-2 font-mono text-xs font-semibold uppercase border transition-all cursor-pointer ${
+            className={`inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 font-mono text-xs font-semibold uppercase border transition-all cursor-pointer min-h-[36px] sm:min-h-0 ${
               isSimulating
                 ? 'bg-pulse-green/20 text-pulse-green border-pulse-green cursor-wait'
                 : 'bg-signal-white text-obsidian border-signal-white hover:bg-[#e4e4e7]'
@@ -171,15 +171,15 @@ export const N8nVisualizer: React.FC = () => {
       </div>
 
       {/* Live Workflows & Recent Executions Stream */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 p-0.5">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-5 p-0.5">
         {/* Active Workflows Panel */}
-        <CrosshairCard className="lg:col-span-6 p-5 bg-[#0a0a0a]">
-          <div className="flex items-center justify-between font-mono text-xs text-smoke uppercase tracking-wider mb-3 pb-2 border-b border-graphite">
+        <CrosshairCard className="lg:col-span-6 p-3.5 sm:p-5 bg-[#0a0a0a]">
+          <div className="flex items-center justify-between font-mono text-[11px] sm:text-xs text-smoke uppercase tracking-wider mb-3 pb-2 border-b border-graphite">
             <span className="flex items-center gap-1.5 text-chalk font-semibold">
-              <GitBranch className="h-3.5 w-3.5 text-compass-gold" />
+              <GitBranch className="h-3.5 w-3.5 text-gold-bright" />
               <span>Workflows Activos en Instancia</span>
             </span>
-            <span className="text-pulse-green">
+            <span className="text-pulse-green font-semibold">
               {workflows.filter((w) => w.active).length} ACTIVOS
             </span>
           </div>
@@ -189,7 +189,7 @@ export const N8nVisualizer: React.FC = () => {
               workflows.map((wf) => (
                 <div
                   key={wf.id}
-                  className="flex items-center justify-between p-2.5 border border-graphite bg-[#121212] font-mono text-xs"
+                  className="flex items-center justify-between p-2 sm:p-2.5 border border-graphite bg-[#121212] font-mono text-[11.5px] sm:text-xs"
                 >
                   <div className="flex items-center gap-2 truncate">
                     <span
@@ -199,7 +199,7 @@ export const N8nVisualizer: React.FC = () => {
                     />
                     <span className="text-chalk truncate">{wf.name}</span>
                   </div>
-                  <span className="text-[11px] text-smoke ml-2 flex-shrink-0">
+                  <span className="text-[10.5px] sm:text-[11px] text-smoke ml-2 flex-shrink-0">
                     ID: {wf.id}
                   </span>
                 </div>
@@ -213,20 +213,20 @@ export const N8nVisualizer: React.FC = () => {
         </CrosshairCard>
 
         {/* Live Executions Panel with Direct Simulation Trigger */}
-        <CrosshairCard className="lg:col-span-6 p-5 bg-[#0a0a0a]">
-          <div className="flex items-center justify-between font-mono text-xs text-smoke uppercase tracking-wider mb-3 pb-2 border-b border-graphite">
+        <CrosshairCard className="lg:col-span-6 p-3.5 sm:p-5 bg-[#0a0a0a]">
+          <div className="flex items-center justify-between font-mono text-[11px] sm:text-xs text-smoke uppercase tracking-wider mb-3 pb-2 border-b border-graphite">
             <span className="flex items-center gap-1.5 text-chalk font-semibold">
               <Activity className="h-3.5 w-3.5 text-pulse-green" />
               <span>Últimas Ejecuciones en Tiempo Real</span>
             </span>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-[10px] text-smoke">Haz click para simular</span>
+              <span className="font-mono text-[10px] text-smoke hidden sm:inline">Click para simular</span>
               <button
                 onClick={fetchN8nTelemetry}
-                className="text-smoke hover:text-chalk transition-colors cursor-pointer"
+                className="text-smoke hover:text-chalk transition-colors cursor-pointer p-1"
                 title="Refrescar"
               >
-                <RefreshCw className="h-3 w-3" />
+                <RefreshCw className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
@@ -239,7 +239,7 @@ export const N8nVisualizer: React.FC = () => {
                   <div
                     key={ex.id}
                     onClick={() => simulatePacketPulse(ex.id)}
-                    className={`flex items-center justify-between p-2.5 border cursor-pointer transition-all duration-200 ${
+                    className={`flex items-center justify-between p-2 sm:p-2.5 border cursor-pointer transition-all duration-200 min-h-[40px] ${
                       isSelectedForSim
                         ? 'border-pulse-green bg-pulse-green/15 shadow-[0_0_12px_rgba(152,255,56,0.2)]'
                         : 'border-graphite bg-[#121212] hover:border-compass-gold/60 hover:bg-[#181818]'
@@ -251,8 +251,8 @@ export const N8nVisualizer: React.FC = () => {
                       <span className="text-chalk font-mono text-xs">Ejecución #{ex.id}</span>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <span className="text-[11px] text-smoke">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <span className="text-[10px] sm:text-[11px] text-smoke">
                         {new Date(ex.startedAt).toLocaleTimeString('es-VE', {
                           hour: '2-digit',
                           minute: '2-digit',
@@ -265,7 +265,7 @@ export const N8nVisualizer: React.FC = () => {
                           e.stopPropagation();
                           simulatePacketPulse(ex.id);
                         }}
-                        className="flex items-center gap-1 font-mono text-[10px] uppercase font-semibold px-2 py-0.5 border border-compass-gold/40 text-compass-gold bg-compass-gold/10 hover:bg-compass-gold/25 transition-colors"
+                        className="flex items-center gap-1 font-mono text-[9.5px] sm:text-[10px] uppercase font-semibold px-2 py-0.5 border border-compass-gold/40 text-gold-bright bg-compass-gold/10 hover:bg-compass-gold/25 transition-colors"
                       >
                         <Play className="h-2.5 w-2.5 fill-current" />
                         <span>Simular</span>
@@ -285,26 +285,26 @@ export const N8nVisualizer: React.FC = () => {
 
       {/* 33-Node Visualizer Topology Grid */}
       <div ref={topologyRef} className="p-0.5">
-        <CrosshairCard className="p-6 bg-[#080808]">
-          <div className="flex items-center justify-between font-mono text-xs text-smoke uppercase tracking-wider mb-4 pb-2 border-b border-graphite">
+        <CrosshairCard className="p-3.5 sm:p-6 bg-[#080808]">
+          <div className="flex items-center justify-between font-mono text-[11px] sm:text-xs text-smoke uppercase tracking-wider mb-3 sm:mb-4 pb-2 border-b border-graphite">
             <span className="flex items-center gap-2 text-chalk font-semibold">
               <Zap className="h-3.5 w-3.5 text-pulse-green" />
               <span>Pipeline Visual de 33 Nodos</span>
             </span>
             {activeExecutionId && (
-              <span className="font-mono text-xs text-pulse-green font-semibold animate-pulse">
+              <span className="font-mono text-[11px] sm:text-xs text-pulse-green font-semibold animate-pulse">
                 SIMULANDO EJECUCIÓN #{activeExecutionId}
               </span>
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 overflow-x-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 sm:gap-5">
             {N8N_ZONES.map((zone) => (
               <div
                 key={zone.zone}
-                className="bg-[#0e0e0e] border border-graphite p-4 flex flex-col gap-2.5"
+                className="bg-[#0e0e0e] border border-graphite p-3 sm:p-4 flex flex-col gap-2 sm:gap-2.5"
               >
-                <div className="font-mono text-[11px] text-compass-gold uppercase tracking-wider border-b border-graphite pb-2 mb-1">
+                <div className="font-mono text-[10.5px] sm:text-[11px] text-gold-bright uppercase tracking-wider border-b border-graphite pb-1.5 sm:pb-2 mb-1 font-semibold">
                   {zone.title}
                 </div>
 
@@ -313,7 +313,7 @@ export const N8nVisualizer: React.FC = () => {
                   return (
                     <div
                       key={node.id}
-                      className={`p-3 border flex items-center gap-2.5 text-xs text-chalk cursor-pointer transition-all duration-200 ${
+                      className={`p-2.5 sm:p-3 border flex items-center gap-2 sm:gap-2.5 text-xs text-chalk cursor-pointer transition-all duration-200 min-h-[38px] ${
                         isFiring
                           ? 'border-pulse-green bg-pulse-green/15 shadow-[0_0_14px_rgba(152,255,56,0.25)] scale-[1.02]'
                           : 'border-graphite bg-[#141414] hover:border-ash hover:bg-[#1c1c1c]'
@@ -323,10 +323,10 @@ export const N8nVisualizer: React.FC = () => {
                         className={`h-2 w-2 rounded-full flex-shrink-0 transition-all ${
                           isFiring
                             ? 'bg-pulse-green shadow-[0_0_8px_var(--color-pulse-green)]'
-                            : 'bg-compass-gold'
+                            : 'bg-gold-bright'
                         }`}
                       />
-                      <span className="font-mono text-[11.5px] truncate">{node.name}</span>
+                      <span className="font-mono text-[11px] sm:text-[11.5px] truncate">{node.name}</span>
                     </div>
                   );
                 })}

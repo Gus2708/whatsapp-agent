@@ -117,21 +117,21 @@ export const MicroservicesTopologyCard: React.FC = () => {
   ];
 
   return (
-    <CrosshairCard className="p-4 bg-[#0c0c0c] flex flex-col justify-between h-full max-h-full min-h-0 flex-1">
-      <div className="flex flex-col gap-2.5 h-full justify-between min-h-0">
+    <CrosshairCard className="p-3 sm:p-4 bg-[#0c0c0c] flex flex-col justify-between flex-1 min-h-0">
+      <div className="flex flex-col gap-2.5 min-h-0">
         {/* Header with status badge */}
-        <div className="flex justify-between items-center flex-shrink-0">
+        <div className="flex flex-wrap justify-between items-center gap-2 flex-shrink-0">
           <div>
-            <span className="font-mono text-[10px] uppercase tracking-wider text-compass-gold block mb-0.5">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-gold-bright block mb-0.5 font-medium">
               // RESILIENCE & RUNTIME TOPOLOGY
             </span>
-            <h3 className="text-[15px] font-normal text-chalk">
+            <h3 className="text-sm sm:text-[15px] font-normal text-chalk">
               Topología de Microservicios & Pipeline en Producción
             </h3>
           </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-pulse-green/10 border border-pulse-green/30 font-mono text-[10px] text-pulse-green">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-pulse-green/10 border border-pulse-green/30 font-mono text-[10px] text-pulse-green flex-shrink-0">
             <span className="h-1.5 w-1.5 rounded-full bg-pulse-green animate-pulse" />
-            <span>ALTA DISPONIBILIDAD ACTIVA</span>
+            <span>ALTA DISPONIBILIDAD</span>
           </div>
         </div>
 
@@ -145,17 +145,17 @@ export const MicroservicesTopologyCard: React.FC = () => {
             return (
               <div
                 key={srv.id}
-                className={`p-2.5 border transition-all duration-300 flex flex-col justify-between ${
+                className={`p-2 sm:p-2.5 border transition-all duration-300 flex flex-col justify-between ${
                   isServicePulsing
                     ? 'bg-pulse-green/15 border-pulse-green shadow-[0_0_16px_rgba(152,255,56,0.3)] ring-1 ring-pulse-green/50 scale-[1.01]'
                     : 'bg-[#080808] border-graphite/80 hover:border-ash hover:bg-[#101010]'
                 }`}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-1.5 font-mono text-[9px] text-smoke uppercase truncate">
+                <div className="flex items-center justify-between mb-1 gap-1">
+                  <div className="flex items-center gap-1.5 font-mono text-[9px] text-smoke uppercase truncate min-w-0">
                     <Icon
                       className={`h-3 w-3 flex-shrink-0 ${
-                        isServicePulsing ? 'text-pulse-green animate-pulse' : 'text-compass-gold'
+                        isServicePulsing ? 'text-pulse-green animate-pulse' : 'text-gold-bright'
                       }`}
                     />
                     <span className={`truncate ${isServicePulsing ? 'text-chalk font-semibold' : ''}`}>
@@ -177,17 +177,17 @@ export const MicroservicesTopologyCard: React.FC = () => {
 
                 <div>
                   <div
-                    className={`text-[11.5px] font-medium truncate ${
+                    className={`text-[11px] sm:text-[11.5px] font-medium truncate ${
                       isServicePulsing
                         ? 'text-pulse-green font-semibold'
                         : isGold
-                        ? 'text-compass-gold'
+                        ? 'text-gold-bright'
                         : 'text-pulse-green'
                     }`}
                   >
                     {srv.status}
                   </div>
-                  <div className="font-mono text-[9.5px] text-smoke truncate mt-0.5">
+                  <div className="font-mono text-[9px] sm:text-[9.5px] text-smoke truncate mt-0.5">
                     {srv.detail}
                   </div>
                 </div>
@@ -198,16 +198,15 @@ export const MicroservicesTopologyCard: React.FC = () => {
 
         {/* Interactive Linear DAG Pipeline Flow */}
         <div
-          className={`p-3 border transition-all duration-300 flex flex-col gap-2 flex-shrink-0 ${
+          className={`p-2.5 sm:p-3 border transition-all duration-300 flex flex-col gap-2 flex-shrink-0 ${
             activeStage !== null
               ? 'bg-[#0e0e0e] border-compass-gold/60 shadow-[0_0_20px_rgba(212,175,55,0.15)]'
               : 'bg-[#080808] border-graphite'
           }`}
         >
-          <div className="font-mono text-[9px] uppercase tracking-wider text-compass-gold flex items-center justify-between">
+          <div className="font-mono text-[9px] uppercase tracking-wider text-gold-bright flex flex-wrap items-center justify-between gap-1">
             <div className="flex items-center gap-2">
-              {/* Compact 20px ThinkingOrb from library */}
-              <div className="h-5 w-5 flex items-center justify-center flex-shrink-0">
+              <div className="h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center flex-shrink-0">
                 <ThinkingOrb
                   state={activeStage !== null ? 'searching_rag' : 'idle'}
                   currentScanningLayer={activeStage !== null ? (Math.min(5, activeStage + 1) as 1 | 2 | 3 | 4 | 5) : null}
@@ -215,14 +214,15 @@ export const MicroservicesTopologyCard: React.FC = () => {
                   showLabel={false}
                 />
               </div>
-              <span className="font-mono text-[9.5px]">Flujo de Ejecución de Eventos en Tiempo Real</span>
+              <span className="font-mono text-[9px] sm:text-[9.5px]">Pipeline de Eventos en Tiempo Real</span>
             </div>
             <span className={activeStage !== null ? 'text-pulse-green font-bold animate-pulse' : 'text-smoke'}>
-              {activeStage !== null ? `Paso ${activeStage + 1}/6 en proceso...` : 'Latencia Total ~700ms'}
+              {activeStage !== null ? `Paso ${activeStage + 1}/6 en proceso...` : '~700ms Latencia'}
             </span>
           </div>
 
-          <div className="flex items-center justify-between gap-1.5 px-0.5 py-1">
+          {/* Desktop/Tablet: Horizontal flow with arrows. Mobile: 3x2 Grid */}
+          <div className="hidden md:flex items-center justify-between gap-1 px-0.5 py-1">
             {pipelineStages.map((stage, idx) => {
               const isStageActive = activeStage === stage.stageIdx;
               const isStagePassed = activeStage !== null && activeStage > stage.stageIdx;
@@ -230,7 +230,7 @@ export const MicroservicesTopologyCard: React.FC = () => {
               return (
                 <React.Fragment key={stage.label}>
                   <div
-                    className={`flex flex-col items-center px-2 py-1.5 flex-1 min-w-0 text-center border transition-all duration-300 ${
+                    className={`flex flex-col items-center px-1.5 py-1 flex-1 min-w-0 text-center border transition-all duration-300 ${
                       isStageActive
                         ? 'bg-pulse-green/20 border-pulse-green text-pulse-green shadow-[0_0_16px_rgba(152,255,56,0.4)] scale-[1.02] font-semibold ring-1 ring-pulse-green'
                         : isStagePassed
@@ -239,14 +239,14 @@ export const MicroservicesTopologyCard: React.FC = () => {
                     }`}
                   >
                     <span
-                      className={`font-mono text-[9px] font-medium truncate w-full ${
+                      className={`font-mono text-[8.5px] lg:text-[9px] font-medium truncate w-full ${
                         isStageActive ? 'text-pulse-green font-bold' : isStagePassed ? 'text-emerald-300' : 'text-chalk'
                       }`}
                     >
                       {stage.label}
                     </span>
                     <span
-                      className={`font-mono text-[8px] truncate mt-0.5 ${
+                      className={`font-mono text-[7.5px] lg:text-[8px] truncate mt-0.5 ${
                         isStageActive ? 'text-pulse-green font-bold animate-pulse' : isStagePassed ? 'text-emerald-400' : 'text-pulse-green'
                       }`}
                     >
@@ -264,25 +264,61 @@ export const MicroservicesTopologyCard: React.FC = () => {
               );
             })}
           </div>
+
+          {/* Mobile Grid (3 cols x 2 rows) for crisp readability */}
+          <div className="grid grid-cols-3 gap-1.5 md:hidden">
+            {pipelineStages.map((stage) => {
+              const isStageActive = activeStage === stage.stageIdx;
+              const isStagePassed = activeStage !== null && activeStage > stage.stageIdx;
+
+              return (
+                <div
+                  key={stage.label}
+                  className={`flex flex-col items-center px-1.5 py-1 text-center border transition-all duration-300 ${
+                    isStageActive
+                      ? 'bg-pulse-green/20 border-pulse-green text-pulse-green shadow-[0_0_12px_rgba(152,255,56,0.4)] font-semibold ring-1 ring-pulse-green'
+                      : isStagePassed
+                      ? 'bg-emerald-950/30 border-emerald-800 text-emerald-300'
+                      : 'bg-[#141414] border-graphite text-chalk'
+                  }`}
+                >
+                  <span
+                    className={`font-mono text-[8.5px] font-medium truncate w-full ${
+                      isStageActive ? 'text-pulse-green font-bold' : isStagePassed ? 'text-emerald-300' : 'text-chalk'
+                    }`}
+                  >
+                    0{stage.stageIdx + 1} {stage.label}
+                  </span>
+                  <span
+                    className={`font-mono text-[8px] truncate mt-0.5 ${
+                      isStageActive ? 'text-pulse-green font-bold animate-pulse' : isStagePassed ? 'text-emerald-400' : 'text-pulse-green'
+                    }`}
+                  >
+                    {stage.sub}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Operational Resilience Guarantees Footer */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-graphite/40 flex-shrink-0 font-mono text-[9.5px]">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-graphite/40 flex-shrink-0 font-mono text-[9px] sm:text-[9.5px]">
           <div className="flex items-center gap-1.5 text-smoke truncate">
             <ShieldCheck className="h-3 w-3 text-pulse-green flex-shrink-0" />
             <span className="text-chalk truncate">Deduplicación 100%</span>
           </div>
           <div className="flex items-center gap-1.5 text-smoke truncate">
-            <Server className="h-3 w-3 text-compass-gold flex-shrink-0" />
+            <Server className="h-3 w-3 text-gold-bright flex-shrink-0" />
             <span className="text-chalk truncate">7.650 SKUs Catálogo</span>
           </div>
           <div className="flex items-center gap-1.5 text-smoke truncate">
             <Zap className="h-3 w-3 text-gold-bright flex-shrink-0" />
-            <span className="text-chalk truncate">Zero Data Loss Queue</span>
+            <span className="text-chalk truncate">Zero Data Loss</span>
           </div>
           <div className="flex items-center gap-1.5 text-smoke truncate">
             <Cloud className="h-3 w-3 text-blue-400 flex-shrink-0" />
-            <span className="text-chalk truncate">Cloudflare Resilient</span>
+            <span className="text-chalk truncate">Cloudflare Tunnels</span>
           </div>
         </div>
       </div>

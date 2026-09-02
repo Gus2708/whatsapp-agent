@@ -16,6 +16,7 @@ out/
 dashboard/.next/
 dashboard/out/
 dashboard/node_modules/
+*.tsbuildinfo
 
 # ── Logs (boot, catchup, watchdog, sync, etc.) ──
 *.log

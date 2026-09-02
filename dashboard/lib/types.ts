@@ -2,6 +2,9 @@ export type TabType = 'flight' | 'crm' | 'rag' | 'n8n' | 'devops';
 
 export type LeadStatus = 'qualified' | 'in-progress' | 'escalated' | 'closed';
 
+/** Which CRM pane is in focus on viewports too narrow to show list and chat together. */
+export type CrmPane = 'list' | 'chat';
+
 export interface ChatMessage {
   id?: string;
   sender: 'client' | 'agent' | 'system';

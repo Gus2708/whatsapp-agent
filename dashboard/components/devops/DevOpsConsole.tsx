@@ -171,38 +171,38 @@ export const DevOpsConsole: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="mb-4">
-        <span className="font-mono text-[11px] text-compass-gold uppercase tracking-wider block mb-1">
+    <div className="space-y-4 sm:space-y-6 pb-8">
+      <div className="mb-2 sm:mb-4">
+        <span className="font-mono text-[10px] sm:text-[11px] text-gold-bright uppercase tracking-wider block mb-1 font-medium">
           // DEVOPS & RESILIENCE RUNNER
         </span>
-        <h2 className="text-2xl font-normal text-chalk tracking-tight">
+        <h2 className="text-xl sm:text-2xl font-normal text-chalk tracking-tight">
           Consola de Scripts de Automatización & Auto-Mejora
         </h2>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-5">
         {scriptCards.map((s) => {
           const state = scripts[s.id];
           return (
-            <CrosshairCard key={s.id} className="p-6 bg-[#0d0d0d] flex flex-col justify-between">
+            <CrosshairCard key={s.id} className="p-4 sm:p-6 bg-[#0d0d0d] flex flex-col justify-between">
               <div>
-                <span className="font-mono text-[10px] text-compass-gold uppercase tracking-wider block mb-1">
+                <span className="font-mono text-[9.5px] sm:text-[10px] text-gold-bright uppercase tracking-wider block mb-1 font-semibold">
                   {s.tag}
                 </span>
-                <h3 className="text-base font-medium text-chalk mb-1">{s.name}</h3>
-                <p className="text-xs text-smoke leading-relaxed mb-4">{s.desc}</p>
+                <h3 className="text-sm sm:text-base font-medium text-chalk mb-1">{s.name}</h3>
+                <p className="text-[11px] sm:text-xs text-smoke leading-relaxed mb-3 sm:mb-4">{s.desc}</p>
 
-                <div className="h-40 bg-[#050505] border border-graphite p-3 font-mono text-[11px] text-[#94a3b8] overflow-y-auto whitespace-pre-wrap">
+                <div className="h-32 sm:h-40 bg-[#050505] border border-graphite p-2.5 sm:p-3 font-mono text-[10.5px] sm:text-[11px] text-[#94a3b8] overflow-y-auto whitespace-pre-wrap">
                   {state.output}
                 </div>
               </div>
 
-              <div className="mt-4">
+              <div className="mt-3 sm:mt-4">
                 <button
                   onClick={() => runScript(s.id)}
                   disabled={state.isRunning}
-                  className={`w-full inline-flex items-center justify-center gap-2 py-2.5 font-mono text-xs font-semibold uppercase border transition-all ${
+                  className={`w-full inline-flex items-center justify-center gap-2 py-2.5 sm:py-2.5 px-4 font-mono text-xs font-semibold uppercase border transition-all min-h-[44px] cursor-pointer ${
                     state.isRunning
                       ? 'bg-pulse-green/20 text-pulse-green border-pulse-green cursor-wait'
                       : 'bg-signal-white text-obsidian border-signal-white hover:bg-[#e4e4e7]'

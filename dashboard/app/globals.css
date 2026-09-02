@@ -32,16 +32,38 @@ body {
   color: var(--color-chalk);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   overflow: hidden !important;
-  max-width: 100vw;
-  width: 100vw;
+  overscroll-behavior: none;
+  max-width: 100%;
+  width: 100%;
+  /* 100vh sits under mobile browser chrome; dvh tracks the visible viewport. */
   height: 100vh;
+  height: 100dvh;
   position: relative;
+}
+
+/* Honour the OS "reduce motion" setting across the whole deck. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Custom Sleek Scrollbar (Zero horizontal scrollbar) */
 ::-webkit-scrollbar {
   width: 4px;
-  height: 0px;
+  height: 4px;
+}
+
+@media (pointer: coarse) {
+  ::-webkit-scrollbar {
+    width: 0px;
+    height: 0px;
+  }
 }
 
 ::-webkit-scrollbar-track {
@@ -102,3 +124,63 @@ body {
 .token-str { color: #38bdf8; }
 .token-num { color: var(--color-pulse-green); }
 .token-comm { color: #52525b; }
+
+/*
+ * Short viewports (landscape phones) cannot afford a three-row header.
+ * Dropping the wordmark lets brand + nav + status collapse onto a single row,
+ * which gives the CRM message stream back ~60px of vertical space.
+ */
+/*
+ * Header spacing lives here rather than in utility classes so the short-viewport
+ * override is not reordered by the generated utility sheet.
+ */
+.hud-header {
+  padding: 0.5rem 0.625rem;
+  margin-bottom: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .hud-header {
+    padding: 0.625rem 0.875rem;
+    margin-bottom: 0.75rem;
+  }
+}
+
+@media (max-height: 560px) {
+  .hud-header {
+    padding: 0.25rem 0.625rem;
+    margin-bottom: 0.25rem;
+  }
+
+}
+
+/* Like the wordmark, the CTA label needs both horizontal and vertical room. */
+.hud-guide-label {
+  display: none;
+}
+
+@media (min-width: 768px) and (min-height: 561px) {
+  .hud-guide-label {
+    display: inline;
+  }
+}
+
+/*
+ * Single source of truth for the wordmark: it needs BOTH horizontal room and
+ * vertical room, so it is opt-in rather than a utility the cascade can reorder.
+ */
+.hud-header-brand {
+  display: none;
+}
+
+@media (min-width: 640px) and (min-height: 561px) {
+  .hud-header-brand {
+    display: block;
+  }
+}
+
+/* Scroll affordance for the horizontally scrollable CRM filter row. */
+.scroll-fade-x {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+}

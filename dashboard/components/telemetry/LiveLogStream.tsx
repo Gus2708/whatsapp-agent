@@ -147,40 +147,40 @@ export const LiveLogStream: React.FC = () => {
   };
 
   return (
-    <CrosshairCard className="p-4 bg-[#0c0c0c] h-full max-h-full min-h-0 flex flex-col flex-1">
-      <div className="flex justify-between items-center mb-2.5 flex-shrink-0">
-        <span className="font-mono text-[10.5px] uppercase tracking-wider text-compass-gold">
+    <CrosshairCard className="p-3 sm:p-4 bg-[#0c0c0c] flex flex-col flex-1 min-h-[280px] lg:min-h-0">
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-2.5 flex-shrink-0">
+        <span className="font-mono text-[10.5px] uppercase tracking-wider text-gold-bright font-medium">
           // RUNTIME LOG STREAM
         </span>
         <button
           onClick={injectSimulatedEvent}
           disabled={isInjecting}
-          className={`inline-flex items-center gap-1.5 border px-2.5 py-0.5 font-mono text-[10px] uppercase font-semibold transition-all cursor-pointer ${
+          className={`inline-flex items-center gap-1.5 border px-3 py-1.5 sm:py-0.5 font-mono text-[10.5px] sm:text-[10px] uppercase font-semibold transition-all cursor-pointer min-h-[36px] sm:min-h-0 ${
             isInjecting
               ? 'border-pulse-green bg-pulse-green/15 text-pulse-green animate-pulse'
-              : 'border-compass-gold/50 bg-compass-gold/10 text-compass-gold hover:bg-compass-gold/20 hover:border-compass-gold'
+              : 'border-compass-gold/50 bg-compass-gold/10 text-gold-bright hover:bg-compass-gold/20 hover:border-compass-gold'
           }`}
         >
-          <Zap className="h-3 w-3 text-pulse-green" />
+          <Zap className="h-3.5 w-3.5 sm:h-3 sm:w-3 text-pulse-green" />
           <span>{isInjecting ? 'Procesando Flujo...' : 'Inyectar Evento'}</span>
         </button>
       </div>
 
       <div
         ref={logContainerRef}
-        className="flex-1 overflow-y-auto bg-[#080808] border border-graphite p-3 font-mono text-xs flex flex-col gap-2 min-h-0"
+        className="flex-1 overflow-y-auto bg-[#080808] border border-graphite p-2.5 sm:p-3 font-mono text-xs flex flex-col gap-2 min-h-0"
       >
         {logs.map((log) => (
-          <div key={log.id} className="flex items-start gap-3 border-b border-[#161616] pb-2 transition-all">
-            <span className="text-smoke/60 font-mono text-[11px] select-none">{log.time}</span>
+          <div key={log.id} className="flex items-start gap-2 sm:gap-3 border-b border-[#161616] pb-2 transition-all">
+            <span className="text-smoke/60 font-mono text-[10px] sm:text-[11px] select-none flex-shrink-0">{log.time}</span>
             <span
-              className={`font-mono text-[9px] uppercase px-1.5 py-0.5 flex-shrink-0 font-medium ${getTagClass(
+              className={`font-mono text-[8.5px] sm:text-[9px] uppercase px-1.5 py-0.5 flex-shrink-0 font-medium ${getTagClass(
                 log.tag
               )}`}
             >
               {log.tagLabel}
             </span>
-            <span className="text-chalk font-mono text-[11.5px] leading-snug break-all">{log.msg}</span>
+            <span className="text-chalk font-mono text-[10.5px] sm:text-[11.5px] leading-snug break-words flex-1 min-w-0">{log.msg}</span>
           </div>
         ))}
       </div>

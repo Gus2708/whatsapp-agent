@@ -32,6 +32,8 @@ const config: Config = {
       animation: {
         "slow-spin": "slow-spin 20s linear infinite",
         "pulse-glow": "pulse-glow 2s infinite ease-in-out",
+        "sheet-in": "sheet-in 240ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "fade-in": "fade-in 200ms ease-out",
       },
       keyframes: {
         "slow-spin": {
@@ -41,6 +43,14 @@ const config: Config = {
         "pulse-glow": {
           "0%, 100%": { opacity: "0.4", transform: "scale(0.9)" },
           "50%": { opacity: "1", transform: "scale(1.2)" },
+        },
+        "sheet-in": {
+          from: { transform: "translateX(100%)" },
+          to: { transform: "translateX(0)" },
+        },
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
         },
       },
     },

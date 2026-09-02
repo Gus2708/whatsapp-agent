@@ -9,9 +9,7 @@ import { HeaderNav } from '@/components/hud/HeaderNav';
 import { KpiMatrix } from '@/components/telemetry/KpiMatrix';
 import { LiveLogStream } from '@/components/telemetry/LiveLogStream';
 import { MicroservicesTopologyCard } from '@/components/telemetry/MicroservicesTopologyCard';
-import { ConversationList } from '@/components/crm/ConversationList';
-import { ChatWindow } from '@/components/crm/ChatWindow';
-import { LeadDetailsPane } from '@/components/crm/LeadDetailsPane';
+import { CrmWorkspace } from '@/components/crm/CrmWorkspace';
 import { RagStudio } from '@/components/rag/RagStudio';
 import { N8nVisualizer } from '@/components/n8n/N8nVisualizer';
 import { DevOpsConsole } from '@/components/devops/DevOpsConsole';
@@ -211,26 +209,26 @@ export default function FlightDeckDashboard() {
       <div ref={viewContainerRef} className="flex-1 min-h-0 flex flex-col w-full max-w-full p-1.5 overflow-hidden mt-1">
         {/* VIEW 1: FLIGHT DECK */}
         {activeTab === 'flight' && (
-          <div className="flex flex-col flex-1 min-h-0 justify-between gap-3 p-1">
+          <div className="flex flex-col flex-1 min-h-0 gap-3 p-1 overflow-y-auto lg:overflow-hidden lg:justify-between">
             <div className="flex-shrink-0">
-              <span className="font-mono text-[10px] text-compass-gold uppercase tracking-wider block mb-0.5">
+              <span className="font-mono text-[10px] text-gold-bright uppercase tracking-wider block mb-0.5 font-medium">
                 // GLOBAL TELEMETRY & FLIGHT RADAR
               </span>
-              <h2 className="text-xl font-normal text-chalk tracking-tight">
+              <h2 className="text-lg sm:text-xl font-normal text-chalk tracking-tight">
                 Métricas Operativas del Agente en Producción
               </h2>
             </div>
 
             <KpiMatrix />
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 flex-1 min-h-0 p-1">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 flex-1 min-h-0 p-0.5">
               {/* Architecture & Topology Card */}
-              <div className="lg:col-span-7 h-full max-h-full min-h-0 flex flex-col">
+              <div className="lg:col-span-7 min-h-0 flex flex-col">
                 <MicroservicesTopologyCard />
               </div>
 
               {/* Log Stream */}
-              <div className="lg:col-span-5 h-full max-h-full min-h-0 flex flex-col">
+              <div className="lg:col-span-5 min-h-[300px] lg:min-h-0 flex flex-col">
                 <LiveLogStream />
               </div>
             </div>
@@ -239,34 +237,22 @@ export default function FlightDeckDashboard() {
 
         {/* VIEW 2: WHATSAPP CRM */}
         {activeTab === 'crm' && (
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 flex-1 min-h-0 overflow-hidden">
-            <div className="md:col-span-4 lg:col-span-3 h-full max-h-full min-h-0 overflow-hidden flex flex-col">
-              <ConversationList
-                conversations={conversations}
-                selectedId={selectedConversation.id}
-                onSelect={setSelectedConversationId}
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                filter={filter}
-                onFilterChange={setFilter}
-              />
-            </div>
-            <div className="md:col-span-8 lg:col-span-6 h-full max-h-full min-h-0 overflow-hidden flex flex-col">
-              <ChatWindow
-                conversation={selectedConversation}
-                onToggleSilentMode={handleToggleSilentMode}
-                onSendMessage={handleSendMessage}
-              />
-            </div>
-            <div className="hidden lg:flex lg:col-span-3 h-full max-h-full min-h-0 overflow-hidden flex-col">
-              <LeadDetailsPane conversation={selectedConversation} />
-            </div>
-          </div>
+          <CrmWorkspace
+            conversations={conversations}
+            selectedConversation={selectedConversation}
+            onSelectConversation={setSelectedConversationId}
+            onToggleSilentMode={handleToggleSilentMode}
+            onSendMessage={handleSendMessage}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            filter={filter}
+            onFilterChange={setFilter}
+          />
         )}
 
         {/* VIEW 3: RAG STUDIO */}
         {activeTab === 'rag' && (
-          <div className="flex-1 min-h-0 overflow-hidden flex flex-col p-1">
+          <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden flex flex-col p-1">
             <RagStudio />
           </div>
         )}
