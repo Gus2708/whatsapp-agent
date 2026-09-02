@@ -117,7 +117,7 @@ export const MicroservicesTopologyCard: React.FC = () => {
   ];
 
   return (
-    <CrosshairCard className="p-3 sm:p-4 bg-[#0c0c0c] flex flex-col justify-between flex-1 min-h-0">
+    <CrosshairCard className="p-3 sm:p-4 bg-[#0c0c0c] flex flex-col justify-between flex-1 lg:min-h-0">
       <div className="flex flex-col gap-2.5 min-h-0">
         {/* Header with status badge */}
         <div className="flex flex-wrap justify-between items-center gap-2 flex-shrink-0">
@@ -136,7 +136,7 @@ export const MicroservicesTopologyCard: React.FC = () => {
         </div>
 
         {/* 6 Microservice HUD Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 flex-shrink-0">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 flex-shrink-0">
           {microservices.map((srv) => {
             const Icon = srv.icon;
             const isGold = srv.statusType === 'gold';
