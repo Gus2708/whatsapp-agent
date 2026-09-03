@@ -1,0 +1,95 @@
+name: live
+
+# Manually-dispatched credentialed tier. Only workflow_dispatch triggers this
+# file -- no other event, automatic or PR-driven, may ever start it -- the
+# live suite issues real requests against a Supabase project with limited
+# egress quota and must only ever run on a maintainer's explicit action.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_stdout_audit:
+        description: "Type AUDITED to confirm the rag.js stdout credential audit was performed (see sdd/ci-pipeline design D4). This does not prove the audit happened -- it makes forgetting impossible and records a bypass as a deliberate act."
+        required: true
+        type: string
+      mode:
+        description: "Live suite mode"
+        required: true
+        type: choice
+        options:
+          - full
+          - fast
+        default: full
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live
+  cancel-in-progress: false # never cancel a live run mid-flight -- that burns egress for no result
+
+jobs:
+  live:
+    name: live suite (${{ inputs.mode }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: live # secret scoping + deployment branch policy (master only) -- see design D4
+    steps:
+      - name: Confirm stdout audit precondition
+        run: |
+          if [ "${{ inputs.confirm_stdout_audit }}" != "AUDITED" ]; then
+            echo "confirm_stdout_audit must equal AUDITED. The rag.js stdout credential audit must be performed before dispatching this workflow." >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install (root only -- dashboard is irrelevant to the live suite)
+        run: npm ci
+
+      # D3: rag.js:19-22 reads credentials by parsing the .env FILE with its
+      # own regex (fs.readFileSync + pick(key)); it has NO process.env
+      # fallback, and its SUPABASE_URL fallback is a hardcoded real project
+      # URL. Supplying secrets only via step-level `env:` would make the
+      # pretest:live preflight pass (it does fall back to process.env) while
+      # rag.js itself either crashes on ENOENT or silently issues
+      # unauthenticated requests against the real project. This step is
+      # mandatory, not stylistic. Values are read from process.env inside
+      # Node -- never interpolated into shell command text -- and only key
+      # NAMES are ever printed to stdout.
+      - name: Materialize .env from environment secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          node -e "
+            const fs = require('fs');
+            const keys = ['SUPABASE_URL','SUPABASE_ANON_KEY','OPENAI_API_KEY','OPENROUTER_API_KEY'];
+            const lines = keys.map((k) => k + '=' + (process.env[k] || ''));
+            fs.writeFileSync('.env', lines.join('\n') + '\n', { mode: 0o600 });
+            fs.chmodSync('.env', 0o600);
+            console.log('.env materialized with key names: ' + keys.join(', '));
+          "
+
+      # No `env:` on this step by design (D3): rag.js reads the .env file it
+      # just received, not process.env, and a step-level env: here would
+      # only recreate the false-green trap this workflow exists to avoid.
+      - name: Run live suite (full)
+        if: inputs.mode == 'full'
+        run: npm run test:live
+
+      - name: Run live suite (fast)
+        if: inputs.mode == 'fast'
+        run: npm run test:live -- --rapida
+
+      - name: Remove .env
+        if: always()
+        run: rm -f .env

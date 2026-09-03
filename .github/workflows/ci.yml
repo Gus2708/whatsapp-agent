@@ -1,0 +1,147 @@
+name: ci
+
+# Lockfile trap (sdd/ci-pipeline task 1.4): a plain `npm install` on a Windows
+# dev machine silently rewrites dashboard/package-lock.json back to a
+# Windows-only optional-dependency tree, and `npm ci` here will then fail at
+# the "npm --prefix dashboard run test" tail with
+# "Cannot find module @rollup/rollup-linux-x64-gnu" (npm/cli#4828). Recovery:
+# run `npm run lock` from the repo root on any OS and commit both lockfiles.
+# Never revert to plain `npm install` in this workflow.
+
+on:
+  push:
+    branches: [master] # PR-branch pushes do NOT double-trigger: push is master-only
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  gate:
+    name: gate ${{ matrix.label }} (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: ${{ !matrix.blocking }}
+    strategy:
+      fail-fast: false # a 24.x failure must never cancel the 22.x leg
+      matrix:
+        include:
+          - { node: "22.x", label: blocking, blocking: true }
+          - { node: "24.x", label: advisory, blocking: false }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            dashboard/package-lock.json
+
+      - name: Install (root)
+        run: npm ci
+
+      - name: Install (dashboard)
+        working-directory: dashboard
+        run: npm ci
+
+      - name: Test (hermetic chain)
+        run: npm test
+
+      - name: Credential-handling unit tests
+        if: matrix.blocking
+        run: node --test scripts/_lib_credenciales.test.js
+
+      - name: Typecheck
+        if: matrix.blocking
+        working-directory: dashboard
+        run: npm run typecheck
+
+  quality:
+    name: quality advisory (lint + coverage)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    # Deliberately no `needs: gate` -- this job reports, it never gates.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            dashboard/package-lock.json
+
+      - name: Install (root)
+        continue-on-error: true
+        run: npm ci
+
+      - name: Install (dashboard)
+        continue-on-error: true
+        working-directory: dashboard
+        run: npm ci
+
+      - name: ESLint (advisory)
+        id: eslint
+        if: always()
+        continue-on-error: true
+        working-directory: dashboard
+        run: |
+          npx eslint . --format json > eslint-report.json || true
+          node -e "
+            const fs = require('fs');
+            let data = [];
+            try { data = JSON.parse(fs.readFileSync('eslint-report.json', 'utf8')); } catch (e) {}
+            let errors = 0, warnings = 0;
+            for (const f of data) { errors += f.errorCount; warnings += f.warningCount; }
+            fs.appendFileSync(process.env.GITHUB_ENV, 'ESLINT_ERRORS=' + errors + '\n');
+            fs.appendFileSync(process.env.GITHUB_ENV, 'ESLINT_WARNINGS=' + warnings + '\n');
+          "
+
+      - name: Dashboard coverage (advisory)
+        if: always()
+        continue-on-error: true
+        working-directory: dashboard
+        run: npx vitest run --coverage --coverage.reporter=json-summary --coverage.reporter=text
+
+      - name: Root coverage (advisory)
+        if: always()
+        continue-on-error: true
+        run: node --test --experimental-test-coverage "tests/**/*.test.js" > root-coverage.txt 2>&1 || true
+
+      - name: Lockfile shape check (advisory)
+        if: always()
+        continue-on-error: true
+        run: |
+          if ! grep -q "@rollup/rollup-linux-x64-gnu" dashboard/package-lock.json; then
+            echo "::warning::dashboard/package-lock.json is missing @rollup/rollup-linux-x64-gnu -- run 'npm run lock' from the repo root and commit the regenerated lockfile"
+          fi
+
+      - name: Write job summary
+        if: always()
+        run: |
+          DASH_PCT=$(node -e "try{console.log(require('./dashboard/coverage/coverage-summary.json').total.lines.pct)}catch(e){console.log('n/a')}")
+          {
+            echo "## CI quality baseline"
+            echo ""
+            echo "| Metric | Value |"
+            echo "|---|---|"
+            echo "| ESLint errors | ${ESLINT_ERRORS:-n/a} |"
+            echo "| ESLint warnings | ${ESLINT_WARNINGS:-n/a} |"
+            echo "| Dashboard coverage (lines %) | ${DASH_PCT} |"
+            echo "| \`scratch_live/live_buscar.js\` coverage | not measurable -- executed via \`new AsyncFunction(...)\` (eval), V8/Node coverage cannot attribute execution inside an eval'd function to a source file |"
+            echo ""
+            echo "<details><summary>Root coverage (node --test --experimental-test-coverage, unparsed)</summary>"
+            echo ""
+            echo '```'
+            cat root-coverage.txt 2>/dev/null || echo "(not available)"
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
