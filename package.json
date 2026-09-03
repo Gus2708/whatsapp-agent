@@ -13,7 +13,8 @@
     "test:dashboard": "npm --prefix dashboard run test",
     "pretest:live": "node scripts/check_live_env.js",
     "test:live": "node rag.js suite",
-    "test:live:fast": "node rag.js suite --rapida"
+    "test:live:fast": "node rag.js suite --rapida",
+    "lock": "npm install --package-lock-only --os=linux --cpu=x64 && cd dashboard && npm install --package-lock-only --os=linux --cpu=x64 && cd .."
   },
   "keywords": [
     "whatsapp",
