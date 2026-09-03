@@ -1,42 +1,20 @@
+// Hermetic rewrite: same 9 assertions as before, but driven through a fake axios + fixture
+// catalog instead of live Supabase (see sdd/testing-foundation design D1-D6). The unmodified
+// scratch_live/live_buscar.js is exercised through its existing injected (query, axios, $env)
+// seam via tests/support/load-live-buscar.js.
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('fs');
-const path = require('path');
+const { buscarLive } = require('./support/load-live-buscar');
+const { assertAllMatched } = require('./support/fake-axios');
 
-const axios = {
-  get: async (url, opts) => {
-    const res = await fetch(url, { headers: opts && opts.headers });
-    const data = await res.json();
-    return { data };
-  },
-  post: async (url, body, opts) => {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: opts && opts.headers,
-      body: JSON.stringify(body)
-    });
-    const data = await res.json();
-    return { data };
-  }
-};
-
-const envPath = path.join(__dirname, '..', '.env');
-const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
-const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
-const envMap = { SUPABASE_URL: pick('SUPABASE_URL'), SUPABASE_ANON_KEY: pick('SUPABASE_ANON_KEY') };
-
-async function buscarLive(p_busqueda) {
-  const query = { p_busqueda };
-  const rawCode = fs.readFileSync(path.join(__dirname, '..', 'scratch_live', 'live_buscar.js'), 'utf8');
-  const code = rawCode.replace("const axios = require('axios');", '');
-  const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-  const fn = new AsyncFunction('query', 'axios', '$env', code);
-  const resultStr = await fn(query, axios, envMap);
-  return JSON.parse(resultStr);
+async function buscar(p_busqueda) {
+  const { result, fake } = await buscarLive(p_busqueda);
+  assertAllMatched(fake);
+  return result;
 }
 
 test('Cliente WhatsApp: Q vale la lámina prepintada canal redonda', async () => {
-  const res = await buscarLive('Q vale la lámina prepintada canal redonda');
+  const res = await buscar('Q vale la lámina prepintada canal redonda');
   assert.strictEqual(res.encontrados > 0, true, 'Debe encontrar láminas');
   const prods = res.productos;
   const hasPrepintadaOndulada = prods.some(p => /Zinc Ondu|Ondulado|Techolit|PVC.*OND/i.test(p.nombre) && /Rojo|Azul/i.test(p.nombre));
@@ -45,7 +23,7 @@ test('Cliente WhatsApp: Q vale la lámina prepintada canal redonda', async () =>
 });
 
 test('Cliente WhatsApp: Si nesecito de 12 pies canal ondulado prepintada', async () => {
-  const res = await buscarLive('Si nesecito de 12 pies canal ondulado prepintada');
+  const res = await buscar('Si nesecito de 12 pies canal ondulado prepintada');
   assert.strictEqual(res.encontrados > 0, true);
   const prods = res.productos;
   const all12Pies = prods.every(p => /12\s*Pies?|12PIES|3\.66/i.test(p.nombre));
@@ -55,7 +33,7 @@ test('Cliente WhatsApp: Si nesecito de 12 pies canal ondulado prepintada', async
 });
 
 test('Cliente WhatsApp: de las prepintadas 12 pies', async () => {
-  const res = await buscarLive('de las prepintadas 12 pies');
+  const res = await buscar('de las prepintadas 12 pies');
   assert.strictEqual(res.encontrados > 0, true);
   const prods = res.productos;
   const allLaminas = prods.every(p => /Lamina/i.test(p.nombre));
@@ -63,7 +41,7 @@ test('Cliente WhatsApp: de las prepintadas 12 pies', async () => {
 });
 
 test('Lámina Arquitectónica 6 metros', async () => {
-  const res = await buscarLive('lamina arquitectonica 6 metros');
+  const res = await buscar('lamina arquitectonica 6 metros');
   assert.strictEqual(res.encontrados > 0, true);
   const prods = res.productos;
   const hasArquitectonica = prods.some(p => /Arquitectonica|7 Canales/i.test(p.nombre));
@@ -71,14 +49,14 @@ test('Lámina Arquitectónica 6 metros', async () => {
 });
 
 test('Lámina Techolit Roja', async () => {
-  const res = await buscarLive('lamina techolit roja');
+  const res = await buscar('lamina techolit roja');
   assert.strictEqual(res.encontrados > 0, true);
   const prods = res.productos;
   assert.strictEqual(prods.some(p => /Techolit/i.test(p.nombre)), true, 'Debe retornar lámina Techolit');
 });
 
 test('Lámina prepintada azul', async () => {
-  const res = await buscarLive('lamina prepintada azul');
+  const res = await buscar('lamina prepintada azul');
   assert.strictEqual(res.encontrados > 0, true);
   const prods = res.productos;
   const allBlue = prods.every(p => /Azul/i.test(p.nombre));
@@ -86,7 +64,7 @@ test('Lámina prepintada azul', async () => {
 });
 
 test('Lámina prepintada roja', async () => {
-  const res = await buscarLive('lamina prepintada roja');
+  const res = await buscar('lamina prepintada roja');
   assert.strictEqual(res.encontrados > 0, true);
   const prods = res.productos;
   const allRed = prods.every(p => /Roj[oa]|Techolit/i.test(p.nombre));
@@ -94,14 +72,14 @@ test('Lámina prepintada roja', async () => {
 });
 
 test('Lámina techo PVC azul', async () => {
-  const res = await buscarLive('lamina techo pvc azul');
+  const res = await buscar('lamina techo pvc azul');
   assert.strictEqual(res.encontrados > 0, true);
   const prods = res.productos;
   assert.strictEqual(prods.some(p => /PVC/i.test(p.nombre) && /Azul/i.test(p.nombre)), true);
 });
 
 test('Láminas de colores para techo', async () => {
-  const res = await buscarLive('laminas de colores para techo');
+  const res = await buscar('laminas de colores para techo');
   assert.strictEqual(res.encontrados > 0, true);
   const prods = res.productos;
   const hasColor = prods.some(p => /Roj[oa]|Azul|Techolit/i.test(p.nombre));

@@ -9,7 +9,11 @@
     "start": "npm --prefix dashboard run start",
     "dashboard": "npm --prefix dashboard run dev",
     "dashboard:build": "npm --prefix dashboard run build",
-    "test": "node --test && node scripts/check_sources_sync.js && node scripts/check_workflow_sync.js"
+    "test": "node --test \"tests/**/*.test.js\" && node scripts/check_sources_sync.js && node scripts/check_workflow_sync.js && npm --prefix dashboard run test",
+    "test:dashboard": "npm --prefix dashboard run test",
+    "pretest:live": "node scripts/check_live_env.js",
+    "test:live": "node rag.js suite",
+    "test:live:fast": "node rag.js suite --rapida"
   },
   "keywords": [
     "whatsapp",

@@ -1,0 +1,86 @@
+[
+  {
+    "codigo_interno": "LAM-001",
+    "descripcion": "LAMINA ZINC ONDULADA AZUL 3.66",
+    "precio_venta": 12.5,
+    "existencia": 10,
+    "_origen": "lamina_search.test.js: 'Q vale la lamina prepintada canal redonda' (Zinc Ondu + Azul)"
+  },
+  {
+    "codigo_interno": "LAM-002",
+    "descripcion": "LAMINA ZINC ONDULADA ROJO 12 PIES 3.66",
+    "precio_venta": 13.0,
+    "existencia": 8,
+    "_origen": "lamina_search.test.js: 'Si nesecito de 12 pies canal ondulado prepintada' and 'de las prepintadas 12 pies'"
+  },
+  {
+    "codigo_interno": "LAM-003",
+    "descripcion": "LAMINA TECHOLIT ROJA 3.66",
+    "precio_venta": 15.0,
+    "existencia": 6,
+    "_origen": "lamina_search.test.js: 'lamina techolit roja', 'lamina prepintada roja', 'laminas de colores para techo'"
+  },
+  {
+    "codigo_interno": "LAM-004",
+    "descripcion": "LAMINA ARQUITECTONICA 7 CANALES 6 METROS",
+    "precio_venta": 18.0,
+    "existencia": 5,
+    "_origen": "lamina_search.test.js: 'lamina arquitectonica 6 metros'"
+  },
+  {
+    "codigo_interno": "LAM-005",
+    "descripcion": "LAMINA PVC TECHO AZUL ONDULADA",
+    "precio_venta": 20.0,
+    "existencia": 4,
+    "_origen": "lamina_search.test.js: 'lamina techo pvc azul', 'laminas de colores para techo', 'lamina prepintada azul'"
+  },
+  {
+    "codigo_interno": "PIN-001",
+    "descripcion": "PINTURA SUN DECO CLASE A BLANCO",
+    "precio_venta": 22.0,
+    "existencia": 12,
+    "_origen": "paint_search.test.js: 'pintura clase a blanca'"
+  },
+  {
+    "codigo_interno": "PIN-002",
+    "descripcion": "PINTURA MAR DECO CLASE B AZUL",
+    "precio_venta": 21.0,
+    "existencia": 11,
+    "_origen": "paint_search.test.js: 'pintura clase b azul', Liliana incident (marca clase B)"
+  },
+  {
+    "codigo_interno": "PIN-003",
+    "descripcion": "PINTURA RIO DECO CLASE C GRIS",
+    "precio_venta": 19.0,
+    "existencia": 9,
+    "_origen": "paint_search.test.js: 'pintura clase c'"
+  },
+  {
+    "codigo_interno": "PIN-004",
+    "descripcion": "PINTURA ACEITE GRIS SUN DECO CLASE A",
+    "precio_venta": 23.5,
+    "existencia": 14,
+    "_origen": "paint_search.test.js: 'Hay pintura cris para exterior', 'pintura cris', 'pintura de aceite gris'"
+  },
+  {
+    "codigo_interno": "PIN-005",
+    "descripcion": "PINTURA SATINADA SEDA STYL MARFIL",
+    "precio_venta": 24.0,
+    "existencia": 7,
+    "_origen": "paint_search.test.js: 'pintura satinada marfil'"
+  },
+  {
+    "codigo_interno": "PIN-006",
+    "descripcion": "PINTURA CUNETE 4GL BLANCO",
+    "precio_venta": 45.0,
+    "existencia": 3,
+    "_origen": "paint_search.test.js: 'cunete de pintura blanca'"
+  },
+  {
+    "codigo_interno": "PIN-007",
+    "descripcion": "PINTURA FLORIPAINT CLASE B MAR DECO EXTERIOR",
+    "precio_venta": 25.0,
+    "existencia": 6,
+    "_origen": "paint_search.test.js: Liliana incident (Floripaint) and 'pintura floripaint clase b'"
+  }
+]

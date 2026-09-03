@@ -78,3 +78,29 @@ test('parseItems: parses "name:qty" lists', () => {
     [{ nombre: 'cemento gris', cantidad: 2 }, { nombre: 'cabilla 12mm', cantidad: 4 }]
   );
 });
+
+test('scoreMatch: exact-word match scores higher than a bare substring hit', () => {
+  const exact = L.scoreMatch('TUBO PVC 1/2', ['tubo']);
+  const substring = L.scoreMatch('DESTORNILLADOR', ['tor']);
+  assert.strictEqual(exact > 0, true, 'a whole-word match must score positively');
+  assert.strictEqual(exact > substring, true, 'whole-word hit (+10) must outscore substring hit (+5)');
+});
+
+test('scoreMatch: substring match still scores, but lower than whole-word', () => {
+  // "cabl" is a 4-char substring of "CABLE": scores via the substring branch (+5), not
+  // the whole-word branch (+10), because it is not itself one of the tokenized words.
+  const s = L.scoreMatch('CABLE THWN 12 X MT', ['cabl']);
+  assert.strictEqual(s > 0, true, 'substring hit must still contribute a positive score');
+});
+
+test('scoreMatch: measure bonus applies when the numeric token is present', () => {
+  const withMedida = L.scoreMatch('TUBO PVC 1/2', ['tubo', '1/2']);
+  const withoutMedida = L.scoreMatch('TUBO PVC 1/2', ['tubo', '3/4']);
+  assert.strictEqual(withMedida > withoutMedida, true, 'matching the requested measure must outscore a non-matching one');
+});
+
+test('scoreMatch: "all tokens matched" bonus rewards full coverage over partial', () => {
+  const full = L.scoreMatch('CEMENTO GRIS CSC', ['cemento', 'gris']);
+  const partial = L.scoreMatch('CEMENTO BLANCO', ['cemento', 'gris']);
+  assert.strictEqual(full - partial >= 50, true, 'matching every query token must add the +50 "all" bonus over a partial match');
+});
