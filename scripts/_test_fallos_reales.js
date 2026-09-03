@@ -8,10 +8,8 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
 
-const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
-const pick = k => (env.match(new RegExp('^' + k + '=(.+)$', 'm')) || [])[1].trim();
-const SB = pick('SUPABASE_URL') || pick('SUPABASE_URL');
-const ANON = pick('SUPABASE_ANON_KEY');
+const { leerCredenciales, construirEnv } = require('./_lib_credenciales');
+const { SUPABASE_URL: SB, SUPABASE_ANON_KEY: ANON } = leerCredenciales();
 
 const body = fs.readFileSync(path.join(ROOT, 'scratch_live', 'live_buscar.js'), 'utf8');
 const axiosShim = {
@@ -20,9 +18,9 @@ const axiosShim = {
 };
 const fakeRequire = n => (n === 'axios' ? axiosShim : require(n));
 // $env: el nodo Code de n8n lo expone; sin él el rescate semántico no se ejecuta.
-const fakeEnv = { OPENROUTER_API_KEY: pick('OPENROUTER_API_KEY') };
+const $ENV = construirEnv();
 const run = b => new Function('query', 'require', '$env', '"use strict"; return (async () => {\n' + b + '\n})();');
-const buscar = async q => { try { return JSON.parse(await run(body)({ p_busqueda: q }, fakeRequire, fakeEnv)); } catch (e) { return { error: e.message }; } };
+const buscar = async q => { try { return JSON.parse(await run(body)({ p_busqueda: q }, fakeRequire, $ENV)); } catch (e) { return { error: e.message }; } };
 
 // Consultas que NO son de catálogo: saludos, fotos, seguimientos sin producto.
 // El bot hace bien en no encontrarlas; no cuentan como fallo de búsqueda.

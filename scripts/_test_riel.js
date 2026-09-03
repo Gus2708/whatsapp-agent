@@ -29,8 +29,10 @@ const axiosShim = {
   async post(url, body, cfg) { const r = await fetch(url, { method: 'POST', headers: { ...((cfg && cfg.headers) || {}) }, body: JSON.stringify(body) }); let data = null; try { data = await r.json(); } catch (e) {} return { data }; },
 };
 function fakeRequire(name) { return name === 'axios' ? axiosShim : require(name); }
-function makeRunner(body) { return new Function('query', 'require', '"use strict"; return (async () => {\n' + body + '\n})();'); }
-async function runTool(body, productos) { const out = await makeRunner(body)({ productos }, fakeRequire); try { return JSON.parse(out); } catch (e) { return { raw: out }; } }
+const { construirEnv } = require('./_lib_credenciales');
+const $ENV = construirEnv();
+function makeRunner(body) { return new Function('query', 'require', '$env', '"use strict"; return (async () => {\n' + body + '\n})();'); }
+async function runTool(body, productos) { const out = await makeRunner(body)({ productos }, fakeRequire, $ENV); try { return JSON.parse(out); } catch (e) { return { raw: out }; } }
 
 const X = '×'; // signo multiplicacion (lo que escribe el cliente en el telefono)
 const inputs = [

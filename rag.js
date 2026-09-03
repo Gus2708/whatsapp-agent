@@ -682,7 +682,7 @@ async function diagnostico(consulta, flags) {
     async post(u, b, cf) { const r = await fetch(u, { method: 'POST', headers: (cf && cf.headers) || {}, body: JSON.stringify(b) }); let d = null; try { d = await r.json(); } catch (e) {} return { data: d }; },
   };
   const runMatcher = new Function('query', 'require', '$env', '"use strict"; return (async () => {\n' + body + '\n})();');
-  const fakeEnv = { OPENROUTER_API_KEY: pick('OPENROUTER_API_KEY'), OPENAI_API_KEY: pick('OPENAI_API_KEY') };
+  const $ENV = require('./scripts/_lib_credenciales').construirEnv();
 
   const reporte = [];
 
@@ -703,7 +703,7 @@ async function diagnostico(consulta, flags) {
     };
 
     // 1. Léxico
-    const lex = JSON.parse(await runMatcher({ p_busqueda: texto }, n => (n === 'axios' ? axiosShim : require(n)), { OPENROUTER_API_KEY: '', OPENAI_API_KEY: '' }));
+    const lex = JSON.parse(await runMatcher({ p_busqueda: texto }, n => (n === 'axios' ? axiosShim : require(n)), $ENV));
     const topLex = (lex.productos || [])[0];
     casoRes.lexico = topLex || null;
     if (!soloJson) {

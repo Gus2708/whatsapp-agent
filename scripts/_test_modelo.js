@@ -1,8 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const envPath = path.join(__dirname, '..', '.env');
-const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
-const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
+const CRED = require('./_lib_credenciales');
 
 // READ-ONLY(*): prueba end-to-end de un MODELO contra el agente real.
 // Usa el systemMessage desplegado + el cuerpo EXACTO de buscar_productos /
@@ -13,8 +11,6 @@ const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || 
 //   node scripts/_test_modelo.js openai/gpt-4.1-mini  # linea base
 //
 // (*) las tools de Engram van STUBEADAS: no escribe memoria de clientes reales.
-const fs = require('fs');
-const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const wf = JSON.parse(fs.readFileSync(path.join(ROOT, 'n8n_workflow.json'), 'utf8'));
@@ -24,8 +20,9 @@ const MODEL = process.argv[2] || nodeBy('OpenRouter Chat Model').parameters.mode
 const TEMP = nodeBy('OpenRouter Chat Model').parameters.options.temperature;
 const SYS = nodeBy('AI Agent').parameters.options.systemMessage;
 
-const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
-const OR_KEY = (env.match(/^OPENROUTER_API_KEY=(.+)$/m) || [])[1].trim();
+// Fail loud and named if the key is absent, instead of a bare TypeError from
+// indexing a failed regex match. Single source of truth: _lib_credenciales.
+const OR_KEY = CRED.exigirCredenciales(['OPENROUTER_API_KEY']).OPENROUTER_API_KEY;
 
 // --- ejecucion real de los nodos Code (mismo shim que _verify_cable_rollo.js) ---
 const axiosShim = {
@@ -39,10 +36,10 @@ const BUSCAR = read('live_buscar.js');
 const PRESUP = read('live_presupuesto.js');
 
 // $env: el nodo Code de n8n lo expone; sin él el rescate semántico no se ejecuta.
-const fakeEnv = { OPENROUTER_API_KEY: OR_KEY };
+const $ENV = CRED.construirEnv();
 const TOOLS_IMPL = {
-  buscar_productos: q => runner(BUSCAR)(q, fakeRequire, fakeEnv),
-  hacer_presupuesto: q => runner(PRESUP)(q, fakeRequire, fakeEnv),
+  buscar_productos: q => runner(BUSCAR)(q, fakeRequire, $ENV),
+  hacer_presupuesto: q => runner(PRESUP)(q, fakeRequire, $ENV),
   obtener_tasa_bcv: async () => {
     const r = await fetch('https://rgniqjfooifchyctnbzu.supabase.co/rest/v1/tazas?select=*&order=fecha.desc&limit=1',
       { headers: { apikey: ANON, Authorization: 'Bearer ' + ANON } });

@@ -17,8 +17,10 @@ const axiosShim = {
   async post(u, b, c) { const r = await fetch(u, { method: 'POST', headers: { ...((c && c.headers) || {}) }, body: JSON.stringify(b) }); let d = null; try { d = await r.json(); } catch (e) {} return { data: d }; },
 };
 const req = n => n === 'axios' ? axiosShim : require(n);
-function runBuscar(body, q) { return new Function('query', 'require', '"use strict"; return (async()=>{\n' + body + '\n})();')({ p_busqueda: q }, req); }
-function runPresu(body, q) { return new Function('query', 'require', '"use strict"; return (async()=>{\n' + body + '\n})();')({ productos: q }, req); }
+const { construirEnv } = require('./_lib_credenciales');
+const $ENV = construirEnv();
+function runBuscar(body, q) { return new Function('query', 'require', '$env', '"use strict"; return (async()=>{\n' + body + '\n})();')({ p_busqueda: q }, req, $ENV); }
+function runPresu(body, q) { return new Function('query', 'require', '$env', '"use strict"; return (async()=>{\n' + body + '\n})();')({ productos: q }, req, $ENV); }
 
 const X = '×';
 const buscarInputs = [

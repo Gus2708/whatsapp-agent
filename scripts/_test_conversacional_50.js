@@ -9,7 +9,9 @@ const axiosShim = {
   async post(u, b, c) { const r = await fetch(u, { method: 'POST', headers: (c && c.headers) || {}, body: JSON.stringify(b) }); return { data: await r.json().catch(() => null) }; },
 };
 const req = n => n === 'axios' ? axiosShim : require(n);
-const load = f => new AF('require', 'query', fs.readFileSync(f, 'utf8'));
+const { construirEnv } = require('./_lib_credenciales');
+const $ENV = construirEnv();
+const load = f => new AF('require', 'query', '$env', fs.readFileSync(f, 'utf8'));
 const loadOr = (f, alt) => load(fs.existsSync(f) ? f : alt);
 const OLD = { buscar: loadOr('scratch_live/live_buscar.bak.js', 'scratch_live/live_buscar.js'), pres: loadOr('scratch_live/live_presupuesto.bak.js', 'scratch_live/live_presupuesto.js') };
 const NEW = { buscar: load('scratch_live/live_buscar.js'), pres: load('scratch_live/live_presupuesto.js') };
@@ -82,14 +84,14 @@ function summarize(set, inp, t) {
   return (async () => {
     try {
       if (t === 'b') {
-        const r = JSON.parse(await set.buscar(req, { p_busqueda: inp }));
+        const r = JSON.parse(await set.buscar(req, { p_busqueda: inp }, $ENV));
         const pe = r.instruccion && /PEDIR_AYUDA/.test(r.instruccion);
         const top = (r.productos && r.productos[0]) ? r.productos[0].nombre : '';
         if (r.encontrados === 0 || pe) return { status: 'PEDIR', top: top };
         if (r.instruccion && /NO coincide/.test(r.instruccion)) return { status: 'DEBIL', top };
         return { status: 'ok', top };
       } else {
-        const r = JSON.parse(await set.pres(req, { some_input: inp }));
+        const r = JSON.parse(await set.pres(req, { some_input: inp }, $ENV));
         if (!r.ok) return { status: 'PEDIR', top: r.mensaje || '' };
         const first = (r.presupuesto_texto || '').split('\n')[0].replace(/[*0-9.]/g, '').trim();
         return { status: 'ok', top: first };

@@ -18,7 +18,9 @@ const axiosShim = {
   async post(u, b, c) { const r = await fetch(u, { method: 'POST', headers: { ...((c && c.headers) || {}) }, body: JSON.stringify(b) }); let d = null; try { d = await r.json(); } catch (e) {} return { data: d }; },
 };
 const req = n => n === 'axios' ? axiosShim : require(n);
-const run = (body, q) => new Function('query', 'require', '"use strict"; return (async()=>{\n' + body + '\n})();')({ p_busqueda: q }, req);
+const { construirEnv } = require('./_lib_credenciales');
+const $ENV = construirEnv();
+const run = (body, q) => new Function('query', 'require', '$env', '"use strict"; return (async()=>{\n' + body + '\n})();')({ p_busqueda: q }, req, $ENV);
 function short(r) { try { const o = JSON.parse(r); if (!o.productos) return ['(0) ' + (o.mensaje || '')]; return o.productos.slice(0, 4).map(p => p.nombre + ' [' + p.precio_divisas_texto + (p.disponible ? '' : ' AGOTADO') + ']'); } catch (e) { return ['(parse err)']; } }
 
 const objetivo = [

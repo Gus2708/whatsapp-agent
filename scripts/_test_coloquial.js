@@ -15,11 +15,8 @@ const ROOT = path.join(__dirname, '..');
 const SET = path.join(ROOT, 'scratch_live', '_coloquial_set.json');
 const norm = require(path.join(ROOT, 'lib', 'serrucho-search.js')).norm;
 
-const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
-const pick = k => (env.match(new RegExp('^' + k + '=(.+)$', 'm')) || [])[1].trim();
-const SB = pick('SUPABASE_URL') || pick('SUPABASE_URL');
-const ANON = pick('SUPABASE_ANON_KEY');
-const OR_KEY = pick('OPENROUTER_API_KEY');
+const { leerCredenciales, construirEnv } = require('./_lib_credenciales');
+const { SUPABASE_URL: SB, SUPABASE_ANON_KEY: ANON, OPENROUTER_API_KEY: OR_KEY } = leerCredenciales();
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON };
 
 const body = fs.readFileSync(path.join(ROOT, 'scratch_live', 'live_buscar.js'), 'utf8');
@@ -32,12 +29,9 @@ const fakeRequire = n => (n === 'axios' ? axiosShim : require(n));
 // --sin-vector omite la key de OpenAI para medir el aporte REAL de la capa vectorial
 // sobre el MISMO set de consultas; sin eso la comparación antes/después no vale nada.
 const SIN_VECTOR = process.argv.includes('--sin-vector');
-const fakeEnv = {
-  OPENROUTER_API_KEY: pick('OPENROUTER_API_KEY'),
-  OPENAI_API_KEY: SIN_VECTOR ? '' : pick('OPENAI_API_KEY'),
-};
+const $ENV = construirEnv({ sinVector: SIN_VECTOR });
 const run = b => new Function('query', 'require', '$env', '"use strict"; return (async () => {\n' + b + '\n})();');
-const buscar = async q => { try { return JSON.parse(await run(body)({ p_busqueda: q }, fakeRequire, fakeEnv)); } catch (e) { return { error: e.message }; } };
+const buscar = async q => { try { return JSON.parse(await run(body)({ p_busqueda: q }, fakeRequire, $ENV)); } catch (e) { return { error: e.message }; } };
 
 const SIM = `Eres un cliente venezolano común de un pueblo de Falcón: albañil, herrero, ama de casa o gente mayor. Escribes por WhatsApp a la ferretería.
 

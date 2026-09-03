@@ -14,10 +14,12 @@ const axiosShim = {
   async post(url, body, cfg) { const r = await fetch(url, { method: 'POST', headers: (cfg && cfg.headers) || {}, body: JSON.stringify(body) }); const data = await r.json().catch(() => null); return { data }; },
 };
 const fakeRequire = (n) => (n === 'axios' ? axiosShim : require(n));
+const { construirEnv } = require('./_lib_credenciales');
+const $ENV = construirEnv();
 
 const body = fs.readFileSync(path.join(__dirname, '..', 'scratch_live', 'live_buscar.js'), 'utf8');
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-const runBuscar = new AsyncFunction('require', 'query', body);
+const runBuscar = new AsyncFunction('require', 'query', '$env', body);
 
 // expect = clases aceptables (la primera es la ideal)
 const TESTS = [
@@ -72,7 +74,7 @@ function clasificar(p) {
   let pass = 0, fail = 0, ideal = 0;
   for (const t of TESTS) {
     let parsed, err = null;
-    try { parsed = JSON.parse(await runBuscar(fakeRequire, { p_busqueda: t.q })); }
+    try { parsed = JSON.parse(await runBuscar(fakeRequire, { p_busqueda: t.q }, $ENV)); }
     catch (e) { err = e.message; parsed = {}; }
     const clase = err ? ('EXCEPCION: ' + err) : clasificar(parsed);
     const okTest = !err && t.expect.includes(clase);
