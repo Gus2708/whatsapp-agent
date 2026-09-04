@@ -153,3 +153,44 @@ jobs:
             echo '```'
             echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  workflow-hygiene:
+    name: workflow hygiene (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    # Deliberately no `needs:` -- this job reports, it never gates. Both
+    # checks below exist because tests/ci_workflow_guard.test.js is a raw-text
+    # assertion with no real YAML parser: it only catches shapes someone
+    # thought to write down, and it has no way to know whether an environment
+    # a workflow declares (e.g. live.yml's `environment: live`) actually
+    # exists in this repository's settings -- see design D4 and the incident
+    # where it didn't, for weeks, with nothing here noticing.
+    steps:
+      - uses: actions/checkout@v4
+
+      # actionlint parses each workflow file for real (not raw text) and
+      # shellchecks every `run:` block -- a whole class of bug (quoting,
+      # unset variables, SC-series shellcheck findings inside a step's shell
+      # script) the raw-text guard in tests/ci_workflow_guard.test.js can
+      # never cover, because it never actually parses YAML or shell.
+      - name: actionlint
+        uses: docker://rhysd/actionlint:1.7.12
+        with:
+          args: -color
+
+      # Cross-check every `environment:` declared in the workflow files
+      # against the environments GitHub reports actually existing. The `gh
+      # api` call is best-effort (`|| true`): if it fails (no auth, rate
+      # limit, network), the script below still runs and reports that it
+      # could not check -- it never fails the build either way, and it never
+      # reports a skipped check as a clean pass. Uses the ambient
+      # `github.token`, never a repository secret (see the credential-free
+      # invariant tests/ci_workflow_guard.test.js enforces over this file).
+      - name: Fetch declared GitHub environments
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api "repos/${GITHUB_REPOSITORY}/environments" > environments.json || true
+
+      - name: Check declared-vs-existing environments (advisory)
+        run: node scripts/check_declared_environments.js environments.json
