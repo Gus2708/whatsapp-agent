@@ -21,6 +21,7 @@ const SB = pick('SUPABASE_URL') || pick('SUPABASE_URL');
 const ANON = pick('SUPABASE_ANON_KEY');
 // .env manda, pero se acepta la variable de entorno para probar sin tocar el archivo
 const OAI = pick('OPENAI_API_KEY') || (process.env.OPENAI_API_KEY || '').trim();
+const OR = pick('OPENROUTER_API_KEY') || (process.env.OPENROUTER_API_KEY || '').trim();
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
 
 const MODELO = 'text-embedding-3-small';
@@ -34,6 +35,7 @@ const PRECIO_M = 0.02;     // USD por millon de tokens
 
 const FULL = process.argv.includes('--full');
 const DRY = process.argv.includes('--dry');
+const REHASH = process.argv.includes('--rehash');
 
 async function sbGet(q) {
   const r = await fetch(`${SB}/rest/v1/${q}`, { headers: H });
@@ -80,19 +82,52 @@ function textoDe(p) {
 }
 const hashDe = t => crypto.createHash('md5').update(t).digest('hex');
 
+let proveedorActivo = OAI ? 'OpenAI' : 'OpenRouter';
 async function embeber(textos) {
-  const r = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${OAI}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: MODELO, input: textos, dimensions: DIMS }),
-  });
-  const j = await r.json();
-  if (!r.ok || j.error) throw new Error(`OpenAI ${r.status}: ${JSON.stringify(j.error || j).slice(0, 300)}`);
-  return { vectores: j.data.map(d => d.embedding), tokens: j.usage.total_tokens };
+  if (OAI && proveedorActivo === 'OpenAI') {
+    try {
+      const r = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${OAI}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: MODELO, input: textos, dimensions: DIMS }),
+      });
+      const j = await r.json();
+      if (r.ok && !j.error) {
+        return { vectores: j.data.map(d => d.embedding), tokens: j.usage.total_tokens };
+      }
+      const esGeo = r.status === 403 && /country|region|territory/i.test(JSON.stringify(j));
+      if (OR && (esGeo || r.status >= 400)) {
+        console.log(`\n  \x1b[38;2;224;175;104m▲\x1b[0m OpenAI no disponible (${esGeo ? 'bloqueo geográfico' : `HTTP ${r.status}`}). Conmutando automáticamente a OpenRouter...`);
+        proveedorActivo = 'OpenRouter';
+      } else {
+        throw new Error(`OpenAI ${r.status}: ${JSON.stringify(j.error || j).slice(0, 300)}`);
+      }
+    } catch (err) {
+      if (OR) {
+        console.log(`\n  \x1b[38;2;224;175;104m▲\x1b[0m OpenAI error: ${err.message}. Conmutando automáticamente a OpenRouter...`);
+        proveedorActivo = 'OpenRouter';
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  if (OR && proveedorActivo === 'OpenRouter') {
+    const r = await fetch('https://openrouter.ai/api/v1/embeddings', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${OR}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: MODELO, input: textos, dimensions: DIMS }),
+    });
+    const j = await r.json();
+    if (!r.ok || j.error) throw new Error(`OpenRouter ${r.status}: ${JSON.stringify(j.error || j).slice(0, 300)}`);
+    return { vectores: j.data.map(d => d.embedding), tokens: (j.usage && j.usage.total_tokens) || (textos.length * 25) };
+  }
+
+  throw new Error('No hay proveedor de embeddings funcional (falta OPENAI_API_KEY u OPENROUTER_API_KEY)');
 }
 
 (async () => {
-  if (!OAI) throw new Error('falta OPENAI_API_KEY en .env — créala en platform.openai.com/api-keys');
+  if (!OAI && !OR) throw new Error('falta OPENAI_API_KEY u OPENROUTER_API_KEY en .env');
   if (!ANON) throw new Error('falta SUPABASE_ANON_KEY en .env');
 
   const c = {
@@ -138,8 +173,33 @@ async function embeber(textos) {
   );
   console.log('  ' + c.ok('⏺') + ' ' + c.bold(c.num(previos.size.toLocaleString('es-VE'))) + c.gray(' ya embebidos'));
 
-  const pendientes = productos.filter(p => FULL || previos.get(p.codigo_interno) !== hashDe(textoDe(p)));
-  console.log('  ' + c.claude('❯') + ' ' + c.bold(c.cyan(`${pendientes.length.toLocaleString('es-VE')}`)) + c.gray(` a embeber${FULL ? ' (--full)' : ' (nuevos o con descripción cambiada)'}`));
+  const sinVector = productos.filter(p => !previos.has(p.codigo_interno));
+  const descCambiada = productos.filter(p => {
+    const prevHash = previos.get(p.codigo_interno);
+    return prevHash && prevHash !== hashDe(textoDe(p));
+  });
+
+  let pendientes;
+  if (FULL) {
+    pendientes = productos;
+    console.log('  ' + c.claude('❯') + ' ' + c.bold(c.cyan(`${pendientes.length.toLocaleString('es-VE')}`)) + c.gray(' a embeber (--full: catálogo completo)'));
+  } else if (REHASH) {
+    pendientes = productos.filter(p => previos.get(p.codigo_interno) !== hashDe(textoDe(p)));
+    console.log('  ' + c.claude('❯') + ' ' + c.bold(c.cyan(`${pendientes.length.toLocaleString('es-VE')}`)) + c.gray(' a embeber (--rehash: enriquecimiento modificado)'));
+  } else {
+    // Modo automático e incremental para ejecuciones nocturnas:
+    // Prioriza productos sin vector y descripciones modificadas en catálogo.
+    if (sinVector.length > 0) {
+      pendientes = sinVector;
+      console.log('  ' + c.claude('❯') + ' ' + c.bold(c.cyan(`${pendientes.length.toLocaleString('es-VE')}`)) + c.gray(` productos nuevos SIN vector a embeber`));
+    } else if (descCambiada.length > 0 && descCambiada.length <= 500) {
+      pendientes = descCambiada;
+      console.log('  ' + c.claude('❯') + ' ' + c.bold(c.cyan(`${pendientes.length.toLocaleString('es-VE')}`)) + c.gray(` productos con descripción modificada a embeber`));
+    } else {
+      pendientes = [];
+    }
+  }
+
   if (!pendientes.length) { console.log('\n ' + c.ok('▎') + ' ' + c.bold(c.ok('Nada que hacer: el catálogo no cambió.')) + '\n'); return; }
 
   const tokensEst = Math.ceil(pendientes.reduce((a, p) => a + textoDe(p).length, 0) / 4);

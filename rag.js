@@ -340,18 +340,32 @@ async function estado() {
   seccion('CONECTIVIDAD');
   const OAI = pick('OPENAI_API_KEY');
   const OR = pick('OPENROUTER_API_KEY');
-  const sondas = await Promise.all([
-    OR ? sonda('OpenRouter · Luna', 'https://openrouter.ai/api/v1/chat/completions', {
+  const sondaOAI = OAI ? await sonda('OpenAI · embeddings', 'https://api.openai.com/v1/embeddings', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + OAI, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'text-embedding-3-small', input: 'ok', dimensions: 1536 }),
+  }, 'capa vectorial apagada') : { nombre: 'OpenAI · embeddings', ok: false, faltaKey: true, esperado: 'capa vectorial apagada' };
+
+  let sondaEmb = sondaOAI;
+  if (!sondaOAI.ok && OR) {
+    const sondaOR = await sonda('OpenRouter · embeddings', 'https://openrouter.ai/api/v1/embeddings', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + OR, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'text-embedding-3-small', input: 'ok', dimensions: 1536 }),
+    }, 'capa vectorial apagada');
+    if (sondaOR.ok) {
+      sondaEmb = { nombre: 'OpenRouter · embeddings (fallback)', ok: true, ms: sondaOR.ms };
+    }
+  }
+
+  const sondas = [
+    OR ? await sonda('OpenRouter · Luna', 'https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + OR, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'openai/gpt-5.6-luna', max_tokens: 1, messages: [{ role: 'user', content: 'ok' }] }),
-    }, 'el bot no puede responder a nadie') : Promise.resolve({ nombre: 'OpenRouter · Luna', ok: false, faltaKey: true, esperado: 'el bot no puede responder a nadie' }),
-    OAI ? sonda('OpenAI · embeddings', 'https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + OAI, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'text-embedding-3-small', input: 'ok', dimensions: 1536 }),
-    }, 'capa vectorial apagada') : Promise.resolve({ nombre: 'OpenAI · embeddings', ok: false, faltaKey: true, esperado: 'capa vectorial apagada' }),
-  ]);
+    }, 'el bot no puede responder a nadie') : { nombre: 'OpenRouter · Luna', ok: false, faltaKey: true, esperado: 'el bot no puede responder a nadie' },
+    sondaEmb,
+  ];
 
   const caidos = [];
   for (const s of sondas) {
@@ -445,15 +459,30 @@ const DEMO = 'tapa para el baño';
 
 async function embeder(textos) {
   const OAI = pick('OPENAI_API_KEY');
-  if (!OAI) return null;
-  const r = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + OAI, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'text-embedding-3-small', input: textos, dimensions: 1536 }),
-  });
-  const j = await r.json();
-  if (!r.ok || j.error) return null;
-  return j.data.map(d => d.embedding);
+  const OR = pick('OPENROUTER_API_KEY');
+  if (OAI) {
+    try {
+      const r = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${OAI}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'text-embedding-3-small', input: textos, dimensions: 1536 }),
+      });
+      const j = await r.json();
+      if (r.ok && !j.error) return j.data.map(d => d.embedding);
+    } catch {}
+  }
+  if (OR) {
+    try {
+      const r = await fetch('https://openrouter.ai/api/v1/embeddings', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${OR}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'text-embedding-3-small', input: textos, dimensions: 1536 }),
+      });
+      const j = await r.json();
+      if (r.ok && !j.error) return j.data.map(d => d.embedding);
+    } catch {}
+  }
+  return null;
 }
 async function vecinos(vec, limite) {
   const r = await fetch(`${SB}/rest/v1/rpc/buscar_semantico`, {
