@@ -12,7 +12,9 @@ const getEnvVar = (key: string, defaultValue: string = ''): string => {
   // Fallback local buscando .env en root o en dashboard
   try {
     const candidates = [
+      path.resolve(process.cwd(), '.env.local'),
       path.resolve(process.cwd(), '.env'),
+      path.resolve(process.cwd(), '..', '.env.local'),
       path.resolve(process.cwd(), '..', '.env'),
     ];
     for (const p of candidates) {

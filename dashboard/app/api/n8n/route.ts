@@ -28,15 +28,41 @@ const getN8nApiKey = (): string => {
   return '';
 };
 
+const getCanonicalWorkflows = (): Array<{ id: string; name: string; active: boolean; updatedAt?: string }> => {
+  try {
+    const candidatePaths = [
+      path.resolve(process.cwd(), 'n8n_workflow.json'),
+      path.resolve(process.cwd(), '..', 'n8n_workflow.json'),
+    ];
+    for (const p of candidatePaths) {
+      if (fs.existsSync(p)) {
+        const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
+        return [
+          {
+            id: raw.id || 'ugHOTQv3Vb6cuTct',
+            name: raw.name || 'whatsapp agent',
+            active: raw.active ?? true,
+            updatedAt: raw.updatedAt,
+          },
+        ];
+      }
+    }
+  } catch {}
+  return [];
+};
+
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const n8nUrl = await getTunnelUrl('n8n');
+  const tunnelUrl = await getTunnelUrl('n8n');
+  const fallbackWorkflows = getCanonicalWorkflows();
+  const n8nUrl = tunnelUrl || process.env.N8N_API_URL || null;
+
   if (!n8nUrl) {
     return NextResponse.json({
       online: false,
       error: 'Túnel de n8n no disponible',
-      workflows: [],
+      workflows: fallbackWorkflows,
       executions: [],
     });
   }
@@ -55,11 +81,15 @@ export async function GET() {
       }),
     ]);
 
-    const workflows = wfRes.ok ? (await wfRes.json())?.data || [] : [];
+    let workflows = wfRes.ok ? (await wfRes.json())?.data || [] : [];
     const executions = execRes.ok ? (await execRes.json())?.data || [] : [];
 
+    if (workflows.length === 0 && fallbackWorkflows.length > 0) {
+      workflows = fallbackWorkflows;
+    }
+
     return NextResponse.json({
-      online: true,
+      online: wfRes.ok,
       url: n8nUrl,
       workflows,
       executions,
@@ -69,7 +99,7 @@ export async function GET() {
       online: false,
       url: n8nUrl,
       error: error.message,
-      workflows: [],
+      workflows: fallbackWorkflows,
       executions: [],
     });
   }
