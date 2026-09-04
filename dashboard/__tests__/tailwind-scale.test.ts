@@ -54,10 +54,14 @@ function nearestOpacityStep(n: number): number {
  * a guard is worse than a gap: the fix a reader reaches for is deleting the
  * guard, not correcting the class.
  */
-const DEFAULT_FONT_SIZE_TOKENS = new Set<string>([
+// A plain array, not a Set: dashboard/tsconfig.json targets es5, where
+// spreading a Set is a TS2802 error. Vitest transpiles with esbuild and never
+// typechecks, so only `tsc --noEmit` catches that -- which is exactly how CI
+// caught it here.
+const DEFAULT_FONT_SIZE_TOKENS: readonly string[] = [
   'xs', 'sm', 'base', 'lg', 'xl',
   '2xl', '3xl', '4xl', '5xl', '6xl', '7xl', '8xl', '9xl',
-]);
+];
 
 const fontSizeTokens = new Set<string>([
   ...DEFAULT_FONT_SIZE_TOKENS,
@@ -96,7 +100,10 @@ function isValidSpacingDecimal(value: string): boolean {
 
 function nearestSpacingDecimal(value: string): string {
   const target = Number(value);
-  const candidates = [...DEFAULT_SPACING_DECIMALS, ...extendedSpacingDecimals];
+  // Array.from, not spread: see DEFAULT_FONT_SIZE_TOKENS above (es5 target).
+  const candidates = Array.from(DEFAULT_SPACING_DECIMALS).concat(
+    Array.from(extendedSpacingDecimals),
+  );
   let best = candidates[0];
   let bestDiff = Math.abs(Number(best) - target);
   for (const candidate of candidates) {
