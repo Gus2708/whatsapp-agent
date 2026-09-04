@@ -1,19 +1,31 @@
 import './globals.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { SoundProvider } from '@/components/audio/SoundProvider';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { BlueprintCanvas } from '@/components/hud/BlueprintCanvas';
+import { PwaRegister } from '@/components/pwa/PwaRegister';
+
+export const viewport: Viewport = {
+  themeColor: '#0a0a0a',
+};
 
 export const metadata: Metadata = {
   title: 'Perucho // WhatsApp CRM & Operational Flight Deck · Ferretería El Serrucho',
   description: 'Mission control, WhatsApp CRM, and RAG intelligence deck for Ferretería El Serrucho',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Perucho Flight Deck',
+  },
   icons: {
     icon: [
       { url: '/crmlogo.svg', type: 'image/svg+xml' },
-      { url: '/crmlogo.png', type: 'image/png' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
     ],
-    shortcut: '/crmlogo.png',
-    apple: '/crmlogo.png',
+    shortcut: '/icon-192.png',
+    apple: '/apple-touch-icon.png',
   },
 };
 
@@ -26,7 +38,10 @@ export default function RootLayout({
     <html lang="es" className="dark">
       <head>
         <link rel="icon" href="/crmlogo.svg" type="image/svg+xml" />
-        <link rel="alternate icon" href="/crmlogo.png" type="image/png" />
+        <link rel="alternate icon" href="/icon-192.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <meta name="theme-color" content="#0a0a0a" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
@@ -38,6 +53,7 @@ export default function RootLayout({
         <SoundProvider>
           {/* Blueprint Radar Canvas ALWAYS active across all views and auth states */}
           <BlueprintCanvas />
+          <PwaRegister />
           <main className="relative z-10 mx-auto flex h-full w-full max-w-[1580px] flex-col overflow-hidden px-2 pb-2 pt-2 sm:px-4 sm:pb-3 sm:pt-3 lg:px-6">
             <AuthProvider>{children}</AuthProvider>
           </main>
