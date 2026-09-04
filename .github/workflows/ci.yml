@@ -1,5 +1,13 @@
 name: ci
 
+# READING A RED X: only the `gate blocking (node 22.x)` job can fail this
+# workflow. `gate advisory (node 24.x)` and `quality advisory (lint +
+# coverage)` both run with continue-on-error, so a red X on either one
+# reports a signal -- a 24.x incompatibility, an ESLint regression, a
+# coverage drop -- and does NOT block the pull request. Read the job
+# summary, then decide. Do not "fix" an advisory failure by deleting the
+# job; that is the only thing it exists to tell you.
+
 # Lockfile trap (sdd/ci-pipeline task 1.4): a plain `npm install` on a Windows
 # dev machine silently rewrites dashboard/package-lock.json back to a
 # Windows-only optional-dependency tree, and `npm ci` here will then fail at
