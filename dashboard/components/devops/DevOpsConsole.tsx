@@ -174,7 +174,7 @@ export const DevOpsConsole: React.FC = () => {
     <div className="space-y-4 sm:space-y-6 pb-8">
       <div className="mb-2 sm:mb-4">
         <span className="font-mono text-[10px] sm:text-[11px] text-gold-bright uppercase tracking-wider block mb-1 font-medium">
-          // DEVOPS & RESILIENCE RUNNER
+          {'//'} DEVOPS & RESILIENCE RUNNER
         </span>
         <h2 className="text-xl sm:text-2xl font-normal text-chalk tracking-tight">
           Consola de Scripts de Automatización & Auto-Mejora

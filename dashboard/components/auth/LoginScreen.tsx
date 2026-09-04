@@ -63,7 +63,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onEnte
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-graphite/60 font-mono text-[10px]">
             <span className="text-gold-bright uppercase tracking-wider flex items-center gap-1.5 font-medium">
               <Shield className="h-3.5 w-3.5 text-pulse-green" />
-              // SECURE ACCESS GATEWAY
+              {'//'} SECURE ACCESS GATEWAY
             </span>
             <span className="px-2 py-0.5 bg-pulse-green/10 border border-pulse-green/30 text-pulse-green text-[9px] font-semibold">
               SUPABASE AUTH
@@ -177,7 +177,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onEnte
               <div className="flex items-center justify-between font-mono text-[9px] text-smoke uppercase">
                 <span className="text-gold-bright flex items-center gap-1.5 font-semibold">
                   <Zap className="h-3 w-3 text-pulse-green flex-shrink-0" />
-                  <span>// ACCESO EVALUADORES TÉCNICOS</span>
+                  <span>{'//'} ACCESO EVALUADORES TÉCNICOS</span>
                 </span>
                 <span className="px-1.5 py-0.5 bg-pulse-green/10 border border-pulse-green/30 text-pulse-green text-[10px] font-semibold">
                   1-CLICK GUEST

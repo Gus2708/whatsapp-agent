@@ -59,7 +59,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
       {/* Pane title + inbox counter */}
       <div className="flex flex-shrink-0 items-center justify-between gap-2 border-b border-graphite bg-[#0e0e0e] px-3 py-2.5">
         <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-gold-bright">
-          // Inbox
+          {'//'} Inbox
         </span>
         <span className="font-mono text-[10px] tabular-nums text-smoke">
           {filtered.length}/{conversations.length}

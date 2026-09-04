@@ -212,7 +212,7 @@ export default function FlightDeckDashboard() {
           <div className="crosshair-safe flex flex-col flex-1 min-h-0 gap-3 py-1 overflow-y-auto lg:overflow-hidden lg:justify-between">
             <div className="flex-shrink-0">
               <span className="font-mono text-[10px] text-gold-bright uppercase tracking-wider block mb-0.5 font-medium">
-                // GLOBAL TELEMETRY & FLIGHT RADAR
+                {'//'} GLOBAL TELEMETRY & FLIGHT RADAR
               </span>
               <h2 className="text-lg sm:text-xl font-normal text-chalk tracking-tight">
                 Métricas Operativas del Agente en Producción

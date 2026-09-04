@@ -134,7 +134,7 @@ export const N8nVisualizer: React.FC = () => {
       <div className="flex flex-wrap justify-between items-start sm:items-end gap-3 mb-2 sm:mb-4">
         <div>
           <span className="font-mono text-[10px] sm:text-[11px] text-gold-bright uppercase tracking-wider block mb-1 font-medium">
-            // LIVE CLOUDFLARE TUNNEL · N8N ORCHESTRATION ENGINE
+            {'//'} LIVE CLOUDFLARE TUNNEL · N8N ORCHESTRATION ENGINE
           </span>
           <h2 className="text-xl sm:text-2xl font-normal text-chalk tracking-tight">
             Topología de 33 Nodos & Telemetría en Vivo

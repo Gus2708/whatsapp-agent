@@ -55,7 +55,7 @@ export const LeadDetailsPane: React.FC<LeadDetailsPaneProps> = ({
       <div className="flex flex-shrink-0 items-start justify-between gap-2 border-b border-graphite bg-[#0e0e0e] px-4 py-3">
         <div>
           <span className="mb-0.5 block font-mono text-[10px] uppercase tracking-[0.14em] text-gold-bright">
-            // Qualification engine
+            {'//'} Qualification engine
           </span>
           <h4 className="text-[15px] font-normal leading-tight text-chalk">
             Perfil del Lead

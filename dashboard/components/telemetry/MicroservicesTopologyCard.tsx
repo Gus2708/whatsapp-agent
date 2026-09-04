@@ -123,7 +123,7 @@ export const MicroservicesTopologyCard: React.FC = () => {
         <div className="flex flex-wrap justify-between items-center gap-2 flex-shrink-0">
           <div>
             <span className="font-mono text-[10px] uppercase tracking-wider text-gold-bright block mb-0.5 font-medium">
-              // RESILIENCE & RUNTIME TOPOLOGY
+              {'//'} RESILIENCE & RUNTIME TOPOLOGY
             </span>
             <h3 className="text-sm sm:text-[15px] font-normal text-chalk">
               Topología de Microservicios & Pipeline en Producción

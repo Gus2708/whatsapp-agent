@@ -150,7 +150,7 @@ export const LiveLogStream: React.FC = () => {
     <CrosshairCard className="p-3 sm:p-4 bg-[#0c0c0c] flex flex-col flex-1 min-h-[280px] lg:min-h-0">
       <div className="flex flex-wrap justify-between items-center gap-2 mb-2.5 flex-shrink-0">
         <span className="font-mono text-[10.5px] uppercase tracking-wider text-gold-bright font-medium">
-          // RUNTIME LOG STREAM
+          {'//'} RUNTIME LOG STREAM
         </span>
         <button
           onClick={injectSimulatedEvent}

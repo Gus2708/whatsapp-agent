@@ -149,7 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       <div className="flex-1 w-full h-full min-h-0 flex flex-col items-center justify-center gap-4 select-none">
         <ThinkingOrb state="searching_rag" size={64} showLabel={false} />
         <div className="font-mono text-xs text-compass-gold tracking-widest uppercase animate-pulse">
-          // VERIFICANDO CREDENCIALES SUPABASE AUTH...
+          {'//'} VERIFICANDO CREDENCIALES SUPABASE AUTH...
         </div>
       </div>
     );

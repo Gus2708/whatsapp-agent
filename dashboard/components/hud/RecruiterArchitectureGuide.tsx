@@ -47,7 +47,7 @@ export const RecruiterArchitectureGuide: React.FC<RecruiterArchitectureGuideProp
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-[9.5px] sm:text-[10px] uppercase tracking-wider text-gold-bright font-bold">
-                    // RECRUITER & TECH LEAD BRIEFING
+                    {'//'} RECRUITER & TECH LEAD BRIEFING
                   </span>
                   <span className="px-1.5 sm:px-2 py-0.5 bg-pulse-green/10 border border-pulse-green/40 text-pulse-green font-mono text-[10px] font-semibold">
                     ENTERPRISE ARCHITECTURE
@@ -152,7 +152,7 @@ export const RecruiterArchitectureGuide: React.FC<RecruiterArchitectureGuideProp
             {/* Interactive Benchmark Matrix */}
             <div className="p-2.5 sm:p-3 bg-[#080808] border border-graphite">
               <div className="text-[9.5px] sm:text-[10px] text-gold-bright uppercase tracking-wider mb-2 flex items-center justify-between font-medium">
-                <span>// BENCHMARK TÉCNICO: PIPELINE HÍBRIDO VS LLM TRADICIONAL</span>
+                <span>{'//'} BENCHMARK TÉCNICO: PIPELINE HÍBRIDO VS LLM TRADICIONAL</span>
                 <span className="text-smoke">Muestra de 1.000 consultas</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[10px]">

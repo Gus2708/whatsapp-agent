@@ -190,7 +190,7 @@ export const RagStudio: React.FC = () => {
       <div className="flex flex-wrap justify-between items-center gap-2 flex-shrink-0">
         <div>
           <span className="font-mono text-[10px] text-gold-bright uppercase tracking-wider block mb-0.5 font-medium">
-            // CLI TUI STUDIO & RETRIEVAL LAB · LIVE DATABASE CONNECTED
+            {'//'} CLI TUI STUDIO & RETRIEVAL LAB · LIVE DATABASE CONNECTED
           </span>
           <h2 className="text-lg sm:text-xl font-normal text-chalk tracking-tight">
             Pruebas de Búsqueda Híbrida & SNR (7.650 SKUs)
@@ -315,7 +315,7 @@ export const RagStudio: React.FC = () => {
             <div className="flex items-center justify-between pb-2 border-b border-graphite/60 flex-shrink-0">
               <div>
                 <span className="font-mono text-[10px] uppercase tracking-wider text-gold-bright block mb-0.5 font-medium">
-                  // CASCADE WATERFALL TELEMETRY
+                  {'//'} CASCADE WATERFALL TELEMETRY
                 </span>
                 <h3 className="text-sm sm:text-[14.5px] font-normal text-chalk">
                   Resolución por Capas en Cascada
