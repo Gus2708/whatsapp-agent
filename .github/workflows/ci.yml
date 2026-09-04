@@ -1,12 +1,13 @@
 name: ci
 
 # READING A RED X: only the `gate blocking (node 22.x)` job can fail this
-# workflow. `gate advisory (node 24.x)` and `quality advisory (lint +
-# coverage)` both run with continue-on-error, so a red X on either one
-# reports a signal -- a 24.x incompatibility, an ESLint regression, a
-# coverage drop -- and does NOT block the pull request. Read the job
-# summary, then decide. Do not "fix" an advisory failure by deleting the
-# job; that is the only thing it exists to tell you.
+# workflow. `gate advisory (node 24.x)`, `quality advisory (lint +
+# coverage)`, and `e2e advisory (cuj playwright)` all run with
+# continue-on-error, so a red X reports a signal -- a 24.x incompatibility,
+# an ESLint regression, a coverage drop, or a CUJ break -- and does NOT
+# block the pull request. Read the job summary, then decide. Do not "fix"
+# an advisory failure by deleting the job; that is the only thing it
+# exists to tell you.
 
 # Lockfile trap (sdd/ci-pipeline task 1.4): a plain `npm install` on a Windows
 # dev machine silently rewrites dashboard/package-lock.json back to a
@@ -194,3 +195,36 @@ jobs:
 
       - name: Check declared-vs-existing environments (advisory)
         run: node scripts/check_declared_environments.js environments.json
+
+  e2e:
+    name: e2e cuj (playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    # Deliberately no `needs: gate` -- reports CUJ health across desktop & mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            dashboard/package-lock.json
+
+      - name: Install (root)
+        continue-on-error: true
+        run: npm ci
+
+      - name: Install (dashboard)
+        continue-on-error: true
+        working-directory: dashboard
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: dashboard
+        run: npx playwright install chromium --with-deps
+
+      - name: Run E2E CUJ tests
+        run: npm run test:e2e
