@@ -17,6 +17,12 @@ dashboard/out/
 dashboard/node_modules/
 *.tsbuildinfo
 
+# ── Playwright test artifacts ──
+playwright-report/
+test-results/
+dashboard/playwright-report/
+dashboard/test-results/
+
 # ── Logs (boot, catchup, watchdog, sync, etc.) ──
 *.log
 logs/

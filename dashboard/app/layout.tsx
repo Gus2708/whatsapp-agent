@@ -40,8 +40,6 @@ export default function RootLayout({
         <link rel="icon" href="/crmlogo.svg" type="image/svg+xml" />
         <link rel="alternate icon" href="/icon-192.png" type="image/png" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <link rel="manifest" href="/manifest.webmanifest" />
-        <meta name="theme-color" content="#0a0a0a" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
