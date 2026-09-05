@@ -11,8 +11,8 @@ describe('PWA Manifest & Assets', () => {
     expect(fs.existsSync(manifestPath)).toBe(true);
 
     const manifestContent = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-    expect(manifestContent.name).toBe('Perucho Flight Deck · Ferretería El Serrucho');
-    expect(manifestContent.short_name).toBe('Perucho Flight Deck');
+    expect(manifestContent.name).toBe('WhatsApp AI Agent Flight Deck');
+    expect(manifestContent.short_name).toBe('AI Flight Deck');
     expect(manifestContent.start_url).toBe('/');
     expect(manifestContent.display).toBe('standalone');
   });

@@ -26,5 +26,8 @@ if (updated !== 3) {
   console.error('expected to update 3 nodes, updated ' + updated + ' — aborting, no file written');
   process.exit(1);
 }
+if (wf.activeVersion && wf.activeVersion.nodes) {
+  wf.activeVersion.nodes = JSON.parse(JSON.stringify(wf.nodes));
+}
 fs.writeFileSync(wfPath, JSON.stringify(wf, null, 2) + '\n');
 console.log('regenerated workflow: 3 nodes updated');

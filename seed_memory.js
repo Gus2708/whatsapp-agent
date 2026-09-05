@@ -1,7 +1,25 @@
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 
-const port = 7437;
-const project = 'whatsapp-agent';
+const port = Number(process.env.ENGRAM_PORT || 7437);
+const project = process.env.PROJECT_NAME || 'whatsapp-agent';
+
+let contextData = {};
+try {
+  const ctxPath = path.join(__dirname, 'data', 'business_context.json');
+  if (fs.existsSync(ctxPath)) {
+    contextData = JSON.parse(fs.readFileSync(ctxPath, 'utf8'));
+  }
+} catch (e) {
+  // Fall back to env or defaults
+}
+
+const storeName = process.env.STORE_NAME || contextData?.comercio?.nombre || 'Comercio';
+const agentName = process.env.AGENT_NAME || 'Asistente de Ventas';
+const storeLocation = process.env.STORE_LOCATION || contextData?.comercio?.ubicacion_central || 'Sucursal Principal';
+const storeSchedule = process.env.STORE_SCHEDULE || contextData?.comercio?.horarios_atencion?.horario || 'Lunes a Sábado de 08:00 AM a 06:00 PM';
+const currency = process.env.STORE_CURRENCY || 'USD';
 
 // Memorias base de la tienda: reglas, horarios, políticas de envío y personalidad
 const observations = [
@@ -9,37 +27,37 @@ const observations = [
     title: 'Horario Comercial y Atención',
     type: 'policy',
     topic_key: 'bot:horarios',
-    content: 'Ferretería El Serrucho atiende al público de Lunes a Sábado de 08:00 AM a 06:00 PM, con un descanso para el almuerzo de 01:00 PM a 02:00 PM. Los domingos y días feriados nacionales la tienda permanece cerrada y no se atienden consultas de WhatsApp.'
+    content: `${storeName} atiende al público en el siguiente horario: ${storeSchedule}. Los domingos y feriados nacionales la atención de consultas puede estar pausada o diferida.`
   },
   {
     title: 'Ubicación de la Tienda, Retiro y Transporte',
     type: 'policy',
     topic_key: 'bot:ubicacion',
-    content: 'La tienda física de Ferretería El Serrucho está ubicada en Mene Mauroa, Estado Falcón, Venezuela. El cliente puede retirar sus compras de manera presencial en la tienda. Además se ofrece transporte de materiales a $10 dentro del casco central de Mene Mauroa; para entregas fuera del casco central el costo varía según la distancia y lo coordina un empleado (el bot no estima ese monto, deriva a un empleado).'
+    content: `La tienda física de ${storeName} está ubicada en ${storeLocation}. El cliente puede retirar sus compras presencialmente. Las políticas de despacho y transporte son coordinadas con el equipo o según la zona.`
   },
   {
     title: 'Métodos de Pago Aceptados',
     type: 'policy',
     topic_key: 'bot:pagos',
-    content: 'Los métodos de pago admitidos son: Pago Móvil (a tasa oficial del Banco Central de Venezuela - BCV), Efectivo (tanto en Dólares Estadounidenses USD como en Bolívares), Transferencias Bancarias nacionales y Zelle (únicamente para facturas o compras que superen los $20.00 USD).'
+    content: `Los métodos de pago admitidos en ${storeName} incluyen: Pagos electrónicos, Transferencias Bancarias y Efectivo en moneda local o divisas (${currency}).`
   },
   {
     title: 'Políticas de Devolución de Artículos',
     type: 'policy',
     topic_key: 'bot:devoluciones',
-    content: 'Se aceptan cambios y devoluciones de productos dentro de un plazo máximo de 7 días continuos desde la fecha de compra. Requisitos: el artículo debe entregarse sellado en su empaque de origen, sin marcas físicas de uso, en perfectas condiciones y presentando la factura original de compra.'
+    content: 'Se aceptan cambios y devoluciones dentro del plazo estipulado presentando el empaque original sin uso y el comprobante de compra.'
   },
   {
     title: 'Formato y Reglas de Presentación de Precios',
     type: 'instruction',
     topic_key: 'bot:precios',
-    content: 'El asesor de ventas debe cotizar siempre los precios exactamente como los entrega la base de datos de Supabase (campo precio_venta). Se debe usar obligatoriamente el formato \'$[precio_venta] USD\' (en dólares, con prefijo $ y sufijo USD). Está terminantemente prohibido calcular e IVA (16%), realizar recargos o inventar precios.'
+    content: `El asesor de ventas cotiza siempre los precios exactos que entrega la base de datos en formato '$[precio_venta] ${currency}'. Está prohibido alterar precios o inventar montos.`
   },
   {
-    title: 'Personalidad y Tono de Perucho',
+    title: `Personalidad y Tono de ${agentName}`,
     type: 'instruction',
     topic_key: 'bot:personalidad',
-    content: 'El asesor virtual se llama Perucho. Adopta la personalidad de un ferretero mayor, sumamente servicial, paciente y educado, con un trato muy cálido y cercano propio de Mene Mauroa. Utiliza emojis, viñetas de lista ordenadas y modismos respetuosos en sus respuestas de WhatsApp.'
+    content: `El asesor virtual se llama ${agentName}. Atiende en representación de ${storeName}, con un trato servicial, atento, claro y educado. Utiliza viñetas y formato amigable en sus respuestas de WhatsApp.`
   }
 ];
 

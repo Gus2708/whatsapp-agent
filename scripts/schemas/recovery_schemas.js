@@ -1,6 +1,6 @@
-﻿/**
- * RECOVERY SCHEMAS - Ferretería El Serrucho
- * Validadores de esquema estrictos para el flujo de recuperación y catchup.
+/**
+ * RECOVERY SCHEMAS - WhatsApp Sales Agent
+ * Esquemas de validación estructural y defensiva para el subsistema de resiliencia.
  * Diseñado para fallar rápido y reportar errores detallados ante datos malformados.
  */
 

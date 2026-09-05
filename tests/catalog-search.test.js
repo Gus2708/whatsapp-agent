@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const L = require('../lib/serrucho-search.js');
+const L = require('../lib/catalog-search.js');
 
 test('norm: lowercases, strips accents, collapses whitespace', () => {
   assert.strictEqual(L.norm('  Hólá   Múndo '), 'hola mundo');

@@ -1,4 +1,4 @@
-# RAG de Perucho — cómo encuentra un producto
+# Pipeline RAG — Cómo el Agente Encuentra un Producto
 
 Documento de referencia para **investigar mejoras**. No describe lo que se quiso construir,
 sino lo que hay, con los números que lo respaldan y los caminos que se probaron y no
@@ -52,7 +52,7 @@ Y una señal transversal que **reordena** el resultado de cualquier capa:
 
 | Tabla | Filas | Qué guarda | Quién la mantiene |
 | :--- | ---: | :--- | :--- |
-| `productos` | 7.650 | Catálogo, sincronizado desde HybridLite | backend serrucho |
+| `productos` | 7.650 | Catálogo, sincronizado desde ERP / Base de Datos | backend de sincronización |
 | `catalogo_vocabulario` | 3.495 | `termino → canonico` coloquial | `generar_vocabulario.js` |
 | `catalogo_vocab_categorias` | ~710 | Hash md5 **por categoría** | idem |
 | `productos_embedding` | 7.650 | `vector(1536)` + HNSW coseno | `generar_embeddings.js` |
@@ -270,6 +270,6 @@ node scripts/_test_fallos_reales.js --prod      # consultas que de verdad escala
 - **Parchear estos archivos desde el shell:** un heredoc se comió las barras invertidas y
   dejó `/\d/` como `/d/` y `\b` como carácter backspace en los tres archivos. Usar
   herramientas de edición, no `cat <<EOF`.
-- **Cadena de despliegue:** `lib/serrucho-search.js` → `scratch_live/*` → `scripts/new_*.js`
+- **Cadena de despliegue:** `lib/catalog-search.js` → `scratch_live/*` → `scripts/new_*.js`
   → `n8n_workflow.json` → n8n. Desplegar con `deploy_nodos.js` y cerrar siempre con
   `npm test` (los guards detectan drift entre las copias).

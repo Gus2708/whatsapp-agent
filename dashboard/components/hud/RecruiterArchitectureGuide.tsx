@@ -54,7 +54,7 @@ export const RecruiterArchitectureGuide: React.FC<RecruiterArchitectureGuideProp
                   </span>
                 </div>
                 <h2 className="text-sm sm:text-lg font-normal text-chalk tracking-tight">
-                  Perucho Agent · Decisiones de Ingeniería & Telemetría
+                  {process.env.NEXT_PUBLIC_AGENT_NAME || 'WhatsApp AI Agent'} · Decisiones de Ingeniería & Telemetría
                 </h2>
               </div>
             </div>

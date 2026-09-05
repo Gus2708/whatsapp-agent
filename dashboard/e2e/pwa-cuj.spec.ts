@@ -20,8 +20,8 @@ test.describe('PWA Critical User Journey (CUJ) - Flight Deck', () => {
     expect(response.status()).toBe(200);
 
     const manifest = await response.json();
-    expect(manifest.name).toBe('Perucho Flight Deck · Ferretería El Serrucho');
-    expect(manifest.short_name).toBe('Perucho Flight Deck');
+    expect(manifest.name).toBe('WhatsApp AI Agent Flight Deck');
+    expect(manifest.short_name).toBe('AI Flight Deck');
     expect(manifest.display).toBe('standalone');
     expect(manifest.start_url).toBe('/');
     expect(manifest.background_color).toBe('#0a0a0a');
@@ -43,7 +43,7 @@ test.describe('PWA Critical User Journey (CUJ) - Flight Deck', () => {
     await page.goto('/');
 
     // Verify document title
-    await expect(page).toHaveTitle(/Perucho/);
+    await expect(page).toHaveTitle(/Flight Deck/);
 
     // Verify root html has dark class
     const htmlElement = page.locator('html');

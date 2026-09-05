@@ -1,9 +1,9 @@
-// Guard: lib/serrucho-search.js is the single source of truth for the matcher.
+// Guard: lib/catalog-search.js is the single source of truth for the matcher.
 // Fails (non-zero exit) if any copy has drifted. Run via `npm test`.
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
-const L = require('../lib/serrucho-search.js');
+const L = require('../lib/catalog-search.js');
 
 const root = path.join(__dirname, '..');
 // Normalize CRLF->LF: the Windows checkout is CRLF, but Function.prototype.toString() is always LF.

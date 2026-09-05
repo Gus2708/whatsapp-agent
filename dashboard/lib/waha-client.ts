@@ -25,7 +25,7 @@ const getWahaApiKey = (): string => {
     }
   } catch {}
 
-  return 'perucho_waha_secret_2026';
+  return 'agent_waha_secret_2026';
 };
 
 export interface WahaChat {

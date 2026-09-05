@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const progreso = require('./_progreso.js');
-const norm = require(require('path').join(__dirname, '..', 'lib', 'serrucho-search.js')).norm;
+const norm = require(require('path').join(__dirname, '..', 'lib', 'catalog-search.js')).norm;
 
 const ROOT = path.join(__dirname, '..');
 const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');

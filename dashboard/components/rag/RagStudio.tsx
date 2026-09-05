@@ -211,7 +211,7 @@ export const RagStudio: React.FC = () => {
               {/* HUD Blueprint Terminal Banner */}
               <div className="border border-compass-gold/30 bg-compass-gold/[0.03] p-2 sm:p-2.5 mb-2 select-none font-mono">
                 <div className="flex items-center justify-between text-[11px] sm:text-xs text-gold-bright font-semibold tracking-wide">
-                  <span>PERUCHO HYBRID RETRIEVAL BENCHMARK v2.4</span>
+                  <span>HYBRID RETRIEVAL BENCHMARK v2.4</span>
                   <span className="text-[10px] text-smoke font-normal">7,650 SKUs</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[10px] sm:text-[10.5px] text-smoke mt-0.5">
@@ -250,7 +250,7 @@ export const RagStudio: React.FC = () => {
                 historyItems.map((item) => (
                   <div key={item.id} className="space-y-0.5">
                     <div className="text-pulse-green font-semibold text-[11px] sm:text-[11.5px]">
-                      perucho@rag:~$ {item.query}
+                      {(process.env.NEXT_PUBLIC_AGENT_NAME || 'agent').toLowerCase()}@rag:~$ {item.query}
                     </div>
                     {item.status === 'loading' ? (
                       <div className="text-cyan-400 animate-pulse pl-2 text-[10.5px] sm:text-[11px]">
@@ -285,7 +285,7 @@ export const RagStudio: React.FC = () => {
             {/* Input Prompt (16px on mobile to avoid iOS auto-zoom) */}
             <div className="flex items-center gap-1.5 sm:gap-2 bg-[#0f0f0f] border border-graphite p-1.5 sm:p-2 flex-shrink-0">
               <span className="font-mono text-xs font-semibold text-pulse-green pl-1 hidden sm:inline">
-                perucho@rag:~$
+                {(process.env.NEXT_PUBLIC_AGENT_NAME || 'agent').toLowerCase()}@rag:~$
               </span>
               <input
                 type="text"

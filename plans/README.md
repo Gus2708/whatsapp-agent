@@ -67,7 +67,7 @@ Notes:
 ## Findings not yet planned (available for a future `improve` run)
 
 - **S1 — `anon` role full write on `productos`, `ventas`, `tazas`, `clientes`**:
-  cross-repo fix (backend serrucho writes via anon too); coordinate before planning.
+  cross-repo fix (store backend writes via anon too); coordinate before planning.
 - **S3 — Docker socket mounted into n8n** (`docker-compose.yml:74`): LAN-only mitigates;
   flag for hardening if external access is ever enabled.
 - **S5 — Supabase anon JWT hardcoded in 7 code nodes**: anon keys are public by
@@ -102,4 +102,4 @@ tool-results file, not fully parsed — the search columns already have the
 btree+trigram indexes they need); a live diff against the running n8n instance (the
 `n8n-mcp` server was disconnected, so workflow staleness was confirmed via
 `scratch_live` + grep rather than a live pull); and the separate employee-app /
-`backend serrucho` project that shares this Supabase database.
+store backend project that shares this Supabase database.

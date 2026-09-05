@@ -1,4 +1,4 @@
-﻿# -- Watchdog del ecosistema WhatsApp (WAHA + n8n + Catchup Autónomo) --------
+# -- Watchdog del ecosistema WhatsApp (WAHA + n8n + Catchup Autónomo) --------
 # Verifica cada ejecución que:
 #   1) La sesión WAHA "default" esté en WORKING (si falla, la recupera).
 #   2) n8n esté activo y respondiendo en /healthz (si cae, lo recupera).
@@ -25,6 +25,16 @@ $Session   = "default"
 $LogFile   = Join-Path $ProjectDir "waha_watchdog.log"
 $headers   = @{ "X-Api-Key" = $ApiKey; "Content-Type" = "application/json" }
 $StateFile = Join-Path $ProjectDir "waha_watchdog_state.json"
+
+function Get-ActiveContainer([string]$preferred, [string]$fallback) {
+  try {
+    $found = docker ps -a --format "{{.Names}}" 2>$null | Select-String -Pattern "^$preferred`$"
+    if ($found) { return $preferred }
+  } catch {}
+  return $fallback
+}
+$WahaContainer = Get-ActiveContainer "waha_agent" "waha_serrucho"
+$N8nContainer  = Get-ActiveContainer "n8n_agent" "n8n_serrucho"
 
 function Write-Log($msg) {
   $line = "{0}  {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $msg
@@ -63,7 +73,10 @@ function Restart-Session {
 function Trigger-Catchup([string]$reason) {
   Write-Log "Disparando recuperación de mensajes pendientes (motivo: $reason)..."
   try {
-    $catchupVbs = Join-Path $ProjectDir "catchup_serrucho.vbs"
+    $catchupVbs = Join-Path $ProjectDir "catchup.vbs"
+    if (-not (Test-Path $catchupVbs)) {
+      $catchupVbs = Join-Path $ProjectDir "catchup_serrucho.vbs"
+    }
     if (Test-Path $catchupVbs) {
       Start-Process -FilePath "wscript.exe" -ArgumentList "`"$catchupVbs`""
     } else {
@@ -89,9 +102,9 @@ if (-not $n8nHealthy) {
   $lastN8n = $null
   if ($st.lastN8nRestart) { try { $lastN8n = [datetime]$st.lastN8nRestart } catch {} }
   if (-not $lastN8n -or ((Get-Date) - $lastN8n).TotalMinutes -ge 5) {
-    Write-Log "Reiniciando contenedor n8n_serrucho..."
+    Write-Log "Reiniciando contenedor $N8nContainer..."
     try {
-      docker restart n8n_serrucho 2>&1 | Out-Null
+      docker restart $N8nContainer 2>&1 | Out-Null
       Set-Field $st "lastN8nRestart" ((Get-Date).ToString("o"))
       Save-State $st
       Start-Sleep -Seconds 12
@@ -128,7 +141,7 @@ try {
     $CooldownMin = 15
     $rejects = 0
     try {
-      $logs = docker logs waha_serrucho --since 5m 2>&1
+      $logs = docker logs $WahaContainer --since 5m 2>&1
       $rejects = @($logs | Select-String -Pattern "smax-invalid \(479\)|stanza rejected by server" | Where-Object { $_.Line -notmatch "broadcast" }).Count
     } catch {}
 
@@ -189,7 +202,7 @@ try {
       exit 0
     }
     Write-Log "Sesión '$($s.status)' por $streak corridas seguidas. Reiniciando contenedor WAHA..."
-    try { docker restart waha_serrucho 2>&1 | Out-Null } catch { Write-Log "docker restart fallo: $($_.Exception.Message)" }
+    try { docker restart $WahaContainer 2>&1 | Out-Null } catch { Write-Log "docker restart fallo: $($_.Exception.Message)" }
     Set-Field $st "lastContainerRestart" ((Get-Date).ToString("o"))
     Set-Field $st "failedStreak" 0
     Save-State $st
@@ -218,5 +231,5 @@ try {
 
 } catch {
   Write-Log "ERROR consultando WAHA (contenedor caído?): $($_.Exception.Message)"
-  try { docker start waha_serrucho 2>&1 | Out-Null } catch {}
+  try { docker start $WahaContainer 2>&1 | Out-Null } catch {}
 }

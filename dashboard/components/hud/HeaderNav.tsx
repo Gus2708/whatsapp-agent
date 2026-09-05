@@ -152,12 +152,12 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, onSelectTab }) 
           />
           <div className="hud-header-brand min-w-0">
             <div className="flex items-center gap-1.5 truncate font-mono text-[12.5px] font-semibold uppercase tracking-wider text-chalk">
-              <span>{process.env.NEXT_PUBLIC_AGENT_NAME || 'PERUCHO'}</span>
+              <span>{process.env.NEXT_PUBLIC_AGENT_NAME || 'AGENT'}</span>
               <span className="hidden text-gold-bright md:inline">{'//'}</span>
               <span className="hidden text-smoke md:inline">WHATSAPP CRM FLIGHT DECK</span>
             </div>
             <div className="hidden truncate font-mono text-[9.5px] uppercase text-smoke sm:block">
-              TARGET: {process.env.NEXT_PUBLIC_TARGET_NAME || 'FERRETERÍA EL SERRUCHO'} · 33 NODES · 7,650 SKUs
+              TARGET: {process.env.NEXT_PUBLIC_TARGET_NAME || process.env.NEXT_PUBLIC_STORE_NAME || 'COMMERCE STORE'} · 33 NODES · 7,650 SKUs
             </div>
           </div>
         </div>

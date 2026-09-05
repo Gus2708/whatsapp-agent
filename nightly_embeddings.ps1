@@ -1,12 +1,12 @@
 # ============================================================================
-#  EJECUCION NOCTURNA DE EMBEDDINGS - AGENTE SERRUCHO (PERUCHO)
+#  EJECUCION NOCTURNA DE EMBEDDINGS - WHATSAPP SALES AGENT
 # ----------------------------------------------------------------------------
 #  Ejecuta 'node rag.js embeddings' en segundo plano de manera desatendida,
 #  asegurando que todo producto nuevo o modificado en el catalogo cuente con
 #  su vector en pgvector (Supabase).
 # ============================================================================
 
-$ProjectDir = "C:\Proyect\whatsapp-agent"
+$ProjectDir = if ($PSScriptRoot) { $PSScriptRoot } else { Get-Location }
 $LogFile    = Join-Path $ProjectDir "nightly_embeddings.log"
 
 function Write-NightlyLog($msg) {

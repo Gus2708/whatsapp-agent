@@ -153,7 +153,7 @@ En cuanto a neveras, tenemos algunos protectores de voltaje:
 
 **Respuesta:**
 ```
-En Ferretería El Serrucho nos especializamos en materiales de construcción, herramientas y plomería. No manejamos lavadoras ni neveras. ¿Puedo ayudarte con algo de ferretería? 🛠️
+En nuestra tienda nos especializamos en los productos de nuestro catálogo oficial. No manejamos lavadoras ni neveras. ¿Puedo ayudarte con algún otro artículo? 📦
 ```
 
 **Problemas:** Debió decir que no tiene ese producto
@@ -164,7 +164,7 @@ En Ferretería El Serrucho nos especializamos en materiales de construcción, he
 
 **Respuesta:**
 ```
-En Ferretería El Serrucho nos especializamos en materiales de construcción, herramientas y plomería. No manejamos computadoras ni celulares. ¿Puedo ayudarte con algo de ferretería? 🛠️
+En nuestra tienda nos especializamos en los productos de nuestro catálogo oficial. No manejamos computadoras ni celulares. ¿Puedo ayudarte con algún otro artículo? 📦
 ```
 
 **Problemas:** Debió decir que no tiene ese producto
@@ -250,7 +250,7 @@ En Ferretería El Serrucho nos especializamos en materiales de construcción, he
 
 **Respuesta:**
 ```
-En *El Serrucho* nos especializamos en materiales de construcción, herramientas y plomería. No manejamos eso 🙏. ¿Puedo ayudarte con algo de ferretería? 👨🏻‍🔧
+En nuestro comercio nos especializamos en los productos de nuestro catálogo oficial. No manejamos eso 🙏. ¿Puedo ayudarte con algún artículo del catálogo? 👨🏻‍💼
 ```
 
 **Problemas:** No mencionó: tubo/agua
@@ -261,7 +261,7 @@ En *El Serrucho* nos especializamos en materiales de construcción, herramientas
 
 **Respuesta:**
 ```
-En *El Serrucho* nos especializamos en materiales de construcción, herramientas y plomería. No manejamos eso 🙏. ¿Puedo ayudarte con algo de ferretería? 👨🏻‍🔧
+En nuestro comercio nos especializamos en los productos de nuestro catálogo oficial. No manejamos eso 🙏. ¿Puedo ayudarte con algún artículo del catálogo? 👨🏻‍💼
 ```
 
 **Problemas:** No mencionó: malla/pollito
@@ -272,7 +272,7 @@ En *El Serrucho* nos especializamos en materiales de construcción, herramientas
 
 **Respuesta:**
 ```
-En *El Serrucho* nos especializamos en materiales de construcción, herramientas y plomería. No manejamos eso 🙏. ¿Puedo ayudarte con algo de ferretería? 👨🏻‍🔧
+En nuestro comercio nos especializamos en los productos de nuestro catálogo oficial. No manejamos eso 🙏. ¿Puedo ayudarte con algún artículo del catálogo? 👨🏻‍💼
 ```
 
 **Problemas:** No mencionó: manguera/gas
@@ -283,7 +283,7 @@ En *El Serrucho* nos especializamos en materiales de construcción, herramientas
 
 **Respuesta:**
 ```
-En El Serrucho nos especializamos en materiales de construcción, herramientas y plomería. No manejamos eso 🙏. ¿Puedo ayudarte con algo de ferretería? 👨🏻‍🔧
+En nuestra tienda nos especializamos en los productos de nuestro catálogo oficial. No manejamos eso 🙏. ¿Puedo ayudarte con otro artículo disponible? 👨🏻‍💼
 ```
 
 **Problemas:** No mencionó: faja/lumbar
@@ -294,7 +294,7 @@ En El Serrucho nos especializamos en materiales de construcción, herramientas y
 
 **Respuesta:**
 ```
-En El Serrucho nos especializamos en materiales de construcción, herramientas y plomería. No manejamos eso 🙏. ¿Puedo ayudarte con algo de ferretería? 👨🏻‍🔧
+En nuestra tienda nos especializamos en los productos de nuestro catálogo oficial. No manejamos eso 🙏. ¿Puedo ayudarte con otro artículo disponible? 👨🏻‍💼
 ```
 
 **Problemas:** No mencionó: nylon
@@ -305,7 +305,7 @@ En El Serrucho nos especializamos en materiales de construcción, herramientas y
 
 **Respuesta:**
 ```
-En El Serrucho nos especializamos en materiales de construcción, herramientas y plomería. No manejamos eso 🙏. ¿Puedo ayudarte con algo de ferretería? 👨🏻‍🔧
+En nuestra tienda nos especializamos en los productos de nuestro catálogo oficial. No manejamos eso 🙏. ¿Puedo ayudarte con otro artículo disponible? 👨🏻‍💼
 ```
 
 **Problemas:** No mencionó: flotador
@@ -504,7 +504,7 @@ Precio Bs (BCV): 2.10$ o 1,192.13bs
 
 **Respuesta:**
 ```
-Hola Soy *Perucho* 👨🏻‍🔧 El bot de IA experto ferretero de *El Serrucho* 🪚. ¿En qué puedo ayudarte hoy? Si buscas algún producto en particular, ¡déjamelo saber! 👀🔧
+Hola Soy *Asistente de Ventas* 👨🏻‍💼 El asesor comercial de la tienda 🏪. ¿En qué puedo ayudarte hoy? Si buscas algún producto en particular, ¡déjamelo saber! 👀
 ```
 
 **Problemas:** No mencionó: codo/pvc
@@ -631,7 +631,7 @@ Hola Soy *Perucho* 👨🏻‍🔧 El bot de IA experto ferretero de *El Serruch
 
 **Respuesta:**
 ```
-Hola Soy *Perucho* 👨🏻‍🔧 El bot de IA experto ferretero de *El Serrucho* 🪚
+Hola Soy *Asistente de Ventas* 👨🏻‍💼 El asesor comercial de la tienda 🏪
 
 Parece que estoy enfrentando problemas técnicos para buscar el precio de la varilla estriada de 12 en este momento. Pero no te preocupes, estoy aquí para ayudarte.
 
@@ -648,7 +648,7 @@ Parece que estoy enfrentando problemas técnicos para buscar el precio de la var
 
 **Respuesta:**
 ```
-Hola Soy *Perucho* 👨🏻‍🔧 El bot de IA experto ferretero de *El Serrucho* 🪚
+Hola Soy *Asistente de Ventas* 👨🏻‍💼 El asesor comercial de la tienda 🏪
 
 Parece que estoy teniendo dificultades técnicas para buscar el tepe negro en este momento. Pero no te preocupes, estoy aquí para ayudarte.
 

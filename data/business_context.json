@@ -1,0 +1,35 @@
+{
+  "comercio": {
+    "nombre": "Comercio de Ejemplo",
+    "ubicacion_central": "Sucursal Principal, Ciudad",
+    "horarios_atencion": {
+      "dias": "Lunes a Sábado",
+      "horario": "08:00 a 18:00"
+    }
+  },
+  "politicas_despacho": {
+    "disponible": true,
+    "retiro_en_tienda": true,
+    "transporte_casco_central": {
+      "disponible": true,
+      "costo_usd": 10,
+      "zona": "zona metropolitana"
+    },
+    "transporte_fuera_casco_central": {
+      "disponible": true,
+      "costo": "Variable según la distancia; lo coordina un asesor humano."
+    },
+    "mensaje": "Retiro presencial en tienda. Servicio de entrega disponible en zona metropolitana; para otras zonas consultar con un asesor."
+  },
+  "metodos_pago_aceptados": [
+    "Transferencia Bancaria",
+    "Efectivo / Divisas",
+    "Pago Móvil / Tarjeta de Débito",
+    "Plataformas Digitales (Zelle / PayPal)"
+  ],
+  "politicas_devolucion": {
+    "admitida": true,
+    "plazo_maximo_dias": 7,
+    "restricciones": "El producto debe encontrarse en su empaque original, sin uso y con comprobante de compra."
+  }
+}

@@ -1,7 +1,7 @@
 {
-  "name": "Perucho Flight Deck · Ferretería El Serrucho",
-  "short_name": "Perucho Flight Deck",
-  "description": "WhatsApp CRM, Agent Operations, and RAG Intelligence Flight Deck for Ferretería El Serrucho",
+  "name": "WhatsApp AI Agent Flight Deck",
+  "short_name": "AI Flight Deck",
+  "description": "WhatsApp CRM, Agent Operations, and RAG Intelligence Flight Deck",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0a0a",
@@ -41,14 +41,14 @@
       "sizes": "390x844",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Vista móvil de Perucho Flight Deck"
+      "label": "Vista móvil de AI Flight Deck"
     },
     {
       "src": "/screenshot-desktop.png",
       "sizes": "1280x800",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Vista de escritorio de Perucho Flight Deck"
+      "label": "Vista de escritorio de AI Flight Deck"
     }
   ]
 }

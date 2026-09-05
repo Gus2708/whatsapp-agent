@@ -1,5 +1,5 @@
-﻿/**
- * CATCHUP ENGINE - Ferretería El Serrucho
+/**
+ * CATCHUP ENGINE - WhatsApp Sales Agent
  * Automatización para detección de caídas y respuesta a mensajes pendientes.
  * Refactorizado para máxima testabilidad y validación estricta con esquemas.
  *
@@ -14,7 +14,7 @@ const { maskChatId, buildCatchupPayload, evaluateCandidates, parseEnv } = requir
 
 const PROJECT_DIR = path.resolve(__dirname, '..');
 const ENV_FILE = path.join(PROJECT_DIR, '.env');
-const LOG_FILE = path.join(PROJECT_DIR, 'catchup_serrucho.log');
+const LOG_FILE = path.join(PROJECT_DIR, 'catchup.log');
 const LOCK_FILE = path.join(PROJECT_DIR, 'catchup.lock');
 const STATE_FILE = path.join(PROJECT_DIR, 'catchup_state.json');
 

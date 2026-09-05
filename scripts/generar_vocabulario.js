@@ -17,7 +17,7 @@ const crypto = require('crypto');
 const progreso = require('./_progreso.js');
 
 const ROOT = path.join(__dirname, '..');
-const L = require(path.join(ROOT, 'lib', 'serrucho-search.js'));
+const L = require(path.join(ROOT, 'lib', 'catalog-search.js'));
 const norm = L.norm;
 const SIN_HARDCODE = L.SIN;
 

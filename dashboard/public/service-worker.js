@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// Service Worker — Perucho Flight Deck PWA (Ferretería El Serrucho)
+// Service Worker — AI Flight Deck PWA
 // Strategy: Offline-First App Shell + Strict API / Supabase Bypass
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -180,7 +180,7 @@ self.addEventListener('fetch', (event) => {
 
 // ── Web Push & Background Notifications ─────────────────────────────────────
 self.addEventListener('push', (event) => {
-  let data = { title: 'Perucho Flight Deck', body: '', url: '/', urgent: false };
+  let data = { title: 'AI Flight Deck', body: '', url: '/', urgent: false };
   try {
     if (event.data) data = Object.assign(data, event.data.json());
   } catch (e) {

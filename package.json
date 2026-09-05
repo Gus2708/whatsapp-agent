@@ -1,7 +1,7 @@
 {
-  "name": "whatsapp-agent-serrucho",
+  "name": "whatsapp-sales-agent",
   "version": "1.0.0",
-  "description": "Agente de automatización de WhatsApp e IA para Ferretería El Serrucho",
+  "description": "Production-ready, open-source WhatsApp AI Sales & Support Agent (n8n + RAG + WAHA + Supabase + CRM)",
   "main": "setup.js",
   "scripts": {
     "dev": "npm --prefix dashboard run dev",

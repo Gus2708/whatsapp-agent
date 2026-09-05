@@ -70,7 +70,7 @@ function fetchLatestEngramRelease() {
 
 async function main() {
   log('======================================================', colors.cyan);
-  log('   Instalador y Configuración de Ferretería El Serrucho', colors.cyan + colors.bright);
+  log('   Instalador y Configuración de WhatsApp Sales Agent', colors.cyan + colors.bright);
   log('======================================================', colors.cyan);
   log('Este script preparará tu PC para correr el Agente de WhatsApp.', colors.gray);
   log('');
@@ -273,7 +273,12 @@ async function main() {
         await new Promise(resolve => setTimeout(resolve, 15000));
         log('📥 Importando el flujo de n8n desde la CLI del contenedor...', colors.gray);
         try {
-          execSync('docker exec n8n_serrucho n8n import:workflow --input=/etc/n8n/n8n_workflow.json', { stdio: 'inherit' });
+          const n8nContainer = process.env.CONTAINER_PREFIX || 'n8n_agent';
+          try {
+            execSync(`docker exec ${n8nContainer} n8n import:workflow --input=/etc/n8n/n8n_workflow.json`, { stdio: 'inherit' });
+          } catch (e) {
+            execSync('docker exec n8n_serrucho n8n import:workflow --input=/etc/n8n/n8n_workflow.json', { stdio: 'inherit' });
+          }
           log('✅ Flujo de n8n importado exitosamente de manera automática.', colors.green);
         } catch (importErr) {
           log('⚠️ No se pudo importar el flujo automáticamente. Podrás importarlo manualmente desde la interfaz web de n8n.', colors.yellow);

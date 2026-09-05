@@ -1,5 +1,5 @@
 networks:
-  serrucho_net:
+  agent_net:
     driver: bridge
 
 volumes:
@@ -10,12 +10,16 @@ volumes:
 services:
   waha:
     image: devlikeapro/waha:latest
-    container_name: waha_serrucho
+    container_name: ${CONTAINER_PREFIX:-waha_agent}
     restart: unless-stopped
     ports:
       - "3000:3000"
     networks:
-      - serrucho_net
+      agent_net:
+        aliases:
+          - waha
+          - waha_agent
+          - waha_serrucho
     environment:
       - WAHA_DASHBOARD_ENABLED=true
       - WAHA_DASHBOARD_USERNAME=${WAHA_DASHBOARD_USERNAME}
@@ -36,7 +40,7 @@ services:
       # OJO: el webhook NO se define aquí. La sesión "default" ya lo tiene persistido
       # en el volumen (/app/.sessions/noweb/default/.waha.session.config.json) con
       # url=http://host.docker.internal:5678/webhook/whatsapp/inbound y events=[message.any].
-      # Se usa host.docker.internal (no 'n8n_serrucho') porque WAHA rechaza hostnames
+      # Se usa host.docker.internal (no el nombre de contenedor) porque WAHA rechaza hostnames
       # con guion bajo; esta ruta alcanza n8n por el puerto publicado en el host.
       #
       # WHATSAPP_HOOK_URL/WHATSAPP_HOOK_EVENTS se retiraron el 2026-08-13: el hook global
@@ -56,15 +60,24 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: n8n_serrucho
+    container_name: ${CONTAINER_PREFIX:-n8n_agent}
     restart: unless-stopped
     ports:
       - "5678:5678"
     networks:
-      - serrucho_net
+      agent_net:
+        aliases:
+          - n8n
+          - n8n_agent
+          - n8n_serrucho
     depends_on:
       - waha
     environment:
+      - AGENT_NAME=${AGENT_NAME:-Sales Agent}
+      - STORE_NAME=${STORE_NAME:-Commerce Store}
+      - STORE_LOCATION=${STORE_LOCATION:-Main Branch}
+      - STORE_SCHEDULE=${STORE_SCHEDULE:-Mon-Sat 8:00 AM - 6:00 PM}
+      - STORE_CURRENCY=${STORE_CURRENCY:-USD}
       - NODE_ENV=production
       - N8N_HOST=localhost
       - N8N_PORT=5678

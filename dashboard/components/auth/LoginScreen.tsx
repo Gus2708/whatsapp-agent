@@ -74,11 +74,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onEnte
           <div className="mb-5 sm:mb-6 flex flex-col items-center text-center">
             <img
               src="/crmlogo.svg"
-              alt="Perucho CRM Logo"
+              alt="CRM Logo"
               className="h-10 sm:h-12 w-auto object-contain mb-2.5 sm:mb-3"
             />
             <h1 className="text-lg sm:text-xl font-normal text-chalk tracking-tight mb-1">
-              Ferretería El Serrucho
+              {process.env.NEXT_PUBLIC_STORE_NAME || 'WhatsApp AI Agent'}
             </h1>
             <p className="text-[11px] sm:text-xs font-mono text-smoke leading-relaxed max-w-xs">
               Flight Deck CRM & Telemetría Operativa. Ingrese con un usuario registrado en el sistema.
@@ -110,7 +110,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onEnte
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="operador@el-serrucho.com"
+                  placeholder="operador@empresa.com"
                   className="w-full bg-transparent border-none text-chalk font-mono text-base sm:text-xs outline-none placeholder:text-smoke/40"
                   autoComplete="email"
                 />
@@ -209,7 +209,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onEnte
               <Lock className="h-3 w-3 text-gold-bright" />
               <span>TLS 1.3 / JWT Encrypted</span>
             </span>
-            <span className="text-gold-bright">Perucho Agent v2.4</span>
+            <span className="text-gold-bright">{process.env.NEXT_PUBLIC_AGENT_NAME || 'AI Agent'} v2.4</span>
           </div>
         </CrosshairCard>
       </div>

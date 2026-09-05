@@ -4,7 +4,7 @@ test.describe('CUJ: RAG Studio & n8n Visualizer with Real Data', () => {
   test.beforeEach(async ({ page }) => {
     // Authenticate into Demo Mode automatically
     await page.addInitScript(() => {
-      localStorage.setItem('perucho_demo_mode', 'true');
+      localStorage.setItem('agent_demo_mode', 'true');
     });
     await page.goto('/');
   });
@@ -44,7 +44,7 @@ test.describe('CUJ: RAG Studio & n8n Visualizer with Real Data', () => {
     expect(typeof data.latencyMs).toBe('number');
 
     // Verify History item appeared in Terminal Console
-    const terminalHistory = page.locator('div', { hasText: 'perucho@rag:~$ Tornillo drywall 1/2 x 100u' });
+    const terminalHistory = page.locator('div', { hasText: /@rag:~\$ Tornillo drywall 1\/2 x 100u/ });
     await expect(terminalHistory.first()).toBeVisible({ timeout: 10000 });
 
     // Verify custom query via input field
@@ -66,7 +66,7 @@ test.describe('CUJ: RAG Studio & n8n Visualizer with Real Data', () => {
     expect(secondData.productName.length).toBeGreaterThan(0);
 
     // Verify history displays the second prompt
-    const secondTerminalHistory = page.locator('div', { hasText: 'perucho@rag:~$ Pega loca super bonder' });
+    const secondTerminalHistory = page.locator('div', { hasText: /@rag:~\$ Pega loca super bonder/ });
     await expect(secondTerminalHistory.first()).toBeVisible({ timeout: 10000 });
   });
 

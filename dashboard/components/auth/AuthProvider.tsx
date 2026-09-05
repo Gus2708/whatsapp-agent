@@ -37,7 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Verificar si el usuario estaba previamente en modo demo
     if (typeof window !== 'undefined') {
-      const savedDemo = localStorage.getItem('perucho_demo_mode');
+      const savedDemo = localStorage.getItem('agent_demo_mode');
       if (savedDemo === 'true') {
         setIsDemoMode(true);
         const demoUser: User = {
@@ -106,15 +106,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const enterDemoMode = () => {
     setIsDemoMode(true);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('perucho_demo_mode', 'true');
+      localStorage.setItem('agent_demo_mode', 'true');
     }
     const demoUser: User = {
       id: 'demo-guest-recruiter',
       app_metadata: {},
-      user_metadata: { full_name: 'Recruiter / Tech Lead Guest' },
+      user_metadata: { full_name: 'Guest / Demo Mode' },
       aud: 'authenticated',
       created_at: new Date().toISOString(),
-      email: 'recruiter@demo.guest',
+      email: 'demo@guest.local',
     };
     setUser(demoUser);
     setSession({
@@ -130,7 +130,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isDemoMode) {
       setIsDemoMode(false);
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('perucho_demo_mode');
+        localStorage.removeItem('agent_demo_mode');
       }
       setUser(null);
       setSession(null);

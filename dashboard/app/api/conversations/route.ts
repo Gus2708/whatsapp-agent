@@ -4,11 +4,14 @@ import { sendWahaTextMessage, fetchWahaChats } from '@/lib/waha-client';
 import { Conversation, ChatMessage, LeadStatus } from '@/lib/types';
 import { INITIAL_CONVERSATIONS } from '@/lib/constants';
 
+const AGENT_NAME = process.env.NEXT_PUBLIC_AGENT_NAME || process.env.AGENT_NAME || 'Sales Agent';
+const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || process.env.STORE_NAME || 'Commerce Store';
+
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    // 1. Consultar cola de atenciones y solicitudes reales de Ferretería El Serrucho
+    // 1. Consultar cola de atenciones y solicitudes reales en Supabase
     const [atencionesRes, ayudasRes, sessionsRes] = await Promise.all([
       supabase
         .from('atenciones_pendientes')
@@ -78,15 +81,15 @@ export async function GET() {
         time: timeStr,
       };
 
-      let agentText = '¡Hola! 👨🏻‍🔧 Te atiende Perucho de Ferretería El Serrucho. Hemos registrado tu consulta para atención en mostrador.';
+      let agentText = `¡Hola! 👨🏻‍💼 Te atiende ${AGENT_NAME} de ${STORE_NAME}. Hemos registrado tu consulta para atención en mostrador.`;
       let latency = '0.8s';
       let cost = '$0.0000';
 
       if (isReserva) {
-        agentText = `¡Hola ${displayName.split(' ')[0]}! 👨🏻‍🔧 Tu reserva fue registrada con éxito en el catálogo de Ferretería El Serrucho para retiro en tienda física. Materiales apartados.`;
+        agentText = `¡Hola ${displayName.split(' ')[0]}! 👨🏻‍💼 Tu reserva fue registrada con éxito en el catálogo de ${STORE_NAME} para retiro en tienda física. Materiales apartados.`;
         latency = '19ms (Capa 1 AST)';
       } else if (!isPending) {
-        agentText = '👨🏻‍🔧 Atención tomada por asesor de mostrador. Cotización confirmada.';
+        agentText = '👨🏻‍💼 Atención tomada por asesor de mostrador. Cotización confirmada.';
         latency = '0.7s';
       }
 
@@ -180,7 +183,7 @@ export async function GET() {
         name: wahaChat?.name || `Cliente (+${cleanPhone.slice(-4)})`,
         phone: formatPhone(cleanPhone),
         status: isManual ? 'escalated' : 'in-progress',
-        statusLabel: isManual ? 'Atención Manual' : 'IA Activa (Perucho)',
+        statusLabel: isManual ? 'Atención Manual' : `IA Activa (${AGENT_NAME})`,
         score: isManual ? 92 : 78,
         silentMode: isManual,
         lastTime: timeStr,
@@ -198,8 +201,8 @@ export async function GET() {
             id: `m-s-a-${s.id}`,
             sender: 'agent',
             text: isManual
-              ? '👨🏻‍🔧 Un asesor de mostrador de Ferretería El Serrucho ha tomado tu chat.'
-              : '¡Hola! 👨🏻‍🔧 Te atiende Perucho de Ferretería El Serrucho. Contamos con 7.650 SKUs en inventario. ¿Qué material necesitas cotizar?',
+              ? `👨🏻‍💼 Un asesor comercial de ${STORE_NAME} ha tomado tu chat.`
+              : `¡Hola! 👨🏻‍💼 Te atiende ${AGENT_NAME} de ${STORE_NAME}. Contamos con catálogo en línea. ¿Qué producto necesitas cotizar?`,
             time: timeStr,
             latency: '0.8s',
             cost: '$0.0000',

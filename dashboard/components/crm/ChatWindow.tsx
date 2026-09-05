@@ -17,7 +17,7 @@ interface ChatWindowProps {
   onOpenLead?: () => void;
 }
 
-const AGENT_NAME = process.env.NEXT_PUBLIC_AGENT_NAME || 'PERUCHO';
+const AGENT_NAME = process.env.NEXT_PUBLIC_AGENT_NAME || 'AGENT';
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
   conversation,

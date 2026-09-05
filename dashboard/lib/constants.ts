@@ -25,7 +25,7 @@ export const INITIAL_CONVERSATIONS: Conversation[] = [
       {
         id: "m-suly-2",
         sender: "agent",
-        text: "¡Hola Suly! 👨🏻‍🔧 Tu reserva fue registrada con éxito en el inventario de Ferretería El Serrucho. Materiales listos y apartados para retiro en tienda física. Aceptamos Pago Móvil a tasa BCV y divisas en caja.",
+        text: "¡Hola Suly! 👨🏻‍💼 Tu reserva fue registrada con éxito en el inventario. Materiales listos y apartados para retiro en tienda física. Aceptamos transferencias y divisas en caja.",
         time: "09:34",
         latency: "19ms (Capa 1 AST)",
         cost: "$0.0000",

@@ -17,7 +17,7 @@ interface ScriptCard {
 export const DevOpsConsole: React.FC = () => {
   const { playClick, playSuccess } = useSound();
   const [scripts, setScripts] = useState<Record<string, { output: string; isRunning: boolean }>>({
-    catchup: { output: '# Listo para ejecutar catchup_serrucho.ps1...', isRunning: false },
+    catchup: { output: '# Listo para ejecutar catchup.ps1...', isRunning: false },
     sanitize: { output: '# Listo para ejecutar sanitize_output.js...', isRunning: false },
     autoheal: { output: '# Listo para ejecutar auto_healing_sonnet.js...', isRunning: false },
     watchdog: { output: '# Listo para ejecutar waha_watchdog.ps1...', isRunning: false },
@@ -147,7 +147,7 @@ export const DevOpsConsole: React.FC = () => {
     {
       id: 'catchup',
       tag: 'POWERSHELL AUTOMATION',
-      name: 'catchup_serrucho.ps1',
+      name: 'catchup.ps1',
       desc: 'Recuperación ante apagones: reinyecta mensajes desatendidos de WAHA de las últimas 24h a n8n.',
     },
     {

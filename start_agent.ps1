@@ -1,11 +1,12 @@
 # ==========================================
-# SCRIPT DE INICIO DE FERRETERÍA EL SERRUCHO
+# SCRIPT DE INICIO - WHATSAPP SALES AGENT
 # AUTOMATIZACIÓN DE ENGRAM Y DOCKER-COMPOSE
 # ==========================================
 
 $ErrorActionPreference = "Stop"
+$StoreName = if ($env:STORE_NAME) { $env:STORE_NAME } else { "WhatsApp Sales Agent" }
 Write-Host "======================================================" -ForegroundColor Cyan
-Write-Host "  Iniciando Entorno de Ferretería El Serrucho (Mene Mauroa)" -ForegroundColor Cyan
+Write-Host "  Iniciando Entorno: $StoreName" -ForegroundColor Cyan
 Write-Host "======================================================" -ForegroundColor Cyan
 
 # 1. Verificar y arrancar Engram HTTP API en el host

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * rag — CLI único para la capa de búsqueda de Perucho.
+ * rag — CLI único para la capa de búsqueda del Agente de Ventas.
  *
  *   node rag.js                    # estado del sistema
  *   node rag.js ayuda              # todos los comandos
@@ -15,11 +15,13 @@ const readline = require('readline');
 const { spawn, spawnSync } = require('child_process');
 
 const ROOT = __dirname;
-const L = require(path.join(ROOT, 'lib', 'serrucho-search.js'));
-const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
+const L = require(path.join(ROOT, 'lib', 'catalog-search.js'));
+const env = fs.existsSync(path.join(ROOT, '.env')) ? fs.readFileSync(path.join(ROOT, '.env'), 'utf8') : '';
 const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || '').trim();
-const SB = pick('SUPABASE_URL') || 'https://rgniqjfooifchyctnbzu.supabase.co';
-const ANON = pick('SUPABASE_ANON_KEY');
+const storeName = pick('STORE_NAME') || process.env.STORE_NAME || 'Commerce Store';
+const agentName = pick('AGENT_NAME') || process.env.AGENT_NAME || 'Sales Agent';
+const SB = pick('SUPABASE_URL') || process.env.SUPABASE_URL || 'https://your-project.supabase.co';
+const ANON = pick('SUPABASE_ANON_KEY') || process.env.SUPABASE_ANON_KEY || '';
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
 
 // ───────────────────────────────────────────────────────────────────── presentación (Brainless / Claude Code theme)
@@ -39,7 +41,7 @@ const c = {
   bold: s => e(1, s),
   italic: s => e(3, s),
   // Paleta Tokyo Night / Claude Code:
-  claude: s => rgb(205, 105, 74, s),       // Terracota / Serrucho (#cd694a)
+  claude: s => rgb(205, 105, 74, s),       // Terracota / Accent (#cd694a)
   cyan: s => rgb(125, 207, 255, s),         // Azul claro cian (#7dcfff)
   violet: s => rgb(187, 154, 247, s),       // Lavanda / Violeta (#bb9af7)
   ok: s => rgb(78, 169, 111, s),           // Verde suave (#4ea96f)
@@ -77,7 +79,7 @@ function cabecera(titulo, sub, ancho) {
   const lineaInf = c.darkGray('╰' + '─'.repeat(anchoCaja - 2) + '╯');
   
   out('\n' + lineaSup);
-  const statusLine = '  ' + c.darkGray('branch: main') + c.darkGray(' · ') + c.gray('Ferretería El Serrucho') + c.darkGray(' · ') + c.ok('●') + ' ' + c.darkGray('online');
+  const statusLine = '  ' + c.darkGray('branch: main') + c.darkGray(' · ') + c.gray(storeName) + c.darkGray(' · ') + c.ok('●') + ' ' + c.darkGray('online');
   out(c.darkGray('│') + pad(statusLine, anchoCaja - 2) + c.darkGray('│'));
   out(lineaInf);
 }
@@ -266,7 +268,7 @@ async function estado() {
   const t0 = Date.now();
   const spin = cargando();
   CAP = [];                                     // a partir de aquí la salida se acumula
-  cabecera('RAG · Perucho', 'Ferretería El Serrucho');
+  cabecera('RAG · ' + agentName, storeName);
 
   spin.paso('leyendo el catálogo…');
   const productos = (await traerTodo('productos', 'codigo_interno,descripcion,existencia', 'codigo_interno.asc'))
@@ -1128,7 +1130,7 @@ async function embeddingsCmd(flags) {
   return 0;
 }
 function ayuda() {
-  cabecera('RAG · Perucho', 'CLI de la capa de búsqueda');
+  cabecera('RAG · ' + agentName, 'CLI de la capa de búsqueda');
   const g = (t, items) => {
     console.log('\n ' + c.claude('◆') + ' ' + c.bold(c.num(t)));
     for (const [cmd, desc, nota] of items) {
@@ -1164,7 +1166,7 @@ function ayuda() {
 // ───────────────────────────────────────────────────────────────────── TUI interactiva (Brainless / Claude Code REPL)
 async function iniciarTUI() {
   console.clear();
-  cabecera('RAG · Perucho', 'TUI Interactiva');
+  cabecera('RAG · ' + agentName, 'TUI Interactiva');
 
   const menu = () => {
     console.log('\n ' + c.claude('◆') + ' ' + c.bold(c.num('Comandos rápidos:')));
@@ -1213,7 +1215,7 @@ async function iniciarTUI() {
 
     if (primero === '8' || primero === '/cls' || primero === 'clear') {
       console.clear();
-      cabecera('RAG · Perucho', 'TUI Interactiva');
+      cabecera('RAG · ' + agentName, 'TUI Interactiva');
       menu();
       rl.prompt();
       continue;

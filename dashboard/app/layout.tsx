@@ -9,14 +9,17 @@ export const viewport: Viewport = {
   themeColor: '#0a0a0a',
 };
 
+const AGENT_NAME = process.env.NEXT_PUBLIC_AGENT_NAME || 'WhatsApp AI Agent';
+const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'Commerce Store';
+
 export const metadata: Metadata = {
-  title: 'Perucho // WhatsApp CRM & Operational Flight Deck · Ferretería El Serrucho',
-  description: 'Mission control, WhatsApp CRM, and RAG intelligence deck for Ferretería El Serrucho',
+  title: `${AGENT_NAME} // WhatsApp CRM & Operational Flight Deck · ${STORE_NAME}`,
+  description: `Mission control, WhatsApp CRM, and RAG intelligence deck for ${STORE_NAME}`,
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Perucho Flight Deck',
+    title: 'AI Flight Deck',
   },
   icons: {
     icon: [

@@ -153,7 +153,7 @@ export default function FlightDeckDashboard() {
 
     playPacket();
 
-    // En Modo Demo: simular respuesta del agente Perucho en ~600ms
+    // En Modo Demo: simular respuesta del agente en ~600ms
     if (isDemoMode) {
       setTimeout(() => {
         const botResponses = [

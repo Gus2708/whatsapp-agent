@@ -1,6 +1,6 @@
 -- ==========================================
 -- ESTRUCTURA DE BASE DE DATOS - SUPABASE
--- FERRETERÍA EL SERRUCHO
+-- WHATSAPP SALES AGENT
 -- ==========================================
 
 -- 1. Habilitar extensión trigram para soporte ortográfico (coincidencias aproximadas)

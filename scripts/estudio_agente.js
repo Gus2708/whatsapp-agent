@@ -1,5 +1,5 @@
 /**
- * Estudio v2 — Bot Perucho
+ * Estudio v2 — WhatsApp Sales Agent
  * Validación por categoría (no precio exacto del modelo específico).
  * Añade escenarios de presupuesto multi-producto.
  * Acumula resultados en ESTUDIO_AGENTE.md.
@@ -145,10 +145,10 @@ function validar(resp, espera) {
 async function run() {
   // Leer resultados anteriores si existen (para acumular)
   let prevContent = '';
-  try { prevContent = fs.readFileSync('C:/Proyect/whatsapp-agent/ESTUDIO_AGENTE.md','utf8'); } catch(e){}
+  try { prevContent = fs.readFileSync(path.join(__dirname, '..', 'ESTUDIO_AGENTE.md'), 'utf8'); } catch(e){}
   const runNum = (prevContent.match(/^## Corrida #/mg)||[]).length + 1;
 
-  console.log(`\n🔬 Estudio Perucho — Corrida #${runNum}\n`);
+  console.log(`\n🔬 Estudio Agente — Corrida #${runNum}\n`);
   const resultados = [];
 
   for (const esc of ESCENARIOS) {

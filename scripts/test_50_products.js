@@ -112,7 +112,7 @@ function mkPayload(text) {
     timestamp: Math.floor(Date.now() / 1000),
     event: 'message',
     session: 'default',
-    me: { id: TARGET_PHONE, pushName: 'Perucho Bot' },
+    me: { id: TARGET_PHONE, pushName: 'Sales Agent Bot' },
     payload: {
       id: 'msg_test50_' + Date.now(),
       timestamp: Math.floor(Date.now() / 1000),
