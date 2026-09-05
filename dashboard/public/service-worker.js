@@ -3,7 +3,7 @@
 // Strategy: Offline-First App Shell + Strict API / Supabase Bypass
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const STATIC_CACHE  = `flightdeck-static-${CACHE_VERSION}`;
 const FONT_CACHE    = `flightdeck-fonts-${CACHE_VERSION}`;
 
