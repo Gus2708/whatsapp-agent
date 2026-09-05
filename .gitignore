@@ -55,8 +55,10 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
-# estado de runtime del watchdog (cambia solo, no se versiona)
+# estado de runtime del watchdog y catchup (cambian solos, no se versionan)
 waha_watchdog_state.json
+catchup_state.json
+catchup.lock
 
 # Reportes de diagnóstico y suites generados en scratch_live
 scratch_live/*_resultado.json

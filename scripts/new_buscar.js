@@ -553,7 +553,7 @@ async function rescateSemantico(){
     const _cats = (_cr.data || []).map(c => c.categoria);
     if (!_cats.length) return null;
     const _rr = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model: 'openai/gpt-5.6-luna',
+      model: 'google/gemini-2.5-flash',
       temperature: 0.2,
       messages: [
         { role: 'system', content: 'Eres un ferretero venezolano. Te doy lo que pidio un cliente y la lista de CATEGORIAS reales de nuestro catalogo. Di a que categoria se refiere.\nResponde SOLO JSON: {"categoria":"<una EXACTA de la lista, o null si ninguna encaja>","termino":"<la palabra o frase corta que uso el cliente para nombrarlo>","confianza":1-5}\nSi no encaja NINGUNA con claridad, devuelve categoria null. Es preferible decir null que adivinar mal.' },

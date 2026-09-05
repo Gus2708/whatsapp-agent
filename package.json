@@ -10,6 +10,8 @@
     "dashboard": "npm --prefix dashboard run dev",
     "dashboard:build": "npm --prefix dashboard run build",
     "test": "node --test \"tests/**/*.test.js\" && node scripts/check_sources_sync.js && node scripts/check_workflow_sync.js && npm --prefix dashboard run typecheck && npm --prefix dashboard run test",
+    "test:recovery": "node --test tests/recovery_flow.test.js",
+    "lint:recovery": "node --check scripts/catchup_engine.js scripts/lib/catchup_logic.js scripts/schemas/recovery_schemas.js tests/recovery_flow.test.js",
     "test:dashboard": "npm --prefix dashboard run test",
     "test:e2e": "npm --prefix dashboard run test:e2e",
     "pretest:live": "node scripts/check_live_env.js",
