@@ -9,8 +9,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 const { validateCatchupState, validateWahaSession } = require('./schemas/recovery_schemas');
-const { maskChatId, buildCatchupPayload, evaluateCandidates, parseEnv } = require('./lib/catchup_logic');
+const { maskChatId, buildCatchupPayload, evaluateCandidates, parseEnv, normalizeToPhoneJid, resolveAliases } = require('./lib/catchup_logic');
 
 const PROJECT_DIR = path.resolve(__dirname, '..');
 const ENV_FILE = path.join(PROJECT_DIR, '.env');
@@ -132,6 +133,30 @@ async function checkHealth() {
   return { wahaOk, n8nOk, allHealthy: wahaOk && n8nOk };
 }
 
+async function fetchAliasMap() {
+  const aliasMap = {};
+  try {
+    const cmd = "const db=new (require('better-sqlite3'))('/app/.sessions/noweb/default/store.sqlite3');console.log(JSON.stringify(db.prepare('SELECT id, pn FROM lid_map').all()))";
+    const raw = execSync(`docker exec waha_serrucho node -e "${cmd}"`, { encoding: 'utf8', timeout: 5000 }).trim();
+    if (raw) {
+      const rows = JSON.parse(raw);
+      for (const r of rows) {
+        if (r.id && r.pn) {
+          const lid = r.id.trim();
+          const pn = r.pn.trim();
+          const phoneJid = normalizeToPhoneJid(pn);
+          aliasMap[lid] = phoneJid;
+          aliasMap[phoneJid] = lid;
+          aliasMap[pn] = lid;
+        }
+      }
+    }
+  } catch (e) {
+    log(`Aviso leyendo lid_map de WAHA: ${e.message}`);
+  }
+  return aliasMap;
+}
+
 async function fetchCandidatesData(maxAgeHours) {
   const sbHeaders = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
   const sinceIso = new Date(Date.now() - maxAgeHours * 3600 * 1000).toISOString();
@@ -156,10 +181,20 @@ async function fetchCandidatesData(maxAgeHours) {
     log(`Aviso consultando WAHA overview: ${e.message}`);
   }
 
-  // Recolectar todos los chat_ids únicos
+  const aliasMap = await fetchAliasMap();
+
+  // Recolectar todos los chat_ids únicos Y sus alias
   const chatIds = new Set();
-  for (const m of supabaseMsgs) { if (m.chat_id) chatIds.add(m.chat_id); }
-  for (const c of wahaChats) { if (c.id) chatIds.add(c.id); }
+  for (const m of supabaseMsgs) {
+    if (m.chat_id) {
+      for (const a of resolveAliases(m.chat_id, aliasMap)) chatIds.add(a);
+    }
+  }
+  for (const c of wahaChats) {
+    if (c.id) {
+      for (const a of resolveAliases(c.id, aliasMap)) chatIds.add(a);
+    }
+  }
 
   const sessionsMap = {};
   const botMsgsMap = {};
@@ -182,7 +217,7 @@ async function fetchCandidatesData(maxAgeHours) {
     } catch (e) {}
   }
 
-  return { supabaseMsgs, wahaChats, sessionsMap, botMsgsMap };
+  return { supabaseMsgs, wahaChats, sessionsMap, botMsgsMap, aliasMap };
 }
 
 async function main() {
@@ -222,6 +257,7 @@ async function main() {
       wahaChats: data.wahaChats,
       sessionsMap: data.sessionsMap,
       botMsgsMap: data.botMsgsMap,
+      aliasMap: data.aliasMap,
       maxAgeHours: MAX_AGE_HOURS,
       cooldownMs: RECENT_COOLDOWN_MS,
       processedState: state.processed,

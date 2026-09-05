@@ -52,15 +52,91 @@ function buildCatchupPayload({ chatId, text, timestamp, nowMs = Date.now() }) {
   return payload;
 }
 
+function normalizeToPhoneJid(jid) {
+  if (typeof jid !== 'string') return '';
+  const trimmed = jid.trim();
+  if (trimmed.endsWith('@s.whatsapp.net')) {
+    return trimmed.replace('@s.whatsapp.net', '@c.us');
+  }
+  return trimmed;
+}
+
 /**
- * Evalúa mensajes de Supabase y WAHA, aplicando todas las reglas de negocio
- * y deduplicación. Devuelve una lista limpia de candidatos a inyectar.
+ * Resuelve todos los alias conocidos para un identificador de chat (JID),
+ * incluyendo mapeos cruzados entre LID (@lid) y teléfono (@c.us / @s.whatsapp.net).
+ */
+function resolveAliases(chatId, aliasMap = {}) {
+  const aliases = new Set();
+  if (!chatId || typeof chatId !== 'string') return aliases;
+  const clean = chatId.trim();
+  aliases.add(clean);
+  const normalized = normalizeToPhoneJid(clean);
+  aliases.add(normalized);
+
+  if (aliasMap[clean]) {
+    const mapped = aliasMap[clean];
+    aliases.add(mapped);
+    aliases.add(normalizeToPhoneJid(mapped));
+  }
+  if (aliasMap[normalized]) {
+    const mapped = aliasMap[normalized];
+    aliases.add(mapped);
+    aliases.add(normalizeToPhoneJid(mapped));
+  }
+
+  return aliases;
+}
+
+/**
+ * Obtiene la sesión considerando todos los alias conocidos del chat.
+ */
+function getSessionForAliases(aliases, sessionsMap = {}) {
+  for (const a of aliases) {
+    if (sessionsMap[a]) return sessionsMap[a];
+  }
+  return {};
+}
+
+/**
+ * Obtiene el mensaje del bot más reciente considerando todos los alias del chat.
+ */
+function getLatestBotMsgForAliases(aliases, botMsgsMap = {}) {
+  let latest = null;
+  let latestTime = 0;
+  for (const a of aliases) {
+    const msg = botMsgsMap[a];
+    if (msg && msg.created_at) {
+      const t = new Date(msg.created_at).getTime();
+      if (t > latestTime) {
+        latestTime = t;
+        latest = msg;
+      }
+    }
+  }
+  return latest;
+}
+
+/**
+ * Obtiene el estado procesado previo considerando todos los alias del chat.
+ */
+function getProcessedStateForAliases(aliases, processedState = {}) {
+  for (const a of aliases) {
+    if (processedState[a]) return processedState[a];
+  }
+  return null;
+}
+
+/**
+ * Evalúa mensajes de Supabase y WAHA, aplicando todas las reglas de negocio,
+ * unificación de alias LID <-> Teléfono y deduplicación.
+ * Devuelve una lista limpia de candidatos a inyectar.
  */
 function evaluateCandidates({
   supabaseMsgs = [],
   wahaChats = [],
   sessionsMap = {},
   botMsgsMap = {},
+  aliasMap = {},
   maxAgeHours = 48,
   cooldownMs = 15 * 60 * 1000,
   processedState = {},
@@ -69,75 +145,80 @@ function evaluateCandidates({
   const minAllowedTimeMs = nowMs - (maxAgeHours * 3600 * 1000);
   const candidatesMap = new Map();
 
-  // 1. Procesar mensajes provenientes de Supabase (mensajes_procesados)
-  for (const m of supabaseMsgs) {
-    const chatId = m.chat_id || m.telefono;
-    if (!validateJid(chatId).valid) continue;
+  // Función interna para registrar/actualizar candidato unificado por grupo de alias
+  function considerCandidate({ rawChatId, text, clientTimeMs, source }) {
+    if (!validateJid(rawChatId).valid) return;
 
-    const session = sessionsMap[chatId] || {};
-    if (isHumanHandover(session)) continue;
+    const aliases = resolveAliases(rawChatId, aliasMap);
+    const session = getSessionForAliases(aliases, sessionsMap);
+    if (isHumanHandover(session)) return;
 
-    const text = (m.texto || '').trim();
-    if (!text) continue;
+    const cleanText = (text || '').trim();
+    if (!cleanText) return;
 
-    const clientTimeMs = new Date(m.procesado_at || m.created_at).getTime();
-    if (isNaN(clientTimeMs) || clientTimeMs < minAllowedTimeMs) continue;
+    if (isNaN(clientTimeMs) || clientTimeMs < minAllowedTimeMs) return;
 
-    const botMsg = botMsgsMap[chatId];
+    const botMsg = getLatestBotMsgForAliases(aliases, botMsgsMap);
     const botTimeMs = botMsg ? new Date(botMsg.created_at).getTime() : 0;
 
     if (isUnanswered({ clientTimeMs, botTimeMs })) {
-      const existing = candidatesMap.get(chatId);
+      // Clave canónica unificada: preferir teléfono @c.us si existe en alias, o rawChatId
+      let canonicalKey = rawChatId;
+      for (const a of aliases) {
+        if (a.endsWith('@c.us')) {
+          canonicalKey = a;
+          break;
+        }
+      }
+
+      const existing = candidatesMap.get(canonicalKey);
       if (!existing || clientTimeMs > existing.timestamp * 1000) {
-        candidatesMap.set(chatId, {
-          chatId,
-          text,
+        candidatesMap.set(canonicalKey, {
+          chatId: canonicalKey,
+          text: cleanText,
           timestamp: Math.floor(clientTimeMs / 1000),
-          source: 'supabase'
+          source,
+          aliases: Array.from(aliases)
         });
       }
     }
   }
 
+  // 1. Procesar mensajes provenientes de Supabase (mensajes_procesados)
+  for (const m of supabaseMsgs) {
+    const rawChatId = m.chat_id || m.telefono;
+    const clientTimeMs = new Date(m.procesado_at || m.created_at).getTime();
+    considerCandidate({
+      rawChatId,
+      text: m.texto,
+      clientTimeMs,
+      source: 'supabase'
+    });
+  }
+
   // 2. Procesar chats de WAHA (para cubrir mensajes llegados con n8n caído)
   for (const c of wahaChats) {
-    const chatId = c.id;
-    if (!validateJid(chatId).valid) continue;
-
-    const session = sessionsMap[chatId] || {};
-    if (isHumanHandover(session)) continue;
-
+    const rawChatId = c.id;
     const lm = c.lastMessage;
     if (!lm || lm.fromMe) continue;
 
     let ts = Number(lm.timestamp) || 0;
     if (ts > 1e12) ts = Math.floor(ts / 1000);
-    const msgTimeMs = ts * 1000;
-    if (msgTimeMs < minAllowedTimeMs) continue;
-
+    const clientTimeMs = ts * 1000;
     const body = (lm.body || lm.text || lm._data?.body || '').trim();
-    if (!body) continue;
 
-    const botMsg = botMsgsMap[chatId];
-    const botTimeMs = botMsg ? new Date(botMsg.created_at).getTime() : 0;
-
-    if (isUnanswered({ clientTimeMs: msgTimeMs, botTimeMs })) {
-      const existing = candidatesMap.get(chatId);
-      if (!existing || msgTimeMs > existing.timestamp * 1000) {
-        candidatesMap.set(chatId, {
-          chatId,
-          text: body,
-          timestamp: ts,
-          source: 'waha_store'
-        });
-      }
-    }
+    considerCandidate({
+      rawChatId,
+      text: body,
+      clientTimeMs,
+      source: 'waha_store'
+    });
   }
 
-  // 3. Filtrar candidatos por cooldown reciente
+  // 3. Filtrar candidatos por cooldown reciente (revisando en todos los alias del chat)
   const finalCandidates = [];
   for (const cand of candidatesMap.values()) {
-    const prev = processedState[cand.chatId];
+    const prev = getProcessedStateForAliases(cand.aliases || [cand.chatId], processedState);
     if (prev && (nowMs - prev.injectedAt) < cooldownMs && prev.timestamp === cand.timestamp) {
       // Cooldown activo para este mismo mensaje
       continue;
@@ -174,5 +255,7 @@ module.exports = {
   isUnanswered,
   buildCatchupPayload,
   evaluateCandidates,
-  parseEnv
+  parseEnv,
+  normalizeToPhoneJid,
+  resolveAliases
 };

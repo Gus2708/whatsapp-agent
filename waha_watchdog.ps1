@@ -3,8 +3,7 @@
 #   1) La sesión WAHA "default" esté en WORKING (si falla, la recupera).
 #   2) n8n esté activo y respondiendo en /healthz (si cae, lo recupera).
 #   3) No existan mensajes desatendidos: dispara el motor de recuperación
-#      automática de mensajes (catchup) tras cualquier caída o en barridos
-#      periódicos cada 15 min.
+#      automática de mensajes (catchup) tras cualquier caída o reinicio del sistema.
 #
 # Se ejecuta cada 3 min mediante el Programador de tareas de Windows (oculto).
 
@@ -154,15 +153,7 @@ try {
       exit 0
     }
 
-    # --- Barrido periódico de mensajes desatendidos (cada 15 min) ------------
-    $lastPeriodic = $null
-    if ($st.lastPeriodicCatchup) { try { $lastPeriodic = [datetime]$st.lastPeriodicCatchup } catch {} }
-    if (-not $lastPeriodic -or ((Get-Date) - $lastPeriodic).TotalMinutes -ge 15) {
-      Set-Field $st "lastPeriodicCatchup" ((Get-Date).ToString("o"))
-      Save-State $st
-      Trigger-Catchup "Barrido periódico (cada 15 min)"
-    }
-
+    # Catchup solo se dispara ante eventos reales de caída o recuperación (no de forma periódica en vivo)
     exit 0
   }
 

@@ -1,4 +1,4 @@
-﻿const { test, describe } = require('node:test');
+const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -17,7 +17,9 @@ const {
   isUnanswered,
   buildCatchupPayload,
   evaluateCandidates,
-  parseEnv
+  parseEnv,
+  normalizeToPhoneJid,
+  resolveAliases
 } = require('../scripts/lib/catchup_logic');
 
 const { acquireLock, releaseLock } = require('../scripts/catchup_engine');
@@ -261,6 +263,101 @@ describe('Candidate Evaluation Pipeline (TDD Scenarios)', () => {
     assert.equal(candidates.length, 2);
     assert.equal(candidates[0].chatId, 'chat_older@c.us');
     assert.equal(candidates[1].chatId, 'chat_newer@c.us');
+  });
+
+  test('Scenario 8: Cross-alias recognition: answered on @lid excludes pending candidate on @c.us (Dignora case)', () => {
+    const aliasMap = {
+      '248236510068957@lid': '584126438928@s.whatsapp.net',
+      '584126438928@c.us': '248236510068957@lid'
+    };
+    // WAHA reporta el chat con @c.us (último mensaje del cliente a las 2:48pm)
+    const wahaChats = [
+      {
+        id: '584126438928@c.us',
+        lastMessage: {
+          fromMe: false,
+          body: 'No lo sé pero cuando venga mí esposo le pregunto muchas gracias',
+          timestamp: Math.floor((NOW - 1800000) / 1000) // 30 min atrás
+        }
+      }
+    ];
+    // Supabase tiene el mensaje procesado entrante en @lid
+    const supabaseMsgs = [
+      {
+        chat_id: '248236510068957@lid',
+        texto: 'No lo sé pero cuando venga mí esposo le pregunto muchas gracias',
+        procesado_at: new Date(NOW - 1800000).toISOString()
+      }
+    ];
+    // El bot ya respondió en vivo pero registrado bajo @lid (10 min atrás)
+    const botMsgsMap = {
+      '248236510068957@lid': {
+        created_at: new Date(NOW - 600000).toISOString(),
+        texto_norm: 'gracias a ti estamos a la orden'
+      }
+    };
+
+    const candidates = evaluateCandidates({
+      supabaseMsgs,
+      wahaChats,
+      botMsgsMap,
+      aliasMap,
+      nowMs: NOW
+    });
+
+    // CRÍTICO: NO debe incluirse como pendiente porque el bot ya respondió bajo el alias @lid
+    assert.equal(candidates.length, 0, 'No debe disparar catchup para chat ya respondido bajo @lid');
+  });
+
+  test('Scenario 9: Cross-alias recognition: handover on @lid silences @c.us', () => {
+    const aliasMap = {
+      '46218277343487@lid': '584146115639@c.us',
+      '584146115639@c.us': '46218277343487@lid'
+    };
+    const wahaChats = [
+      {
+        id: '584146115639@c.us',
+        lastMessage: {
+          fromMe: false,
+          body: 'Si ok ya llego hasta alla',
+          timestamp: Math.floor((NOW - 1200000) / 1000)
+        }
+      }
+    ];
+    // La sesión manual fue marcada en el LID
+    const sessionsMap = {
+      '46218277343487@lid': {
+        estado: 'manual',
+        manual_since: new Date(NOW - 1000000).toISOString()
+      }
+    };
+
+    const candidates = evaluateCandidates({
+      wahaChats,
+      sessionsMap,
+      aliasMap,
+      nowMs: NOW
+    });
+
+    assert.equal(candidates.length, 0, 'No debe disparar catchup si algún alias está en handover manual');
+  });
+});
+
+describe('LID and Phone Alias Resolution', () => {
+  test('normalizeToPhoneJid normalizes @s.whatsapp.net to @c.us', () => {
+    assert.equal(normalizeToPhoneJid('584126438928@s.whatsapp.net'), '584126438928@c.us');
+    assert.equal(normalizeToPhoneJid('584126438928@c.us'), '584126438928@c.us');
+    assert.equal(normalizeToPhoneJid('248236510068957@lid'), '248236510068957@lid');
+  });
+
+  test('resolveAliases builds complete alias bidirectional set', () => {
+    const aliasMap = {
+      '248236510068957@lid': '584126438928@s.whatsapp.net'
+    };
+    const aliasesFromLid = resolveAliases('248236510068957@lid', aliasMap);
+    assert.ok(aliasesFromLid.has('248236510068957@lid'));
+    assert.ok(aliasesFromLid.has('584126438928@c.us'));
+    assert.ok(aliasesFromLid.has('584126438928@s.whatsapp.net'));
   });
 });
 
