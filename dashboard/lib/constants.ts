@@ -2,135 +2,207 @@ import { Conversation, LogEntry } from './types';
 
 export const INITIAL_CONVERSATIONS: Conversation[] = [
   {
-    id: "c1",
+    id: "conv-suly",
+    name: "Suly",
+    phone: "+58 414-235-4263",
+    status: "qualified",
+    statusLabel: "Reserva Confirmada",
+    score: 96,
+    intent: "Láminas de 12, Tubos 2x1, Cemento y Cercha",
+    budget: "$340.00 USD",
+    schedule: "Retiro en Mostrador (Mene Mauroa)",
+    silentMode: false,
+    lastTime: "09:34",
+    messages: [
+      {
+        id: "m-suly-1",
+        sender: "client",
+        text: "🛒 RESERVA: 10 Láminas de 12, 1 Caja de ganchos, 5 Tubos de 2x1, 2 Tubos de 1.5x3, 1 Saco de Cemento, 1 Cercha",
+        time: "09:34",
+        latency: null,
+        cost: null,
+      },
+      {
+        id: "m-suly-2",
+        sender: "agent",
+        text: "¡Hola Suly! 👨🏻‍🔧 Tu reserva fue registrada con éxito en el inventario de Ferretería El Serrucho. Materiales listos y apartados para retiro en tienda física. Aceptamos Pago Móvil a tasa BCV y divisas en caja.",
+        time: "09:34",
+        latency: "19ms (Capa 1 AST)",
+        cost: "$0.0000",
+      },
+    ],
+  },
+  {
+    id: "conv-yanerys",
+    name: "Yanerys Sánchez Navarro",
+    phone: "+58 416-263-1544",
+    status: "qualified",
+    statusLabel: "Reserva Confirmada",
+    score: 94,
+    intent: "Protector de Voltaje Vitron para Refrigeración",
+    budget: "$28.00 USD",
+    schedule: "Retiro en Tienda (Hoy)",
+    silentMode: false,
+    lastTime: "11:20",
+    messages: [
+      {
+        id: "m-yan-1",
+        sender: "client",
+        text: "🛒 RESERVA: Protector DE Voltaje P/refrig Y Neveras Vitron 110V",
+        time: "11:18",
+        latency: null,
+        cost: null,
+      },
+      {
+        id: "m-yan-2",
+        sender: "agent",
+        text: "¡Hola Yanerys! 👨🏻‍🔧 Confirmado en inventario: Protector de Voltaje Vitron 110V con retardo de reconexión a $28.00 USD. Tu reserva está registrada y lista para entrega en mostrador.",
+        time: "11:20",
+        latency: "19ms (Capa 1 AST)",
+        cost: "$0.0000",
+      },
+    ],
+  },
+  {
+    id: "conv-matilde",
+    name: "Matilde Páez",
+    phone: "+58 424-443-0700",
+    status: "in-progress",
+    statusLabel: "En Mostrador (Cotizado)",
+    score: 88,
+    intent: "Cadena Metálica Galvanizada por Metro",
+    budget: "$45.00 USD",
+    schedule: "Retiro en Tienda",
+    silentMode: false,
+    lastTime: "10:05",
+    messages: [
+      {
+        id: "m-mat-1",
+        sender: "client",
+        text: "Buenos días, tienen cadena metálica fina de eslabón corto por metro?",
+        time: "10:02",
+        latency: null,
+        cost: null,
+      },
+      {
+        id: "m-mat-2",
+        sender: "agent",
+        text: "¡Buenos días Matilde! 👨🏻‍🔧 Sí, disponemos de Cadena Galvanizada 3/16\" y 1/4\" a $2.20 el metro. ¿Cuántos metros requieres cortar para tu trabajo?",
+        time: "10:05",
+        latency: "14ms (Capa 2 Jerga)",
+        cost: "$0.0000",
+      },
+    ],
+  },
+  {
+    id: "conv-diego",
+    name: "Diego Bracho",
+    phone: "+58 412-110-2992",
+    status: "in-progress",
+    statusLabel: "Cotización Eléctrica & PVC",
+    score: 92,
+    intent: "Cables AWG, Tubos PVC 3/4 y Codos",
+    budget: "$215.00 USD",
+    schedule: "Despacho Programado",
+    silentMode: false,
+    lastTime: "12:15",
+    messages: [
+      {
+        id: "m-diego-1",
+        sender: "client",
+        text: "Buenos días, presupuesto para: Cable AWG #14 (3 rollos), Cable AWG #12 (4 rollos), Tubo PVC Eléctrico 3/4 (28 tubos) y 24 curvas 3/4.",
+        time: "12:10",
+        latency: null,
+        cost: null,
+      },
+      {
+        id: "m-diego-2",
+        sender: "agent",
+        text: "¡Saludos Diego! 👨🏻‍🔧 Lista verificada en catálogo de 7.650 SKUs. Disponemos de cable THW 100% cobre y tubería PVC rígida con curvas de fábrica. Presupuesto total procesado.",
+        time: "12:15",
+        latency: "28ms (pgvector + GIN)",
+        cost: "$0.0000",
+      },
+    ],
+  },
+  {
+    id: "conv-carlos",
     name: "Carlos Mendoza",
     phone: "+58 424-647-8892",
-    status: "qualified",
-    statusLabel: "Calificado (Alta Intención)",
-    score: 94,
-    intent: "Cotización Mayorista / Cemento & Bloques",
-    budget: "$850.00 USD",
-    schedule: "Martes 1 Sep · 2:00 PM",
+    status: "closed",
+    statusLabel: "Venta Cerrada ($530)",
+    score: 95,
+    intent: "40 Sacos Cemento Gris & 200 Bloques",
+    budget: "$530.00 USD",
+    schedule: "Retiro en Sucursal (Hoy 2:00 PM)",
     silentMode: false,
     lastTime: "13:02",
     messages: [
       {
+        id: "m-carlos-1",
         sender: "client",
-        text: "Buenas tardes, necesito cotizar 40 sacos de cemento gris y 200 bloques para retirar hoy en Maracaibo.",
+        text: "Buenas tardes, necesito cotizar 40 sacos de cemento gris y 200 bloques para retirar hoy.",
         time: "13:00",
         latency: null,
-        cost: null
+        cost: null,
       },
       {
+        id: "m-carlos-2",
         sender: "agent",
-        text: "¡Buenas tardes! Con gusto. Tenemos disponible Cemento Gris Tipo I en $8.50 el saco y Bloque de Concreto 15cm en $0.95. ¿Deseas agendar el retiro en sucursal o necesitas transporte?",
+        text: "¡Buenas tardes Carlos! 👨🏻‍🔧 Cemento Gris Tipo I en $8.50 el saco ($340.00) y Bloque de Concreto 15cm en $0.95 ($190.00). Total $530.00 USD. ¿Retiras en sucursal o necesitas transporte?",
         time: "13:00",
         latency: "18ms (Capa 1 AST)",
-        cost: "$0.0000"
+        cost: "$0.0000",
       },
       {
+        id: "m-carlos-3",
         sender: "client",
         text: "Excelente precio. Para retirar en sucursal hoy a las 2:00 PM.",
         time: "13:02",
         latency: null,
-        cost: null
+        cost: null,
       },
       {
+        id: "m-carlos-4",
         sender: "agent",
-        text: "Perfecto Carlos. Te he reservado la orden #4921 con presupuesto de $850.00 USD para las 2:00 PM. Un asesor de mostrador tendrá los materiales listos.",
+        text: "Perfecto Carlos. Te reservé la orden con presupuesto de $530.00 USD para las 2:00 PM. El personal de patio tendrá todo listo en mostrador.",
         time: "13:02",
         latency: "~700ms (consulta común)",
-        cost: "$0.00012"
-      }
-    ]
-  },
-  {
-    id: "c2",
-    name: "Dra. Valeria Rincón",
-    phone: "+58 414-612-4490",
-    status: "in-progress",
-    statusLabel: "En Curso (Consultando Medidas)",
-    score: 68,
-    intent: "Tornillería & Fijaciones Drywall",
-    budget: "$120.00 USD",
-    schedule: "Pendiente",
-    silentMode: false,
-    lastTime: "12:45",
-    messages: [
-      {
-        sender: "client",
-        text: "Hola, tienen tornillos drywall de 1/2 pulgada en caja de 100u?",
-        time: "12:44",
-        latency: null,
-        cost: null
+        cost: "$0.00012",
       },
-      {
-        sender: "agent",
-        text: "Hola Valeria. Sí, disponemos de Tornillo Drywall 1/2 pulgada x 100u (Marca FerreMax) en $3.80 la caja. ¿Cuántas cajas necesitas?",
-        time: "12:45",
-        latency: "8ms (Capa 1 Parser)",
-        cost: "$0.0000"
-      }
-    ]
+    ],
   },
   {
-    id: "c3",
-    name: "Ing. Roberto Peña",
-    phone: "+56 9 8812 4431",
+    id: "conv-rafer",
+    name: "Rafer Jesús",
+    phone: "+58 414-562-6474",
     status: "escalated",
-    statusLabel: "Escalado a Humano (Garantía)",
-    score: 45,
-    intent: "Reclamo Técnico de Bomba de Agua",
-    budget: "N/A",
-    schedule: "Asesor Humano Asignado",
+    statusLabel: "Atención Especial (Transporte)",
+    score: 89,
+    intent: "Bloques de 10 con Transporte a Campo Piñita",
+    budget: "$180.00 USD",
+    schedule: "Transporte en Camión a Campo Piñita",
     silentMode: true,
-    lastTime: "11:20",
+    lastTime: "14:54",
     messages: [
       {
+        id: "m-rafer-1",
         sender: "client",
-        text: "Compré una bomba sumergible hace 2 días y necesito hacer válida la garantía técnica.",
-        time: "11:19",
+        text: "Buenas, cuánto sale el ciento de bloque de diez normal y el transporte incluido para Campo Piñita, para pagar por pago móvil de una vez?",
+        time: "14:50",
         latency: null,
-        cost: null
+        cost: null,
       },
       {
+        id: "m-rafer-2",
         sender: "agent",
-        text: "Entendido Roberto. He pausado la atención automática y transferido tu caso directamente al Gerente de Postventa para revisar tu factura.",
-        time: "11:20",
-        latency: "35ms [ESCALAR_HUMANO]",
-        cost: "$0.0000"
-      }
-    ]
+        text: "¡Hola Rafer! 👨🏻‍🔧 El bloque de 10 normal está en $0.95 c/u ($95 por ciento). He transferido la cotización del flete a Campo Piñita a nuestro coordinador de despacho para coordinar la carga de inmediato.",
+        time: "14:54",
+        latency: "32ms [ESCALAR_HUMANO]",
+        cost: "$0.0000",
+      },
+    ],
   },
-  {
-    id: "c4",
-    name: "Constructora del Lago C.A.",
-    phone: "+58 261-798-1122",
-    status: "closed",
-    statusLabel: "Venta Cerrada ($2,400)",
-    score: 99,
-    intent: "Lote Estructural de Cabillas",
-    budget: "$2,400.00 USD",
-    schedule: "Despachado",
-    silentMode: false,
-    lastTime: "Ayer",
-    messages: [
-      {
-        sender: "client",
-        text: "Confirmamos la transferencia por el lote de cabillas 1/2 pulgada.",
-        time: "Ayer",
-        latency: null,
-        cost: null
-      },
-      {
-        sender: "agent",
-        text: "¡Pago recibido con éxito! La guía de despacho #8812 fue emitida hacia la obra.",
-        time: "Ayer",
-        latency: "22ms (CRM Dispatch)",
-        cost: "$0.0000"
-      }
-    ]
-  }
 ];
 
 export const INITIAL_LOGS: LogEntry[] = [

@@ -38,9 +38,8 @@ export default function FlightDeckDashboard() {
     }
   }, [isDemoMode]);
 
-  // Cargar conversaciones reales desde Supabase y WAHA si no está en modo demo
+  // Cargar conversaciones reales desde Supabase y WAHA
   const fetchConversations = useCallback(async () => {
-    if (isDemoMode) return;
     try {
       const res = await fetch('/api/conversations');
       if (res.ok) {
@@ -56,7 +55,7 @@ export default function FlightDeckDashboard() {
     } catch {
       // Usar datos locales si hay error de red
     }
-  }, [isDemoMode]);
+  }, []);
 
   useEffect(() => {
     fetchConversations();
