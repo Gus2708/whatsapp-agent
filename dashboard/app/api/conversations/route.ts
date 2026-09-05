@@ -4,6 +4,9 @@ import { sendWahaTextMessage, fetchWahaChats } from '@/lib/waha-client';
 import { Conversation, ChatMessage, LeadStatus } from '@/lib/types';
 import { INITIAL_CONVERSATIONS } from '@/lib/constants';
 
+const AGENT_NAME = process.env.AGENT_NAME || 'Perucho';
+const STORE_NAME = process.env.STORE_NAME || 'Ferretería El Serrucho';
+
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
