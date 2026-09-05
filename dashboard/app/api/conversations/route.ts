@@ -31,17 +31,130 @@ export async function GET() {
     const ayudas = ayudasRes.data || [];
     const sessions = sessionsRes.data || [];
 
-    // 2. Intentar consultar WAHA para chats en vivo
+    // 2. Extraer números de teléfono únicos y variantes para consultar mensajes reales
+    const allVariantsSet = new Set<string>();
+    const registerVariants = (raw?: string | null) => {
+      if (!raw) return;
+      const clean = String(raw).replace('@lid', '').replace('@c.us', '').trim();
+      if (!clean || clean.startsWith('test_')) return;
+      allVariantsSet.add(raw);
+      allVariantsSet.add(clean);
+      allVariantsSet.add(`${clean}@lid`);
+      allVariantsSet.add(`${clean}@c.us`);
+    };
+
+    atenciones.forEach((a) => registerVariants(a.telefono));
+    ayudas.forEach((a) => registerVariants(a.telefono));
+    sessions.forEach((s) => registerVariants(s.telefono));
+
+    const allVariants = Array.from(allVariantsSet);
+
+    // 3. Consultar mensajes reales (inbound clientes y outbound bot) y WAHA en paralelo
     let wahaChatsMap: Record<string, any> = {};
-    try {
-      const chats = await fetchWahaChats();
-      if (Array.isArray(chats)) {
-        chats.forEach((c) => {
-          const tel = String(c.id || '').replace('@c.us', '').replace('@lid', '');
-          wahaChatsMap[tel] = c;
+    const messagesByCleanPhone = new Map<string, ChatMessage[]>();
+
+    const [wahaRes, inMsgsRes, outMsgsRes] = await Promise.allSettled([
+      fetchWahaChats(),
+      allVariants.length > 0
+        ? supabase
+            .from('mensajes_procesados')
+            .select('message_id, chat_id, procesado_at, texto')
+            .not('texto', 'is', null)
+            .in('chat_id', allVariants)
+            .order('procesado_at', { ascending: true })
+        : Promise.resolve({ data: [] }),
+      allVariants.length > 0
+        ? supabase
+            .from('mensajes_bot')
+            .select('id, chat_id, created_at, texto_norm')
+            .not('texto_norm', 'is', null)
+            .in('chat_id', allVariants)
+            .order('created_at', { ascending: true })
+        : Promise.resolve({ data: [] }),
+    ]);
+
+    if (wahaRes.status === 'fulfilled' && Array.isArray(wahaRes.value)) {
+      wahaRes.value.forEach((c) => {
+        const tel = String(c.id || '').replace('@c.us', '').replace('@lid', '');
+        wahaChatsMap[tel] = c;
+      });
+    }
+
+    const formatMsgTime = (isoString?: string | null) => {
+      if (!isoString) return '';
+      try {
+        return new Date(isoString).toLocaleTimeString('es-VE', {
+          hour: '2-digit',
+          minute: '2-digit',
         });
+      } catch {
+        return '';
       }
-    } catch {}
+    };
+
+    // Indexar mensajes reales combinados cronológicamente por cleanPhone
+    const inData =
+      inMsgsRes.status === 'fulfilled' && (inMsgsRes.value as any)?.data
+        ? (inMsgsRes.value as any).data
+        : [];
+    const outData =
+      outMsgsRes.status === 'fulfilled' && (outMsgsRes.value as any)?.data
+        ? (outMsgsRes.value as any).data
+        : [];
+
+    const rawMergedList: { cleanPhone: string; rawTime: number; msg: ChatMessage }[] = [];
+
+    inData.forEach((m: any) => {
+      if (!m.texto || !m.texto.trim()) return;
+      const clean = String(m.chat_id || '').replace('@lid', '').replace('@c.us', '');
+      rawMergedList.push({
+        cleanPhone: clean,
+        rawTime: m.procesado_at ? new Date(m.procesado_at).getTime() : 0,
+        msg: {
+          id: `m-in-${m.message_id || Math.random()}`,
+          sender: 'client',
+          text: m.texto,
+          time: formatMsgTime(m.procesado_at),
+        },
+      });
+    });
+
+    outData.forEach((m: any) => {
+      if (!m.texto_norm || !m.texto_norm.trim()) return;
+      const clean = String(m.chat_id || '').replace('@lid', '').replace('@c.us', '');
+      const isTag = m.texto_norm.startsWith('[') && m.texto_norm.endsWith(']');
+      rawMergedList.push({
+        cleanPhone: clean,
+        rawTime: m.created_at ? new Date(m.created_at).getTime() : 0,
+        msg: isTag
+          ? {
+              id: `m-out-${m.id}`,
+              sender: 'system',
+              text:
+                m.texto_norm === '[pedir_ayuda]'
+                  ? '🤖 Consulta escalada para búsqueda avanzada'
+                  : '👨🏻‍💼 Solicitud de atención en mostrador registrada',
+              time: formatMsgTime(m.created_at),
+            }
+          : {
+              id: `m-out-${m.id}`,
+              sender: 'agent',
+              text: m.texto_norm,
+              time: formatMsgTime(m.created_at),
+              latency: '0.8s',
+              cost: '$0.0000',
+            },
+      });
+    });
+
+    rawMergedList.sort((a, b) => a.rawTime - b.rawTime);
+
+    rawMergedList.forEach(({ cleanPhone, msg }) => {
+      if (!messagesByCleanPhone.has(cleanPhone)) {
+        messagesByCleanPhone.set(cleanPhone, []);
+      }
+      messagesByCleanPhone.get(cleanPhone)!.push(msg);
+    });
 
     const convMap = new Map<string, Conversation>();
 
@@ -57,7 +170,7 @@ export async function GET() {
       return clean.startsWith('+') ? clean : `+58 ${clean}`;
     };
 
-    // 3. Mapear atenciones_pendientes (Prioridad 1: reservas y mostrador)
+    // 4. Mapear atenciones_pendientes (Prioridad 1: reservas y mostrador)
     atenciones.forEach((at) => {
       if (!at.motivo && !at.nombre) return;
       const cleanPhone = String(at.telefono || '').replace('@lid', '').replace('@c.us', '');
@@ -65,88 +178,98 @@ export async function GET() {
 
       const isPending = at.status === 'pendiente';
       const isReserva = at.motivo?.includes('RESERVA');
-      const displayName = at.nombre && at.nombre.trim() && at.nombre !== '.' ? at.nombre : `Cliente (+${cleanPhone.slice(-4)})`;
-      const timeStr = at.creado_en
-        ? new Date(at.creado_en).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })
-        : '10:00';
+      const displayName =
+        at.nombre && at.nombre.trim() && at.nombre !== '.'
+          ? at.nombre
+          : `Cliente (+${cleanPhone.slice(-4)})`;
+      const timeStr = at.creado_en ? formatMsgTime(at.creado_en) : '10:00';
 
-      const clientText = at.motivo || 'Hola, requiero comunicarme con un asesor de mostrador.';
-      const clientMsg: ChatMessage = {
-        id: `m-at-c-${at.id}`,
-        sender: 'client',
-        text: clientText,
-        time: timeStr,
-      };
+      const realMsgs = messagesByCleanPhone.get(cleanPhone) || [];
+      const messages: ChatMessage[] =
+        realMsgs.length > 0
+          ? realMsgs
+          : [
+              {
+                id: `m-at-c-${at.id}`,
+                sender: 'client',
+                text: at.motivo || 'Hola, requiero comunicarme con un asesor de mostrador.',
+                time: timeStr,
+              },
+              {
+                id: `m-at-a-${at.id}`,
+                sender: isPending ? 'system' : 'agent',
+                text: isReserva
+                  ? `🛒 Solicitud de reserva registrada para retiro en tienda.`
+                  : isPending
+                  ? '👨🏻‍💼 Solicitud de atención en mostrador registrada en cola.'
+                  : '👨🏻‍💼 Atención tomada por asesor de mostrador.',
+                time: timeStr,
+                latency: '0.8s',
+                cost: '$0.0000',
+              },
+            ];
 
-      let agentText = '¡Hola! 👨🏻‍🔧 Te atiende Perucho de Ferretería El Serrucho. Hemos registrado tu consulta para atención en mostrador.';
-      let latency = '0.8s';
-      let cost = '$0.0000';
-
-      if (isReserva) {
-        agentText = `¡Hola ${displayName.split(' ')[0]}! 👨🏻‍🔧 Tu reserva fue registrada con éxito en el catálogo de Ferretería El Serrucho para retiro en tienda física. Materiales apartados.`;
-        latency = '19ms (Capa 1 AST)';
-      } else if (!isPending) {
-        agentText = '👨🏻‍🔧 Atención tomada por asesor de mostrador. Cotización confirmada.';
-        latency = '0.7s';
-      }
-
-      const agentMsg: ChatMessage = {
-        id: `m-at-a-${at.id}`,
-        sender: 'agent',
-        text: agentText,
-        time: timeStr,
-        latency,
-        cost,
-      };
+      const lastTime = messages[messages.length - 1]?.time || timeStr;
 
       convMap.set(cleanPhone, {
         id: `at-${at.id}`,
         name: displayName,
         phone: formatPhone(cleanPhone),
         status: isReserva ? 'qualified' : isPending ? 'escalated' : 'closed',
-        statusLabel: isReserva ? 'Reserva Confirmada' : isPending ? 'Atención Requerida' : 'Atendido en Tienda',
+        statusLabel: isReserva
+          ? 'Reserva Confirmada'
+          : isPending
+          ? 'Atención Requerida'
+          : 'Atendido en Tienda',
         score: isReserva ? 96 : isPending ? 90 : 82,
         silentMode: isPending,
-        lastTime: timeStr,
-        intent: isReserva ? at.motivo.replace('🛒 RESERVA:', '').trim() : at.motivo?.slice(0, 50) || 'Consulta Ferretera',
+        lastTime,
+        intent: isReserva
+          ? at.motivo.replace('🛒 RESERVA:', '').trim()
+          : at.motivo?.slice(0, 50) || 'Consulta Ferretera',
         budget: isReserva ? '$28.00 USD' : '$ —',
-        schedule: 'Retiro en Tienda (Mene Mauroa)',
-        messages: [clientMsg, agentMsg],
+        schedule: 'Retiro en Tienda',
+        messages,
       });
     });
 
-    // 4. Mapear solicitudes_ayuda (Prioridad 2: preguntas de catálogo complejas)
+    // 5. Mapear solicitudes_ayuda (Prioridad 2: preguntas de catálogo complejas)
     ayudas.forEach((ay) => {
       if (!ay.consulta && !ay.nombre) return;
       const cleanPhone = String(ay.telefono || '').replace('@lid', '').replace('@c.us', '');
       if (!cleanPhone || cleanPhone === 'undefined' || convMap.has(cleanPhone)) return;
 
       const isResolved = ay.status === 'enviado' || ay.status === 'resuelto';
-      const displayName = ay.nombre && ay.nombre.trim() && ay.nombre !== '.' ? ay.nombre : `Cliente (+${cleanPhone.slice(-4)})`;
-      const timeStr = ay.creado_en
-        ? new Date(ay.creado_en).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })
-        : '09:30';
+      const displayName =
+        ay.nombre && ay.nombre.trim() && ay.nombre !== '.'
+          ? ay.nombre
+          : `Cliente (+${cleanPhone.slice(-4)})`;
+      const timeStr = ay.creado_en ? formatMsgTime(ay.creado_en) : '09:30';
 
-      const clientMsg: ChatMessage = {
-        id: `m-ay-c-${ay.id}`,
-        sender: 'client',
-        text: ay.consulta || 'Consulta de inventario',
-        time: timeStr,
-      };
+      const realMsgs = messagesByCleanPhone.get(cleanPhone) || [];
+      const messages: ChatMessage[] =
+        realMsgs.length > 0
+          ? realMsgs
+          : [
+              {
+                id: `m-ay-c-${ay.id}`,
+                sender: 'client',
+                text: ay.consulta || 'Consulta de inventario',
+                time: timeStr,
+              },
+              {
+                id: `m-ay-a-${ay.id}`,
+                sender: 'agent',
+                text: ay.no_disponible
+                  ? 'El producto solicitado no se encuentra disponible actualmente en inventario.'
+                  : 'Producto verificado en catálogo para retiro en tienda.',
+                time: timeStr,
+                latency: '24ms (pgvector + GIN)',
+                cost: '$0.0000',
+              },
+            ];
 
-      let agentText = `¡Hola ${displayName.split(' ')[0]}! 👨🏻‍🔧 Producto verificado en catálogo de 7.650 SKUs. Cotización en mostrador para retiro en tienda.`;
-      if (ay.no_disponible) {
-        agentText = `Hola ${displayName.split(' ')[0]}. 👨🏻‍🔧 Verificado en inventario: el producto solicitado no se encuentra disponible para entrega inmediata.`;
-      }
-
-      const agentMsg: ChatMessage = {
-        id: `m-ay-a-${ay.id}`,
-        sender: 'agent',
-        text: agentText,
-        time: timeStr,
-        latency: '24ms (pgvector + GIN)',
-        cost: '$0.0000',
-      };
+      const lastTime = messages[messages.length - 1]?.time || timeStr;
 
       convMap.set(cleanPhone, {
         id: `ay-${ay.id}`,
@@ -156,24 +279,55 @@ export async function GET() {
         statusLabel: isResolved ? 'Cotizado / Resuelto' : 'En Búsqueda RAG',
         score: 88,
         silentMode: false,
-        lastTime: timeStr,
+        lastTime,
         intent: ay.consulta?.slice(0, 50) || 'Consulta de Catálogo',
         budget: '$ —',
-        schedule: 'Retiro en Tienda (Mene Mauroa)',
-        messages: [clientMsg, agentMsg],
+        schedule: 'Retiro en Tienda',
+        messages,
       });
     });
 
-    // 5. Mapear sesiones activas de WhatsApp
+    // 6. Mapear sesiones activas de WhatsApp
     sessions.forEach((s) => {
       const cleanPhone = String(s.telefono || '').replace('@lid', '').replace('@c.us', '');
-      if (!cleanPhone || cleanPhone === 'undefined' || convMap.has(cleanPhone) || cleanPhone.startsWith('test_')) return;
+      if (
+        !cleanPhone ||
+        cleanPhone === 'undefined' ||
+        convMap.has(cleanPhone) ||
+        cleanPhone.startsWith('test_')
+      )
+        return;
 
       const isManual = s.estado === 'manual';
       const wahaChat = wahaChatsMap[cleanPhone];
-      const timeStr = s.updated_at
-        ? new Date(s.updated_at).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })
-        : 'Ahora';
+      const timeStr = s.updated_at ? formatMsgTime(s.updated_at) : 'Ahora';
+
+      const realMsgs = messagesByCleanPhone.get(cleanPhone) || [];
+      const messages: ChatMessage[] =
+        realMsgs.length > 0
+          ? realMsgs
+          : [
+              {
+                id: `m-s-c-${s.id}`,
+                sender: 'client',
+                text:
+                  wahaChat?.lastMessage?.body ||
+                  'Buenas tardes, tienen disponibilidad de materiales?',
+                time: timeStr,
+              },
+              {
+                id: `m-s-a-${s.id}`,
+                sender: isManual ? 'system' : 'agent',
+                text: isManual
+                  ? '👨🏻‍💼 Sesión asignada para atención manual.'
+                  : `¡Hola! Te atiende ${AGENT_NAME} de ${STORE_NAME}. Contamos con catálogo en línea. ¿Qué producto necesitas cotizar?`,
+                time: timeStr,
+                latency: '0.8s',
+                cost: '$0.0000',
+              },
+            ];
+
+      const lastTime = messages[messages.length - 1]?.time || timeStr;
 
       convMap.set(cleanPhone, {
         id: `session-${s.id || cleanPhone}`,
@@ -183,28 +337,11 @@ export async function GET() {
         statusLabel: isManual ? 'Atención Manual' : 'IA Activa (Perucho)',
         score: isManual ? 92 : 78,
         silentMode: isManual,
-        lastTime: timeStr,
+        lastTime,
         intent: s.no_atender_motivo || 'Consulta Activa en WhatsApp',
         budget: '$ —',
         schedule: 'Retiro en Tienda',
-        messages: [
-          {
-            id: `m-s-c-${s.id}`,
-            sender: 'client',
-            text: wahaChat?.lastMessage?.body || 'Buenas tardes, tienen disponibilidad de materiales?',
-            time: timeStr,
-          },
-          {
-            id: `m-s-a-${s.id}`,
-            sender: 'agent',
-            text: isManual
-              ? '👨🏻‍🔧 Un asesor de mostrador de Ferretería El Serrucho ha tomado tu chat.'
-              : '¡Hola! 👨🏻‍🔧 Te atiende Perucho de Ferretería El Serrucho. Contamos con 7.650 SKUs en inventario. ¿Qué material necesitas cotizar?',
-            time: timeStr,
-            latency: '0.8s',
-            cost: '$0.0000',
-          },
-        ],
+        messages,
       });
     });
 
