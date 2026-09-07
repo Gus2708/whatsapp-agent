@@ -300,10 +300,18 @@ async function main() {
   // oficiales; si el fetch falla, todo va a "sin historial" (nunca se cae la corrida).
   let popularidad = [];
   try {
-    const r = await fetch(`${SB}/rest/v1/producto_popularidad?select=codigo_interno,ultima_venta&limit=10000`, { headers: H });
-    if (r.ok) {
+    // D3 paginado: el servidor corta en 1000 filas por request (aunque pidas
+    // limit=10000). Sin paginar, el join perdería productos y los mandaría a
+    // "sin historial" de forma falsa (bug detectado en la medición A/B real).
+    // Loop: 0.. hasta que una página devuelva menos de 1000 filas.
+    const PAGE = 1000;
+    for (let offset = 0; ; offset += PAGE) {
+      const r = await fetch(`${SB}/rest/v1/producto_popularidad?select=codigo_interno,ultima_venta&limit=${PAGE}&offset=${offset}`, { headers: H });
+      if (!r.ok) throw new Error(`producto_popularidad HTTP ${r.status}`);
       const d = await r.json();
-      if (Array.isArray(d)) popularidad = d;
+      if (!Array.isArray(d)) throw new Error('producto_popularidad no devolvió array');
+      popularidad = popularidad.concat(d);
+      if (d.length < PAGE) break;
     }
   } catch (e) {
     console.warn(`\n  (aviso) no se pudo leer producto_popularidad; todos los casos van a "sin historial": ${e.message}`);
