@@ -114,6 +114,13 @@ Vocabulario y ranking por ventas **sí se mantienen solos**, incrementales por h
 | + embeddings v2 (texto enriquecido) | 75,9% | 6,6% |
 | + ranking por ventas | 76,9% | 6,6% |
 | + descripciones (v3) | **76,9%** | **6,3%** |
+| + intento 4 de plan 006 (`0c31b52`) — **medición 2026-09-07** | 72,2% | 9,7% |
+
+> ⚠️ **Regresión medida**: el intento 4 (simLex, `UMBRAL_LEXICO_FIABLE=0.52`, sort del
+> rescate por similitud, desempate de ventas solo `<0.03`) bajó el recall de **76,9% → 72,2%**
+> sobre el mismo set de 320 (evidencia: `scratch_live/_coloquial_resultados_{vec,sinvec}.json`).
+> Veredicto gate A/B: **REJECTED** (gap vector−sin-vector = 0 pts < 5) — la capa vectorial hoy
+> no aporta nada. El retrabajo de RRF y la revisión del intento 4 quedan en plan 006.
 
 ### Aporte aislado de la capa vectorial (A/B sobre el mismo set)
 
@@ -121,8 +128,11 @@ Vocabulario y ranking por ventas **sí se mantienen solos**, incrementales por h
 | :--- | ---: | ---: |
 | Con vector | 246 (76,9%) | 20 (6,3%) |
 | Sin vector (control) | 239 (74,7%) | 24 (7,5%) |
+| Con vector — 2026-09-07 | 231 (72,2%) | 31 (9,7%) |
+| Sin vector — 2026-09-07 | 231 (72,2%) | 31 (9,7%) |
 
-**+7 aciertos atribuibles al vector.**
+**+7 aciertos atribuibles al vector** (histórico). La medición del 2026-09-07 sobre el código
+actual (`0c31b52`) da **gap 0**: la capa vectorial no aporta tras el intento 4 (REJECTED).
 
 ### Margen señal/ruido — la métrica que decide
 

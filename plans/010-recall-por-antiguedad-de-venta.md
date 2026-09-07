@@ -14,6 +14,24 @@
 - **Depends on**: none
 - **Category**: search-quality
 - **Planned at**: commit `3ac8a1d`, 2026-08-29
+- **Result (medido 2026-09-07, veredicto gate A/B)**: **REJECTED — diferencia < 5 puntos**.
+  Ejecutado vía change `search-accuracy` (openspec). El desglose queda como métrica permanente.
+
+### Resultado por bucket (mismo set cacheado de 320, código actual `0c31b52`)
+
+| Bucket | Casos | Recall exacto | Fallos |
+|---|---:|---:|---:|
+| vendido < 1 año | 171 | 72,5% (124/171) | — |
+| venta > 1 año | 26 | 53,8% (14/26) | — |
+| sin historial | 123 | 75,6% (93/123) | — |
+| **Global** | **320** | **72,2% (231/320)** | 9,7% (31/320) |
+
+> ⚠️ **Regresión respecto al histórico**: 76,9% (246/320) → 72,2% (231/320) tras el intento 4
+> del plan 006 (`0c31b52`). El bucket frío ("sin historial", 123 casos) rinde *mejor* que el
+> vivo (>1 año: 53,8%), así que el desempate por ventas **no está hundiendo** el stock frío —
+> el problema lo puso el propio intento 4. Recuperar RRF y revisar `0c31b52` → **plan 006**.
+> Auditoría completa de SIN, embeddings 3-large, muestreo ponderado y pasos 4-5 de este plan
+> quedan diferidos a sus propios planes.
 
 ## Por qué importa
 
