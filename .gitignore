@@ -62,3 +62,6 @@ catchup.lock
 
 # Reportes de diagnóstico y suites generados en scratch_live
 scratch_live/*_resultado.json
+# Resultados oficiales del harness coloquial (D8: el patrón *_resultado.json NO
+# matchea el plural _resultados.json; el set cacheado _coloquial_set.json SÍ se versiona)
+scratch_live/_coloquial_resultados*.json
