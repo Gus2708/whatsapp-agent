@@ -735,11 +735,15 @@ async function diagnostico(consulta, flags) {
     const lex = JSON.parse(await runMatcher({ p_busqueda: texto }, n => (n === 'axios' ? axiosShim : require(n)), $ENV));
     const topLex = (lex.productos || [])[0];
     casoRes.lexico = topLex || null;
+    casoRes.no_vendido = Boolean(lex.no_vendido);
     if (!soloJson) {
       if (spinD) spinD.fin();
       console.log('\n ' + c.claude('❯') + ' ' + c.bold(c.num(`"${texto}"`)));
       console.log(' ' + c.darkGray('─'.repeat(W + 15)));
       console.log(`  ${c.gray('1. Capa Léxica (Trigramas):')} ${topLex ? c.ok(topLex.nombre) : c.darkGray('(sin resultados)')}`);
+      if (lex.no_vendido) {
+        console.log(`  ${c.gray('1b. Regla viva no_vendido:')} ${c.warn('NO VENDIDO')} ${c.darkGray('(la consulta casa con un negativo guardado: NEGATIVO ⊆ CONSULTA, ≤8 tokens, TTL 90d)')}`);
+      }
     }
 
     // 2. Gatillo

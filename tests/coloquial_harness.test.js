@@ -211,3 +211,46 @@ describe('D4 A/B gate', () => {
     assert.strictEqual(evaluarGate(0), 'REJECTED');
   });
 });
+
+// ───────────────────────────────────────────────────────────── D5 live negation body (R6)
+// scripts/_diag_negativa.js MUST execute the WHOLE live matcher body (c01ed5d rule:
+// NEGATIVO ⊆ CONSULTA, _nt.length<=8, TTL 90d via creado_en server-side) with D1
+// isolation -- never a static replication. Both tests run the real esNoVendido().
+describe('D5 diagnostics run the live negation body (R6)', () => {
+  test('diagBuscar flags no_vendido when a TTL-filtered negative matches; no upsert/webhook POST reaches transport', async () => {
+    const { crearAxiosShim } = require('../scripts/_test_coloquial.js');
+    const { diagBuscar } = require('../scripts/_diag_negativa.js');
+    const fake = createFakeAxios([
+      { when: (r) => r.method === 'GET' && r.path === '/rest/v1/catalogo_vocabulario', reply: () => [] },
+      { when: (r) => r.method === 'GET' && r.path === '/rest/v1/busqueda_aprendizaje', reply: () => [] },
+      { when: (r) => r.method === 'GET' && r.path === '/rest/v1/busqueda_negativa', reply: () => [{ termino_raw: 'pipas de agua de 200', creado_en: '2026-09-01T00:00:00Z' }] },
+    ]);
+    const shim = crearAxiosShim(fake, { sinAprender: true });
+    const env = { SUPABASE_URL: 'http://supabase.test', SUPABASE_ANON_KEY: 'test-anon-key' };
+
+    const res = await diagBuscar('Tiene pipas de agua de 200', shim, env);
+
+    assert.strictEqual(res.no_vendido, true);
+    // 90-day TTL is enforced server-side: the query carries creado_en=gte.
+    const neg = fake.requests.find((r) => r.path === '/rest/v1/busqueda_negativa');
+    assert.ok(neg, 'busqueda_negativa request was issued');
+    assert.match(neg.query, /creado_en=gte\./);
+    // D1 isolation: the negation early-return must not fire any POST (upsert/webhook).
+    assert.ok(fake.requests.every((r) => r.method !== 'POST'));
+    assertAllMatched(fake);
+  });
+
+  test('diagBuscar does not flag an unrelated query (empty denylist)', async () => {
+    const { crearAxiosShim } = require('../scripts/_test_coloquial.js');
+    const { diagBuscar } = require('../scripts/_diag_negativa.js');
+    const { buildFakeAxios } = require('./support/load-live-buscar');
+    const fake = buildFakeAxios();
+    const shim = crearAxiosShim(fake, { sinAprender: true });
+    const env = { SUPABASE_URL: 'http://supabase.test', SUPABASE_ANON_KEY: 'test-anon-key' };
+
+    const res = await diagBuscar('clavos', shim, env);
+
+    assert.notStrictEqual(res.no_vendido, true);
+    assertAllMatched(fake);
+  });
+});
