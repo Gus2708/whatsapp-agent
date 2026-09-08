@@ -612,8 +612,10 @@ async function buscarVectorial(_codLex){
   } catch (e) { console.warn('[vectorial] fallo:', e.message); return { filas: [], simLex: null }; }
 }
 // Por debajo de esto, lo que trajo la busqueda lexica no tiene que ver con lo que pidio el
-// cliente. Medido: acierta 0.606; se equivoca 0.443 y 0.399.
-const UMBRAL_LEXICO_FIABLE = 0.52;
+// cliente. Medido en vivo: acierta 0.606; se equivoca 0.443, 0.399 y 0.5246
+// ("tapa para el bano" -> "Tapa P/toma 270": la puntuacion quedaba un pelo sobre el corte
+// viejo de 0.52 y el secuestro por palabra incidental no se rescataba).
+const UMBRAL_LEXICO_FIABLE = 0.55;
 // A3 (hibrido): similitud minima para confiar en el vector cuando reemplaza a la categoria.
 const UMBRAL_VECTOR_ADOPTAR = 0.55;
 
@@ -673,7 +675,7 @@ if (!_rescate && res.length > 0){
     const _vr = await buscarVectorial(res[0].codigo_interno);
     const _vec = _vr.filas;
     const _vcat = _vec.length ? norm(_vec[0].descripcion || '').split(' ')[0] : '';
-    // A3 (hibrido): se adopta el vector si lo LEXICO se equivoco (< 0.52) o si, sin
+    // A3 (hibrido): se adopta el vector si lo LEXICO se equivoco (< 0.55) o si, sin
     // medicion fiable (simLex nulo), la categoria difiere y la similitud lo respalda
     // (>= 0.55). "disco de corte" sobrevive porque su lexico puntua 0.606: acerto.
     const _lexFalla = _vr.simLex !== null && _vr.simLex < UMBRAL_LEXICO_FIABLE;
