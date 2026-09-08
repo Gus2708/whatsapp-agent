@@ -42,7 +42,7 @@ Chain strategy: size-exception
 ## Phase 4: Conditional Phase C (Tilde)
 
 - [x] 4.1 Probe-gate: tilde probe "tienes lamina arquitectónicas…" **live: 4 encontrados > 0** with Phase A alone, all narrowing to `_esCuadrada` (3× Arquitectonica + 1× Canal Cuadrado) → **"Phase C not adopted"** (R-TILDES).
-- [ ] 4.2 IF entered: add accented handling in `_esCuadrada` (live + mirror); re-run probes with azul/rojo/prepintada unchanged (R-TILDES). *(Did not enter — gate 4.1 decided skip.)*
+- [x] 4.2 IF entered: add accented handling in `_esCuadrada` (live + mirror); re-run probes with azul/rojo/prepintada unchanged (R-TILDES). *(Skipped — gate 4.1 decided skip; no work owed.)*
 
 ## Phase 5: Docs & Conditional Deploy
 

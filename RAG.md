@@ -313,7 +313,9 @@ node scripts/_test_fallos_reales.js --prod      # consultas que de verdad escala
    `medLargas`) + ranking por existencia ganan a la lámina de zinc de 6 mts. Deuda de la
    capa de medidas/ranking (no del alias), fuera del alcance de `fix-regresion-fn`; atacar
    con un sub-filtro de material zinc (`wantZinc`, hoy calculado y sin uso) o con el filtro
-   de medida más estricto.
+   de medida más estricto. *(Archive 2026-09-09: ciclo SDD de `fix-regresion-fn` cerrado con
+   PASS WITH WARNINGS, FN 0 doblemente confirmado; la deuda del `parcial` de #11 sigue
+   siendo esta entrada.)*
 3. **Auditar el resto de `SIN`** — `_audit_sin.js` marcó **21 entradas «a revisar»** que
    nadie ha mirado. Las 5 «dañinas» ya se corrigieron y cada una valía aciertos reales.
 4. **Presupuesto sobre listas largas** — es menos preciso que la búsqueda suelta, y ahí están
