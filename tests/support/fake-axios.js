@@ -20,7 +20,8 @@ function createFakeAxios(handlers) {
 
   async function dispatch(method, url, body) {
     const { path, query } = splitUrl(url);
-    const req = { method, path, query, body: body || null };
+    const origin = (String(url).match(/^https?:\/\/[^/]+/) || [''])[0];
+    const req = { method, path, query, origin, body: body || null };
     requests.push(req);
     const handler = handlers.find((h) => h.when(req));
     if (!handler) {

@@ -13,7 +13,7 @@ const { test, mock, beforeEach, afterEach } = require('node:test');
 const fs = require('fs');
 
 const MODULE_PATH = require.resolve('./_lib_credenciales.js');
-const CLAVES = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY'];
+const CLAVES = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'OPENAI_API_BASE'];
 const originalReadFileSync = fs.readFileSync;
 const envSnapshot = {};
 
@@ -113,7 +113,7 @@ test('construirEnv({sinVector:true}) forces OPENAI_API_KEY to an empty string', 
   assert.equal(env.SUPABASE_URL, 'https://x.supabase.co');
 });
 
-test('construirEnv() returns exactly the 4 CLAVES keys, frozen', () => {
+test('construirEnv() returns exactly the CLAVES keys, frozen', () => {
   const { construirEnv } = cargarConEnv(
     'SUPABASE_URL=https://x.supabase.co\n' +
     'SUPABASE_ANON_KEY=anon-123\n' +
@@ -123,6 +123,19 @@ test('construirEnv() returns exactly the 4 CLAVES keys, frozen', () => {
   const env = construirEnv();
   assert.deepEqual(Object.keys(env).sort(), [...CLAVES].sort());
   assert.ok(Object.isFrozen(env));
+});
+
+test('construirEnv passes OPENAI_API_BASE through even in sinVector mode', () => {
+  const { construirEnv } = cargarConEnv(
+    'SUPABASE_URL=https://x.supabase.co\n' +
+    'SUPABASE_ANON_KEY=anon-123\n' +
+    'OPENAI_API_KEY=sk-openai\n' +
+    'OPENROUTER_API_KEY=sk-router\n' +
+    'OPENAI_API_BASE=https://openrouter.ai/api/v1\n'
+  );
+  const env = construirEnv({ sinVector: true });
+  assert.equal(env.OPENAI_API_KEY, '');
+  assert.equal(env.OPENAI_API_BASE, 'https://openrouter.ai/api/v1');
 });
 
 test('leerCredenciales falls back to process.env when the .env file is absent', () => {

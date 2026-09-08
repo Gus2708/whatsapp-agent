@@ -14,6 +14,7 @@
 //   (e) simLex null   + catDiff  + vec 0.60  -> adopt (guarded category fallback)
 //   (f) empty vector                         -> NO (empty vector never adopted)
 //   (g) no _falta (query "tapa p/toma 270")  -> embeddings endpoint never called
+//   (h) OPENAI_API_BASE override set         -> embeddings hit the override origin
 'use strict';
 
 const { test } = require('node:test');
@@ -32,7 +33,7 @@ const OPENAI_ENV = { OPENAI_API_KEY: 'test-openai-key' };
 function vectorHandlers({ simLex, rows }) {
   return [
     {
-      when: (r) => r.method === 'POST' && r.path === '/v1/embeddings',
+      when: (r) => r.method === 'POST' && r.path.endsWith('/v1/embeddings'),
       reply: () => ({ data: [{ embedding: [0.1] }] }),
     },
     {
@@ -48,7 +49,7 @@ function vectorHandlers({ simLex, rows }) {
 
 function isVectorEndpoint(r) {
   return r.method === 'POST' &&
-    (r.path === '/v1/embeddings' ||
+    (r.path.endsWith('/v1/embeddings') ||
      r.path === '/rest/v1/rpc/buscar_semantico' ||
      r.path === '/rest/v1/rpc/similitud_de_codigos');
 }
@@ -83,7 +84,7 @@ async function runCase(spec) {
 }
 
 function embeddingCalls(fake) {
-  return fake.requests.filter((r) => r.path === '/v1/embeddings').length;
+  return fake.requests.filter((r) => r.path.endsWith('/v1/embeddings')).length;
 }
 
 test('A3 truth table: (a) simLex 0.40 -> adopt (simLex branch)', async () => {
@@ -132,4 +133,27 @@ test('A3 truth table: (g) no _falta -> vector never called (happy path stays che
   assert.equal(fake.requests.filter((r) => r.path === '/v1/embeddings').length, 0);
   assert.equal(fake.requests.filter((r) => r.path === '/rest/v1/rpc/buscar_semantico').length, 0);
   assert.equal(result.productos[0].nombre, 'Tapa P/toma 270');
+});
+
+test('A3 truth table: (h) OPENAI_API_BASE override -> embeddings hit the override origin', async () => {
+  const fake = buildHybridFake([L1], { simLex: 0.4, rows: [V_DIFFCAT(0.6)] });
+  const env = { ...OPENAI_ENV, OPENAI_API_BASE: 'https://openrouter.ai/api/v1' };
+  const { result } = await buscarLive('tapa para el bano', { fake, env });
+  assertAllMatched(fake);
+  const calls = fake.requests.filter((r) => r.path.endsWith('/v1/embeddings'));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].origin, 'https://openrouter.ai');
+  assert.equal(calls[0].path, '/api/v1/embeddings');
+  assert.equal(result.rescate, 'inodoro'); // override no altera la adopción A3
+});
+
+test('A3 truth table: (i) OPENAI_API_BASE vacío -> default OpenAI (no override)', async () => {
+  const fake = buildHybridFake([L1], { simLex: 0.4, rows: [V_DIFFCAT(0.6)] });
+  const env = { ...OPENAI_ENV, OPENAI_API_BASE: '' };
+  const { result } = await buscarLive('tapa para el bano', { fake, env });
+  assertAllMatched(fake);
+  const calls = fake.requests.filter((r) => r.path.endsWith('/v1/embeddings'));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].origin, 'https://api.openai.com');
+  assert.equal(result.rescate, 'inodoro');
 });

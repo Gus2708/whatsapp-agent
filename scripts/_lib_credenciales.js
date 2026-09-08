@@ -14,7 +14,7 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 
-const CLAVES = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY'];
+const CLAVES = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'OPENAI_API_BASE'];
 const REQUERIDAS_SUPABASE = ['SUPABASE_URL', 'SUPABASE_ANON_KEY'];
 
 let cache = null;
@@ -61,10 +61,11 @@ function exigirCredenciales(nombres) {
   return valores;
 }
 
-// Builds the exact 4-key $env object handed to the dynamically-evaluated
+// Builds the exact $env object handed to the dynamically-evaluated
 // live_buscar.js / live_presupuesto.js bodies. Never spreads process.env: the
 // object's stdout is persisted to disk (see design D6), so the surface must
-// stay bounded to these 4 names.
+// stay bounded to these 5 names. OPENAI_API_BASE is a non-secret endpoint
+// override (A-local): absent/empty keeps the OpenAI default in the matcher.
 function construirEnv(opciones) {
   const { sinVector, exigir } = opciones || {};
   const valores = exigirCredenciales(exigir || REQUERIDAS_SUPABASE);
@@ -73,6 +74,7 @@ function construirEnv(opciones) {
     SUPABASE_ANON_KEY: valores.SUPABASE_ANON_KEY,
     OPENAI_API_KEY: sinVector ? '' : valores.OPENAI_API_KEY,
     OPENROUTER_API_KEY: valores.OPENROUTER_API_KEY,
+    OPENAI_API_BASE: valores.OPENAI_API_BASE,
   });
 }
 

@@ -585,7 +585,10 @@ async function buscarVectorial(_codLex){
   const _k = (typeof $env !== 'undefined' && $env && $env.OPENAI_API_KEY) || '';
   if (!_k) return { filas: [], simLex: null };
   try {
-    const _e = await axios.post('https://api.openai.com/v1/embeddings',
+    // Endpoint override (A-local): OPENAI_API_BASE re-apunta el POST de embeddings
+    // (p.ej. a OpenRouter). Ausente o vacio -> default OpenAI. No cambia modelo ni dims.
+    const _base = (typeof $env !== 'undefined' && $env && $env.OPENAI_API_BASE) || 'https://api.openai.com/v1';
+    const _e = await axios.post(_base + '/embeddings',
       { model: 'text-embedding-3-small', input: String(p_busqueda).slice(0, 500), dimensions: 1536 },
       { headers: { Authorization: 'Bearer ' + _k, 'Content-Type': 'application/json' }, timeout: 9000 });
     const _v = _e.data && _e.data.data && _e.data.data[0] && _e.data.data[0].embedding;
