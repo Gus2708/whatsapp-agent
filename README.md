@@ -1,122 +1,90 @@
 # 🤖 WhatsApp AI Sales Agent — Production-Ready Open-Source Engine
 
-[![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![Docker](https://img.shields.io/badge/Docker-required-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Powered by n8n](https://img.shields.io/badge/Powered%20by-n8n-EA4B71?logo=n8n&logoColor=white)](https://n8n.io/)
-[![PostgreSQL & pgvector](https://img.shields.io/badge/Database-Supabase%20Postgres-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
+[![Node.js 22+](https://img.shields.io/badge/Node.js-22+-green.svg)](https://nodejs.org/)
+[![Docker](https://img.shields.io/badge/Docker-Supported-blue.svg)](https://www.docker.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Powered by n8n](https://img.shields.io/badge/Powered%20by-n8n-orange.svg)](https://n8n.io/)
+[![Database: PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%20%7C%20Supabase-blue.svg)](https://supabase.com/)
+[![Next.js 14](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org/)
 
 A modular, white-label, production-grade **WhatsApp AI Sales & Customer Support Agent**. Automates real-time inventory search, price quotations, voice note transcription, persistent customer memory, and seamless human escalation.
 
-Engineered with local-first orchestration (Docker + n8n + WAHA) and a 5-layer hybrid retrieval pipeline (Lexical + Catalog Synonyms + Fuzzy Trigrams + pgvector + Semantic Recovery LLM). Fully customizable for any commercial store or retail business via environment variables (`.env`).
+Engineered with local-first orchestration (Docker + n8n + WAHA) and a 5-layer hybrid retrieval pipeline (Lexical + Catalog Synonyms + Fuzzy Trigrams + pgvector + Semantic Recovery LLM). Fully customizable for any commercial store or retail business via environment variables (`.env`). Includes a companion Next.js Flight Deck CRM & Operations Dashboard (PWA).
 
 ---
 
 ## 🏗️ Architecture
 
-Event-driven architecture with zero recurring VPS fees. WhatsApp messages arrive via **WAHA**, n8n orchestrates conversational reasoning with LLMs via **OpenRouter**, queries PostgreSQL in **Supabase**, and stores customer memory with **Engram**.
+Event-driven. WhatsApp messages arrive via WAHA, n8n orchestrates with LLMs via OpenRouter, queries PostgreSQL in Supabase, stores customer memory with Engram.
 
 ```mermaid
 graph TD
-    Client[📱 WhatsApp User] <-->|Messages & Voice| WAHA[🐋 WAHA · Port 3000<br/>Engine NOWEB]
-    WAHA -->|Webhook 'message'| N8N[🐋 n8n Engine · Port 5678<br/>33 Nodes · 4 Zones]
-    N8N -->|Reasoning| Model[🧠 OpenRouter / OpenAI<br/>LLM Multi-Tool Reasoning]
-    N8N -->|Voice Notes → Text| Groq[🎙️ Groq Whisper <800ms]
-    N8N -->|Catalog / Prices / Orders| Supabase[(☁️ Supabase PostgreSQL<br/>pg_trgm + pgvector + RLS)]
-    N8N -->|Customer Long-Term Memory| Engram[💻 Engram · Host Port 7437]
-    N8N -->|Structured Responses / Escalate| WAHA
-    N8N -->|Human Fallback Queue| FlightDeck[🖥️ Flight Deck CRM / Staff Apps]
+    Client["📱 WhatsApp User"] <-->|"Messages & Voice"| WAHA["🐋 WAHA · Port 3000<br/>Engine NOWEB"]
+    WAHA -->|"Webhook 'message'"| N8N["🐋 n8n Engine · Port 5678<br/>33 Nodes · 4 Zones"]
+    N8N -->|"Reasoning"| Model["🧠 OpenRouter / OpenAI<br/>LLM Multi-Tool Reasoning"]
+    N8N -->|"Voice Notes → Text"| Groq["🎙️ Groq Whisper <800ms"]
+    N8N -->|"Catalog / Prices / Orders"| Supabase[("☁️ Supabase PostgreSQL<br/>pg_trgm + pgvector + RLS")]
+    N8N -->|"Customer Long-Term Memory"| Engram["💻 Engram · Host Port 7437"]
+    N8N -->|"Structured Responses / Escalate"| WAHA
+    N8N -->|"Human Fallback Queue"| FlightDeck["🖥️ Flight Deck CRM / Staff Apps"]
 ```
 
 ### 🧰 Technology Stack
 
 | Component | Technology | Purpose |
-| :--- | :--- | :--- |
-| **WhatsApp HTTP API** | [WAHA](https://waha.devlike.pro/) (Docker, engine NOWEB) | Multi-device session emulation and webhook delivery. |
-| **Workflow Orchestrator** | [n8n](https://n8n.io/) (Docker) | Event management, state routing, rate limiting, and tool dispatch. |
-| **LLM Reasoning** | [OpenRouter](https://openrouter.ai/) / OpenAI | Multi-turn reasoning and tool invocation under strict constraints. |
-| **Voice Transcription** | [Groq](https://groq.com/) Whisper | Audio note transcription in <800ms. |
-| **Database & Search** | [Supabase](https://supabase.com/) (PostgreSQL + `pg_trgm` + `pgvector`) | Inventory catalog, order queue, and hybrid vector search. |
-| **Long-Term Memory** | [Engram](https://github.com/EngineVault/engram) | Persistent cross-session customer facts and preferences. |
-| **Flight Deck & CRM** | [Next.js](https://nextjs.org/) (App Router + Tailwind + GSAP + PWA) | Live telemetry, chat operations queue, and RAG studio. |
-| **Runtime** | Node.js 18+ | CLI tools, sync guards, and recovery engine. |
+| --- | --- | --- |
+| WhatsApp HTTP API | WAHA (Docker, engine NOWEB) | Multi-device session emulation and webhook delivery |
+| Workflow Orchestrator | n8n (Docker) | Event management, state routing, rate limiting, and tool dispatch |
+| LLM Reasoning | OpenRouter / OpenAI | Multi-turn reasoning and tool invocation |
+| Voice Transcription | Groq Whisper | Audio note transcription in <800ms |
+| Database & Search | Supabase (PostgreSQL + pg_trgm + pgvector) | Inventory catalog, order queue, and hybrid vector search |
+| Long-Term Memory | Engram | Persistent cross-session customer facts and preferences |
+| Flight Deck & CRM | Next.js 14 (App Router + Tailwind + GSAP + PWA) | Live telemetry, chat operations queue, RAG studio, DevOps console |
+| Runtime | Node.js 22+ | CLI tools, sync guards, recovery engine |
 
 ---
 
 ## 🔍 The 5-Layer Hybrid Search Pipeline (RAG)
 
-Customers write conversationally (*"the glue for PVC pipes"*, *"gray cement 1/2"*), not with catalog SKUs. The search engine executes a multi-layer cascade that **only falls through to the next layer if the previous layer yielded no confident match**:
-
 | # | Layer | Implementation | What It Resolves |
-| :- | :--- | :--- | :--- |
-| **1** | **Lexical AST** | `ilike` + dimension parser (`NxM`, fractions, caliber) | Core queries in ~50ms without API cost (resolves ~70% of volume). |
-| **2** | **Catalog Dictionary** | Inverted synonym table (`catalogo_vocabulario`) | Regional jargon and colloquialisms (*chapa* → lock, *foco* → lightbulb). |
-| **3** | **Fuzzy Trigram** | `pg_trgm` GIN similarity indexes | Severe typos, transposed letters, or single missing terms. |
-| **4** | **Vector Search** | `pgvector` cosine similarity (`text-embedding-3-small`) | Phrasing variations (*"toilet seat cover"* → `TOILET SEAT STANDARD`). |
-| **5** | **Semantic Recovery** | LLM category classification & intent extraction | Customer describes the *function* of an item. Successful matches feed Layer 2. |
-| **★** | **Sales Popularity** | Weighted purchase frequency | Reranks results: active stock rises, ghost/inactive inventory falls. |
+| --- | --- | --- | --- |
+| 1 | Lexical AST | ilike + dimension parser (NxM, fractions, caliber) | Core queries in ~50ms without API cost (~70% of volume) |
+| 2 | Catalog Dictionary | Inverted synonym table (catalogo_vocabulario) | Regional jargon and colloquialisms |
+| 3 | Fuzzy Trigram | pg_trgm GIN similarity indexes | Severe typos, transposed letters |
+| 4 | Vector Search | pgvector cosine similarity (text-embedding-3-small) | Phrasing variations |
+| 5 | Semantic Recovery | LLM category classification & intent extraction | Customer describes the function of an item |
+| ★ | Sales Popularity | Weighted purchase frequency | Reranks by purchase frequency |
 
-For deep engineering benchmarks and RAG tuning, see [RAG.md](RAG.md) and [ARCHITECTURE.md](ARCHITECTURE.md).
-
----
-
-## ⚡ Quickstart & Setup
-
-### 1. Clone & Configure Environment
-
-```bash
-git clone https://github.com/Gus2708/whatsapp-agent.git
-cd whatsapp-agent
-cp .env.example .env
-```
-
-Open `.env` and set your business parameters:
-
-```env
-# Business Branding (White-Label)
-AGENT_NAME="Sales Assistant"
-STORE_NAME="Acme Retail Store"
-STORE_LOCATION="Downtown Branch, Main Street"
-STORE_SCHEDULE="Monday to Saturday: 8:00 AM - 6:00 PM"
-STORE_CURRENCY="USD"
-
-# API Keys
-WAHA_API_KEY=your_secure_key
-OPENROUTER_API_KEY=your_openrouter_key
-GROQ_API_KEY=your_groq_key
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your_supabase_anon_key
-```
-
-### 2. Start Services via Docker
-
-```bash
-docker compose up -d
-```
-
-- **WAHA Dashboard**: `http://localhost:3000` (scan QR code with WhatsApp)
-- **n8n Automation**: `http://localhost:5678` (pre-configured workflow active)
-
-### 3. Launch the Flight Deck CRM & Terminal Studio
-
-```bash
-npm run dev
-```
-
-Open `http://localhost:3000` (or `http://localhost:3001`) to access the real-time Operations HUD, CRM chat queue, and RAG evaluation studio.
+Link to [RAG.md](RAG.md) and [ARCHITECTURE.md](ARCHITECTURE.md) for deep details.
 
 ---
 
-## 🌿 Branches & Reference Implementations
+## 🖥️ Flight Deck CRM & Operations Dashboard
+The `dashboard/` directory contains a full-featured Next.js 14 companion application:
+- **5 Operational Views** accessible via tabs (keyboard shortcuts 1-5):
+  1. **Flight Deck** — Real-time agent telemetry: KPI matrix (messages processed, latency, cost), live microservices topology map showing WAHA/n8n/Supabase/Engram health, and streaming log viewer
+  2. **WhatsApp CRM** — Live conversation workspace: conversation list with search & filters, real-time chat window with message sending, lead details pane, and silent mode toggle (bot on/off per conversation) via WAHA API
+  3. **RAG Studio** — Interactive search testing terminal: execute product queries against the live 5-layer pipeline, inspect which layers fired, view latencies, token costs, and result confidence scores
+  4. **n8n Visualizer** — Interactive node topology of the 33-node n8n workflow with zone color coding
+  5. **DevOps Console** — Infrastructure operations terminal
+- **Authentication**: Supabase Auth with Demo Mode for showcasing without credentials
+- **Progressive Web App (PWA)**: Installable on desktop and mobile, with offline support via service worker, web push notifications to staff (VAPID), custom icons and splash screens
+- **UI/UX**: Dark obsidian theme, GSAP animations, responsive design, Space Grotesk + JetBrains Mono typography, blueprint radar canvas background
+- **Tech Stack**: Next.js 14, React 18, Tailwind CSS, GSAP, Supabase JS, Lucide icons, Thinking Orbs
+- **Testing**: Vitest unit tests + Playwright E2E tests, TypeScript strict mode
+- **API Routes**: `/api/conversations` (list + send message + toggle silent), `/api/n8n` (workflow telemetry), `/api/rag` (search execution), `/api/telemetry` (KPI stream), `/api/tunnel` (dynamic Cloudflare tunnel URLs)
+- **Deployment**: Vercel-ready (vercel.json included), also runs locally on port 3001
 
-- **`master`** *(Default / Active)*: Clean, 100% white-label open-source template. Everything is agnostic and ready to customize for any store via environment variables (`.env`) and `data/business_context.json`.
-- **`perucho`**: Real-world reference implementation customized for *Ferretería El Serrucho* (hardware store with regional Venezuelan retail persona, delivery policies, and specific catalog vocabulary).
+---
+
+## 🤝 Human Escalation & Help Request System
+- **Attention Queue** (`atenciones_pendientes`): When a customer asks to speak with a human, the bot queues them. Employees see real-time notifications via Supabase Realtime. One pending attention per phone (dedup). RLS-protected.
+- **Help Requests** (`solicitudes_ayuda`): When the bot can't find a product or the customer disputes the result, it creates a help request. Employees select the correct products, and n8n automatically composes and sends the corrected response back to the customer via WhatsApp. Flow: pendiente → resuelto → enviado.
+- **Web Push Notifications**: VAPID-based push to staff even with the app closed, via Supabase Edge Functions.
 
 ---
 
 ## 🗺️ n8n Workflow Topology (4 Zones)
-
-The n8n workflow is organized into **4 decoupled zones** with visual color-coded sticky notes:
 
 ```mermaid
 flowchart TD
@@ -127,7 +95,7 @@ flowchart TD
     classDef tool fill:#ffffff,stroke:#0284c7,stroke-dasharray: 4 4,color:#0369a1;
     classDef drop fill:#fee2e2,stroke:#dc2626,stroke-width:1px,color:#991b1b;
 
-    subgraph ZONA1["🟣 ZONE 1: Ingestion & Security"]
+    subgraph ZONE1["Zone 1: Ingestion & Security"]
         W[Webhook Trigger]:::z1 --> S{Outbound Message?}:::z1
         S -->|Yes · fromMe| DH[Detect Human Intervention]:::z1 --> D1[Discard]:::drop
         S -->|No · Client| CR{Valid Client?}:::z1
@@ -135,7 +103,7 @@ flowchart TD
         CR -->|Yes| AD[Deduplication Filter]:::z1
     end
 
-    subgraph ZONA2["🟡 ZONE 2: Pre-Processing & Audio"]
+    subgraph ZONE2["Zone 2: Pre-Processing & Audio"]
         AD --> DB[Burst Debounce]:::z2
         DB --> WH[Transcribe Voice Note · Whisper]:::z2
         WH --> TXT{Valid Text?}:::z2
@@ -148,25 +116,25 @@ flowchart TD
         MH -->|No| CM[Load Client Memory]:::z2
     end
 
-    subgraph ZONA3["🔵 ZONE 3: AI Agent & Tools"]
-        CM --> AGENT["🤖 AI Sales Agent"]:::z3
-        
-        MODEL["🧠 OpenRouter Model"]:::tool -.-> AGENT
-        MEM["💾 Buffer Memory"]:::tool -.-> AGENT
-        T1["🔍 buscar_productos"]:::tool -.-> AGENT
-        T2["📋 hacer_presupuesto"]:::tool -.-> AGENT
-        T3["💵 obtener_tasa_bcv"]:::tool -.-> AGENT
-        T4["🧠 memoria_engram"]:::tool -.-> AGENT
-        
-        AGENT --> SAN["🛡️ Sanitize Output"]:::z3
+    subgraph ZONE3["Zone 3: AI Agent & Tools"]
+        CM --> AGENT["AI Sales Agent"]:::z3
+
+        MODEL["OpenRouter Model"]:::tool -.-> AGENT
+        MEM["Buffer Memory"]:::tool -.-> AGENT
+        T1["buscar_productos"]:::tool -.-> AGENT
+        T2["hacer_presupuesto"]:::tool -.-> AGENT
+        T3["obtener_tasa_bcv"]:::tool -.-> AGENT
+        T4["memoria_engram"]:::tool -.-> AGENT
+
+        AGENT --> SAN["Sanitize Output"]:::z3
     end
 
-    subgraph ZONA4["🟢 ZONE 4: Routing & Dispatch"]
+    subgraph ZONE4["Zone 4: Routing & Dispatch"]
         SAN --> ESC{Requires Escalation?}:::z4
         ESC -->|Yes · ESCALAR_HUMANO| MAN[Activate Human Chat]:::z4
         MAN --> AP[Queue In atenciones_pendientes]:::z4
         MAN --> WA_ESC[Send Escalation Message]:::z4
-        
+
         ESC -->|No| AYU{Request Help?}:::z4
         AYU -->|Yes · PEDIR_AYUDA| SA[Queue In solicitudes_ayuda]:::z4 --> WA_AYU[Send Hold Message]:::z4
         AYU -->|No · Normal| WA_RESP[Send WhatsApp Reply]:::z4
@@ -175,33 +143,112 @@ flowchart TD
 
 ---
 
+## ⚙️ Auxiliary n8n Workflows
+
+| Workflow | File | Purpose |
+| --- | --- | --- |
+| Auto-Improvement | `workflows/workflow_automejora.json` | Analyzes agent failures and automatically patches the system prompt or search logic |
+| Help Request Forwarding | `workflows/workflow_reenviar_ayuda.json` | Composes and sends corrected product messages to customers after employee resolution |
+| Vocabulary Builder | `workflows/workflow_vocabulario.json` | Generates and updates the catalog synonym dictionary from customer query patterns |
+
+---
+
+## 🗄️ Database Schema
+Supabase PostgreSQL with RLS. Key tables:
+- `productos` — Product catalog (SKU, description, price, stock, barcode)
+- `tazas` — Dynamic exchange rates (BCV USD/EUR, Binance P2P)
+- `clientes` — Customer registry
+- `chat_sessions` — Bot/human state and rate limiting per phone
+- `ventas` / `ventas_detalle` — Sales transactions
+- `ordenes_cambio` / `ordenes_cambio_items` — Inventory adjustments
+- `atenciones_pendientes` — Human escalation queue (Realtime-enabled)
+- `solicitudes_ayuda` / `solicitudes_ayuda_items` — Help request queue (Realtime-enabled)
+- `push_subscriptions` — Web Push notification subscriptions
+- `servidores_tuneles` — Dynamic Cloudflare tunnel URL registry
+
+Key database features: pg_trgm GIN indexes, pgvector cosine search, RLS policies (anon for bot, authenticated for employees), Supabase Realtime subscriptions, SECURITY DEFINER functions.
+
+---
+
+## ⚡ Quickstart & Setup
+
+### 1. Clone & Configure
+```bash
+git clone https://github.com/Gus2708/whatsapp-agent.git
+cd whatsapp-agent
+cp .env.example .env
+```
+Edit `.env` with business branding (AGENT_NAME, STORE_NAME, STORE_LOCATION, STORE_SCHEDULE, STORE_CURRENCY) and API keys (WAHA_API_KEY, OPENROUTER_API_KEY, GROQ_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY, optionally OPENAI_API_KEY for pgvector embeddings).
+
+### 2. Start Services via Docker
+```bash
+docker compose up -d
+```
+- WAHA Dashboard: http://localhost:3000 (scan QR code)
+- n8n Automation: http://localhost:5678
+
+### 3. Launch the Flight Deck CRM
+```bash
+cd dashboard && npm install
+npm run dev
+```
+Open http://localhost:3001. Configure `dashboard/.env.local` from `dashboard/.env.example`.
+
+### 4. Apply Database Schema
+Run `supabase_schema.sql` in your Supabase SQL editor.
+
+### 5. Generate Embeddings (optional, for pgvector layer)
+```bash
+node scripts/generar_embeddings.js
+```
+
+---
+
 ## 🧩 Single Source of Truth & Drift Protection
-
-The search matcher functions live canonically in [`lib/catalog-search.js`](lib/catalog-search.js) and are guarded against drift via automated tests:
-
+Search matcher lives canonically in `lib/catalog-search.js`. Guarded by:
 ```bash
 npm test
 ```
+- `check_sources_sync.js` — verifies lib/catalog-search.js matches scripts and live dumps
+- `check_workflow_sync.js` — verifies n8n_workflow.json matches live system message and search nodes
+- Dashboard: TypeScript strict checking + Vitest unit tests + Playwright E2E
+- Root tests: catalog search, workflow guard, declared environments, paint/lamina search, recovery flow
 
-- `check_sources_sync.js`: Verifies `lib/catalog-search.js` matches scripts and live dumps.
-- `check_workflow_sync.js`: Verifies `n8n_workflow.json` matches `scratch_live/live_systemMessage.txt` and search nodes.
-- `dashboard typecheck & vitest`: Full suite of CRM and PWA UI tests.
+---
+
+## 🌿 Branches & Reference Implementations
+- **`master`** (Default): Clean, 100% white-label open-source template
+- **`perucho`**: Reference implementation for Ferretería El Serrucho (Venezuelan hardware store)
 
 ---
 
 ## 📁 Repository Structure
 
 | Path | Purpose |
-| :--- | :--- |
-| `dashboard/` | Next.js Flight Deck CRM & RAG Studio (Tailwind, GSAP, PWA). |
-| `lib/catalog-search.js` | Canonical core search engine and AST normalizer. |
-| `scratch_live/` | Canonical live workflow dumps (`live_buscar.js`, `live_presupuesto.js`, `live_systemMessage.txt`). |
-| `n8n_workflow.json` | Complete export of the n8n agent workflow. |
-| `data/business_context.example.json` | Template for custom business rules, hours, and delivery zones. |
-| `docker-compose.yml` | Container definitions for WAHA and n8n with dynamic env mapping. |
-| `boot.ps1` · `catchup.ps1` | Production background runner and offline message recovery engine. |
-| `supabase_schema.sql` | PostgreSQL database schemas, triggers, and Row-Level Security policies. |
-| `ARCHITECTURE.md` | Deep architectural whitepaper and engineering design rationale. |
+| --- | --- |
+| `dashboard/` | Next.js Flight Deck CRM & Operations Dashboard (5 views, PWA, Supabase Auth) |
+| `dashboard/components/crm/` | CRM workspace: conversation list, chat window, lead details |
+| `dashboard/components/rag/` | RAG Studio: interactive search testing terminal |
+| `dashboard/components/telemetry/` | KPI matrix, live log stream, microservices topology |
+| `dashboard/components/n8n/` | n8n workflow visualizer |
+| `dashboard/components/devops/` | DevOps console |
+| `dashboard/components/auth/` | Auth provider + login screen (Supabase Auth + Demo Mode) |
+| `dashboard/components/pwa/` | PWA service worker registration |
+| `dashboard/app/api/` | Next.js API routes (conversations, n8n, rag, telemetry, tunnel) |
+| `lib/catalog-search.js` | Canonical core search engine and AST normalizer |
+| `rag.js` | RAG evaluation suite runner |
+| `scripts/` | 120+ operational scripts: patches, tests, workflow builders, embedding generators |
+| `workflows/` | Auxiliary n8n workflows (auto-improvement, help forwarding, vocabulary) |
+| `n8n_workflow.json` | Complete export of the main n8n agent workflow |
+| `data/business_context.example.json` | Template for custom business rules, hours, delivery zones |
+| `docker-compose.yml` | Container definitions for WAHA and n8n |
+| `supabase_schema.sql` | Full PostgreSQL schema with RLS, triggers, and functions |
+| `boot.ps1` / `catchup.ps1` | Production background runner and offline message recovery engine |
+| `waha_watchdog.ps1` | WAHA session health monitoring and auto-recovery |
+| `tests/` | Node.js test:test suite (catalog, workflow, recovery, etc.) |
+| `ARCHITECTURE.md` | Deep architectural whitepaper |
+| `RAG.md` | RAG pipeline engineering benchmarks and tuning |
+| `.env.example` | Root environment template |
 
 ---
 
