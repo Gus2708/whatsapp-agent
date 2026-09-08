@@ -864,7 +864,7 @@ for(const p of res){ if(!seen.has(p.codigo_interno)){ seen.add(p.codigo_interno)
     const _esOndulada = d => /\b(ONDULAD\w*|ONDU\b|OND\b|CANAL\s+REDOND\w*|TECHOLIT|ACEROLIT)\b/i.test(d) || /\bPVC.*OND/i.test(d);
     const _esCuadrada = d => /\b(CUADRAD\w*|CUAD\b|CANAL\s+CUADRAD\w*|ARQUITECTONICA|7\s*CANALES?|PERFIL\s+MCHO|CUAD\s+MACHO)\b/i.test(d);
 
-    let lf = unicos;
+    let lf = unicos.filter(() => true);
 
     if (wantTecholit) {
       const ft = lf.filter(p => /\bTECHOLIT\b/i.test(p.descripcion));
