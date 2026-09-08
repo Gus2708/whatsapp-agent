@@ -275,10 +275,20 @@ node scripts/_test_fallos_reales.js --prod      # consultas que de verdad escala
    `OPENAI_API_KEY` de OpenRouter (embedding `text-embedding-3-small`, dims 1536 compatible).
    El override es **local y de dev**: el cuerpo desplegado en n8n no lleva esa línea (deploy
    empuja solo el cuerpo, nunca `.env`).
-8. **La regresión de 86 casos tiene 2 FN PRE-EXISTENTES conocidos** (`#11 "Que precio este
-   tipo de sinz de 6 metros"`, `#28 "lamina de zinc"`): el baseline pre-cambio (`b1e8823`)
-   falla exactamente igual (delta 0, medido 2026-09-08). Exigir «0 FN» hoy no es alcanzable
-   sin tocar la capa léxica; el criterio operativo es **no introducir FN nuevos**.
+8. **Los 2 FN históricos de LÁMINA quedaron resueltos por `fix-regresion-fn` (2026-09-08).**
+   El baseline pre-cambio (`b1e8823`, medido 2026-09-08) tenía `#11 "Que precio este tipo de
+   sinz de 6 metros"` y `#28 "lamina de zinc"` como FALSO-NEGATIVO (0 resultados) por un
+   alias de array en la regla LÁMINA (`let lf = unicos`): sin sub-filtro que reasignara
+   `lf`, el bloque final (líneas 907-909) vaciaba `unicos` y la regla devolvía 0 — no era
+   la capa léxica sino el idiom del array. Con la copia defensiva
+   (`unicos.filter(() => true)`, mismo idioma que CEMENTO/CABILLA/PINTURA) la regresión de
+   86 casos mide **FN 2→0** y #28 queda sin flags. #11 conserva `🟡 parcial` (no era FN: ver
+   §7): la medida ("6" en `medLargas`) y el ranking por existencia mandan mallas/alambrón
+   a top-4 — deuda de la capa de medidas/ranking, distinta del alias y fuera del alcance de
+   `fix-regresion-fn`. El criterio operativo **no introducir FN nuevos** sigue vigente.
+   **Phase C (tildes) NO se adoptó**: la probe live "tienes lamina arquitectónicas…" dio
+   4 encontrados estrechando a arquitectónica/canal cuadrado con Fase A sola — `norm()`
+   quita los acentos del query antes de `wantCuadrada`, así que las tildes no rompen nada.
 
 ---
 
@@ -294,12 +304,16 @@ node scripts/_test_fallos_reales.js --prod      # consultas que de verdad escala
    saturan los top-N y el recall medido se degrada). Solo tiene sentido si un gate ≥ 5 lo
    habilita; con el gate < 5 correr RRF es medir un cambio no habilitado. Plan en
    [`plans/006-fusion-hibrida-rrf.md`](plans/006-fusion-hibrida-rrf.md).
-2. **Cerrar los 2 FN pre-existentes de la regresión** — `#11 "sinz de 6 metros"` (el mapa
-   `SIN` ya tiene `'sinz':'lamina zinc'` pero no alcanza: el rescate no resuelve el typo +
-   medida) y `#28 "lamina de zinc"` (0 resultados mientras "lamina de zinc azul" da 4 → el
-   guard de consultas cortas/vagas se traga el par de tokens; investigar el filtro de
-   longitud/coincidencia parcial de la capa léxica). Son deuda pre-existente (baseline
-   `b1e8823` idéntico, delta 0) fuera del alcance de A3.
+2. **[RESUELTO] Cerrar los 2 FN de LÁMINA** (`fix-regresion-fn`, 2026-09-08) — la causa
+   era un alias de array en la regla LÁMINA (`let lf = unicos`, línea 867): sin sub-filtro
+   que reasignara `lf`, el bloque final vaciaba `unicos` y devolvía 0. Con la copia
+   defensiva `.filter(() => true)` la regresión mide **FN 2→0** (#28 sin flags; #11 pasa de
+   FALSO-NEGATIVO a `🟡 parcial`). **Queda pendiente el `parcial` de #11**: "sinz de 6
+   metros" devuelve top-4 de mallas/alambrón porque el filtro de medida ("6" en
+   `medLargas`) + ranking por existencia ganan a la lámina de zinc de 6 mts. Deuda de la
+   capa de medidas/ranking (no del alias), fuera del alcance de `fix-regresion-fn`; atacar
+   con un sub-filtro de material zinc (`wantZinc`, hoy calculado y sin uso) o con el filtro
+   de medida más estricto.
 3. **Auditar el resto de `SIN`** — `_audit_sin.js` marcó **21 entradas «a revisar»** que
    nadie ha mirado. Las 5 «dañinas» ya se corrigieron y cada una valía aciertos reales.
 4. **Presupuesto sobre listas largas** — es menos preciso que la búsqueda suelta, y ahí están
