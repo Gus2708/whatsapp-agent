@@ -90,6 +90,13 @@ try {
     } else {
         Log "n8n: OK"
     }
+
+    # Aplicar blindaje de runtime en n8n
+    $patchScript = Join-Path $ProjectDir "scripts\patch_container_runtime.js"
+    if (Test-Path $patchScript) {
+        Get-Content $patchScript -Raw | docker exec -u 0 -i n8n_serrucho node 2>$null
+        Log "Blindaje de runtime aplicado en n8n."
+    }
 } catch {
     Log "ERROR en docker compose: $($_.Exception.Message)"
 }
