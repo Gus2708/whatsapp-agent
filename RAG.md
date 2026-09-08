@@ -115,24 +115,45 @@ Vocabulario y ranking por ventas **sí se mantienen solos**, incrementales por h
 | + ranking por ventas | 76,9% | 6,6% |
 | + descripciones (v3) | **76,9%** | **6,3%** |
 | + intento 4 de plan 006 (`0c31b52`) — **medición 2026-09-07** | 72,2% | 9,7% |
+| + A3 adopción híbrida + recalibración — **medición 2026-09-08** (vec-new, override local OpenRouter) | 76,3% (244) | 7,2% (23) |
 
-> ⚠️ **Regresión medida**: el intento 4 (simLex, `UMBRAL_LEXICO_FIABLE=0.52`, sort del
-> rescate por similitud, desempate de ventas solo `<0.03`) bajó el recall de **76,9% → 72,2%**
-> sobre el mismo set de 320 (evidencia: `scratch_live/_coloquial_resultados_{vec,sinvec}.json`).
-> Veredicto gate A/B: **REJECTED** (gap vector−sin-vector = 0 pts < 5) — la capa vectorial hoy
-> no aporta nada. El retrabajo de RRF y la revisión del intento 4 quedan en plan 006.
+> ⚠️ **Dos mediciones que no hay que confundir (corrección de atribución):**
+>
+> 1. **2026-09-07** — el intento 4 (`0c31b52`) dio **72,2% en AMBOS lados** (vec y sinvec,
+>    gap 0). Hoy sabemos que esa corrida corrió el camino **frío**: la clave de OpenAI estaba
+>    vacía y el egress está geo-bloqueado por OpenAI; sin vector vivo, ambos lados ejecutan el
+>    mismo código léxico → gap 0 idéntico. Ese A/B **NO prueba** "la capa vectorial no aporta
+>    tras el intento 4"; solo prueba que se midió sin vector. El +7 histórico quedaba sin
+>    explicación, y el veredicto REJECTED de aquel día se basaba en una medición vector-OFF.
+> 2. **2026-09-08** (cambio `rrf-reintento`, A3 + umbral recalibrado + override local
+>    `OPENAI_API_BASE`→OpenRouter): **vec-new 244 (76,3%) vs sinvec-new 231 (72,2%) → gap
+>    4,1 pts < 5 → REJECTED**, pero ahora con el vector **vivo**: **+13 aciertos reales
+>    atribuibles a la capa vectorial** (244 vs 231), calibró el umbral con el datapoint vivo
+>    (simLex "tapa" = 0.5246 → `UMBRAL_LEXICO_FIABLE` 0.52→**0.55**).
+>
+> Fase 4 (Phase C): la caída 246→231 **no se reproduce caliente** en el código — las 4
+> corridas A/B calientes de `b439c4a` y `c33e0b0` (before/after, cuerpos portados) dieron
+> todas **243/320, after==before** → ambos sospechosos **inocentes**. La caída queda como
+> deuda de investigación de causa externa (reconstrucción nocturna de popularidad/vocabulario
+> o entorno). El gate sigue < 5 → el RRF queda diferido (ver §7).
 
 ### Aporte aislado de la capa vectorial (A/B sobre el mismo set)
 
 | | Recall | Fallos |
 | :--- | ---: | ---: |
-| Con vector | 246 (76,9%) | 20 (6,3%) |
-| Sin vector (control) | 239 (74,7%) | 24 (7,5%) |
-| Con vector — 2026-09-07 | 231 (72,2%) | 31 (9,7%) |
-| Sin vector — 2026-09-07 | 231 (72,2%) | 31 (9,7%) |
+| Con vector (histórico) | 246 (76,9%) | 20 (6,3%) |
+| Sin vector (control, histórico) | 239 (74,7%) | 24 (7,5%) |
+| Con vector — 2026-09-07 (vec, frío: sin clave/egress bloqueado) | 231 (72,2%) | 31 (9,7%) |
+| Sin vector — 2026-09-07 (sinvec, frío) | 231 (72,2%) | 31 (9,7%) |
+| Con vector + A3 — 2026-09-08 (vec-new, vivo) | **244 (76,3%)** | 23 (7,2%) |
+| Sin vector — 2026-09-08 (sinvec-new) | 231 (72,2%) | 31 (9,7%) |
 
-**+7 aciertos atribuibles al vector** (histórico). La medición del 2026-09-07 sobre el código
-actual (`0c31b52`) da **gap 0**: la capa vectorial no aporta tras el intento 4 (REJECTED).
+**Corrección de atribución (2026-09-08)**: el "+7 aciertos del vector" histórico se confirmó
+y amplió con medición caliente real: **+13 aciertos** (244 vs 231, buckets 133/171 · 15/26 ·
+96/123 vs 124/171 · 14/26 · 93/123). La medición del 2026-09-07 (gap 0) fue **sin vector**
+(clave vacía + egress geo-bloqueado por OpenAI), no un efecto de `0c31b52` sobre la capa
+vectorial. El gate A/B **sigue REJECTED** (4,1 pts < 5): el aporte es real pero no cruza la
+barra de adopción → sin deploy; RRF diferido (ver §7).
 
 ### Margen señal/ruido — la métrica que decide
 
@@ -246,6 +267,18 @@ node scripts/_test_fallos_reales.js --prod      # consultas que de verdad escala
 6. **El set de 320 muestrea AL AZAR**, inventario muerto incluido, así que **subestima el
    ranking por ventas**. Un cambio puede bajar ese número y aun así ser correcto para el
    negocio.
+7. **No confundir una corrida sin vector con una prueba de que el vector no aporta.**
+   OpenAI geo-bloquea este egress (`Country, region, or territory not supported`) y la clave
+   puede estar vacía sin que el harness proteste: un A/B con gap 0 puede ser «medí sin vector
+   dos veces» (exactamente lo que pasó el 2026-09-07, ver §3). Para medir caliente desde acá
+   hay que apuntar el override local `OPENAI_API_BASE=https://openrouter.ai/api/v1` con
+   `OPENAI_API_KEY` de OpenRouter (embedding `text-embedding-3-small`, dims 1536 compatible).
+   El override es **local y de dev**: el cuerpo desplegado en n8n no lleva esa línea (deploy
+   empuja solo el cuerpo, nunca `.env`).
+8. **La regresión de 86 casos tiene 2 FN PRE-EXISTENTES conocidos** (`#11 "Que precio este
+   tipo de sinz de 6 metros"`, `#28 "lamina de zinc"`): el baseline pre-cambio (`b1e8823`)
+   falla exactamente igual (delta 0, medido 2026-09-08). Exigir «0 FN» hoy no es alcanzable
+   sin tocar la capa léxica; el criterio operativo es **no introducir FN nuevos**.
 
 ---
 
@@ -253,18 +286,35 @@ node scripts/_test_fallos_reales.js --prod      # consultas que de verdad escala
 
 **En orden de retorno esperado:**
 
-1. **Fusión híbrida RRF** — la mayor pendiente. Hoy el vector **reemplaza** lo léxico
-   (`res = _vec`) en vez de combinarse: es todo-o-nada, y un producto que sale 3º en léxico y
-   2º en vector no sube por consenso. Plan completo en
+1. **Fusión híbrida RRF — DIFERIDA** (medición 2026-09-08: gate 4,1 pts < 5 tras A3). Hoy el
+   vector **reemplaza** lo léxico (`res = _vec`) en vez de combinarse: es todo-o-nada, y un
+   producto que sale 3º en léxico y 2º en vector no sube por consenso. **Prerrequisito
+   obligatorio antes de reintentar: dedupe por familia de productos** (el RRF mezcla rank
+   posiciones; sin dedupe, las familias con muchas variantes — láminas, tubos, cementos —
+   saturan los top-N y el recall medido se degrada). Solo tiene sentido si un gate ≥ 5 lo
+   habilita; con el gate < 5 correr RRF es medir un cambio no habilitado. Plan en
    [`plans/006-fusion-hibrida-rrf.md`](plans/006-fusion-hibrida-rrf.md).
-2. **Auditar el resto de `SIN`** — `_audit_sin.js` marcó **21 entradas «a revisar»** que
+2. **Cerrar los 2 FN pre-existentes de la regresión** — `#11 "sinz de 6 metros"` (el mapa
+   `SIN` ya tiene `'sinz':'lamina zinc'` pero no alcanza: el rescate no resuelve el typo +
+   medida) y `#28 "lamina de zinc"` (0 resultados mientras "lamina de zinc azul" da 4 → el
+   guard de consultas cortas/vagas se traga el par de tokens; investigar el filtro de
+   longitud/coincidencia parcial de la capa léxica). Son deuda pre-existente (baseline
+   `b1e8823` idéntico, delta 0) fuera del alcance de A3.
+3. **Auditar el resto de `SIN`** — `_audit_sin.js` marcó **21 entradas «a revisar»** que
    nadie ha mirado. Las 5 «dañinas» ya se corrigieron y cada una valía aciertos reales.
-3. **Presupuesto sobre listas largas** — es menos preciso que la búsqueda suelta, y ahí están
+4. **Presupuesto sobre listas largas** — es menos preciso que la búsqueda suelta, y ahí están
    los pedidos grandes. `SIN` exige subcadena **contigua**, así que `tubo electrico →
    tubo electricidad` no aplica a «tubo **pvc** electrico».
-4. **Muestreo del harness ponderado por ventas** — cambio de metodología, no de código.
-5. **Modelo de embeddings** — nunca se probó `text-embedding-3-large` ni otras dimensiones.
+5. **Muestreo del harness ponderado por ventas** — cambio de metodología, no de código.
+6. **Modelo de embeddings** — nunca se probó `text-embedding-3-large` ni otras dimensiones.
    Barato de probar, y el margen dirá enseguida si aporta.
+
+**Investigación abierta (deuda, no urgente)**: la caída 246→231 del recall histórico **no se
+reproduce caliente** en el código (Phase C: `b439c4a` y `c33e0b0` inocentes, 4 corridas
+243/320 with after==before). Sospecha principal: la reconstrucción nocturna de
+`producto_popularidad` y `catalogo_vocabulario` (workflow cron 3:00) cambia rankings y
+equivalencias entre mediciones sin tocar una línea de código — hay que medir con el snapshot
+de popularidad fijado para aislarlo.
 
 **Probablemente NO valga la pena** (evidencia en §5): enriquecer más el texto embebido.
 
