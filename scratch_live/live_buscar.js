@@ -611,6 +611,8 @@ async function buscarVectorial(_codLex){
 // Por debajo de esto, lo que trajo la busqueda lexica no tiene que ver con lo que pidio el
 // cliente. Medido: acierta 0.606; se equivoca 0.443 y 0.399.
 const UMBRAL_LEXICO_FIABLE = 0.52;
+// A3 (hibrido): similitud minima para confiar en el vector cuando reemplaza a la categoria.
+const UMBRAL_VECTOR_ADOPTAR = 0.55;
 
 if (res.length===0){
   if (await esNoVendido()) return NO_VENDIDO_JSON();
@@ -668,12 +670,13 @@ if (!_rescate && res.length > 0){
     const _vr = await buscarVectorial(res[0].codigo_interno);
     const _vec = _vr.filas;
     const _vcat = _vec.length ? norm(_vec[0].descripcion || '').split(' ')[0] : '';
-    // Se adopta el vector solo si lo LEXICO se equivoco, medido semanticamente. Si simLex
-    // no se pudo calcular, se cae a la regla anterior (categoria distinta) para no quedarse
-    // sin criterio. "disco de corte" sobrevive porque su lexico puntua 0.606: acerto.
-    const _lexFalla = _vr.simLex !== null ? (_vr.simLex < UMBRAL_LEXICO_FIABLE)
-                                          : (_vcat !== _d0.split(' ')[0]);
-    if (_vec.length > 0 && _lexFalla){
+    // A3 (hibrido): se adopta el vector si lo LEXICO se equivoco (< 0.52) o si, sin
+    // medicion fiable (simLex nulo), la categoria difiere y la similitud lo respalda
+    // (>= 0.55). "disco de corte" sobrevive porque su lexico puntua 0.606: acerto.
+    const _lexFalla = _vr.simLex !== null && _vr.simLex < UMBRAL_LEXICO_FIABLE;
+    const _catDiff = _vcat !== _d0.split(' ')[0];
+    const _vecFiable = _vec.length > 0 && Number(_vec[0].similitud) >= UMBRAL_VECTOR_ADOPTAR;
+    if (_vec.length > 0 && (_lexFalla || (_catDiff && _vecFiable))){
       res = _vec;
       _rescate = { categoria: _vcat, termino: '', confianza: 4 };
     }
