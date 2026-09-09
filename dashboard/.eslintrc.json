@@ -2,7 +2,6 @@
   "extends": "next/core-web-vitals",
   "ignorePatterns": [
     ".next/",
-    "out/",
-    "lib/live_buscar.js"
+    "out/"
   ]
 }
