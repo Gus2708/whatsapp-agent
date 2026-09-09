@@ -349,6 +349,13 @@ de popularidad fijado para aislarlo.
 - **Cadena de despliegue:** `lib/serrucho-search.js` → `scratch_live/*` → `scripts/new_*.js`
   → `n8n_workflow.json` → n8n. Desplegar con `deploy_nodos.js` y cerrar siempre con
   `npm test` (los guards detectan drift entre las copias).
+- **El despliegue va en UN SOLO sentido:** `scratch_live/*` → `n8n_workflow.json` → n8n.
+  `apply_workflow_hardening.js` hacía lo contrario: leía el workflow vivo, mutaba dos nodos
+  y guardaba **eso** encima de `n8n_workflow.json`. El 2026-09-09 revirtió en silencio un
+  matcher ya montado (guardia de credencial + fix de LÁMINA) mientras desplegaba solo el
+  nodo Sanitize, y ninguna guarda lo detectó porque el archivo quedó coherente consigo
+  mismo. Ahora el script publica el archivo canónico, exige que la guarda de sync pase
+  antes de tocar nada y **nunca escribe** `n8n_workflow.json`.
 - **`n8n_workflow.json` NO es el estado desplegado.** Es un artefacto de staging: un
   resync escribe el archivo pero no publica nada. La única fuente de verdad de producción
   es `GET http://localhost:5678/api/v1/workflows/<id>`. El 2026-09-09 auditamos los tres
