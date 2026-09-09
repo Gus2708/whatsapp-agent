@@ -91,11 +91,27 @@ try {
         Log "n8n: OK"
     }
 
-    # Aplicar blindaje de runtime en n8n
+    # Blindaje de runtime en n8n (parchea node_modules dentro del contenedor).
+    #
+    # OJO con el orden: n8n ya arranco arriba, asi que Node YA cargo los modulos viejos.
+    # Parchear el disco no cambia el proceso vivo. Por eso el script devuelve 10 cuando
+    # realmente modifico algo y aqui se reinicia n8n; si no, el blindaje quedaria inerte
+    # justo en el caso que protege (contenedor recien recreado por un rebuild).
     $patchScript = Join-Path $ProjectDir "scripts\patch_container_runtime.js"
     if (Test-Path $patchScript) {
-        Get-Content $patchScript -Raw | docker exec -u 0 -i n8n_serrucho node 2>$null
-        Log "Blindaje de runtime aplicado en n8n."
+        $patchOut = Get-Content $patchScript -Raw | docker exec -u 0 -i n8n_serrucho node
+        $patchCode = $LASTEXITCODE
+        foreach ($line in @($patchOut)) { if ($line) { Log "  blindaje: $line" } }
+        switch ($patchCode) {
+            0  { Log "Blindaje de runtime: ya estaba aplicado (sin reinicio)." }
+            10 {
+                Log "Blindaje de runtime aplicado. Reiniciando n8n para que cargue los modulos parcheados..."
+                docker compose restart n8n
+                if ($LASTEXITCODE -eq 0) { Log "n8n reiniciado con el blindaje activo." }
+                else { Log "AVISO: fallo el reinicio de n8n (exit $LASTEXITCODE) -- el blindaje NO esta activo todavia." }
+            }
+            default { Log "AVISO: el blindaje de runtime fallo (exit $patchCode). n8n sigue sin blindar." }
+        }
     }
 } catch {
     Log "ERROR en docker compose: $($_.Exception.Message)"
