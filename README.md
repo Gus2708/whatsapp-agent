@@ -5,8 +5,12 @@
   # WhatsApp AI Sales Agent
 
   <p align="center">
-    <strong>Motor autónomo de ventas y atención al cliente para WhatsApp de nivel de producción.</strong><br>
-    Búsqueda híbrida en 5 capas, transcripción de notas de voz en &lt;800ms, memoria persistente y escalamiento a humanos.
+    <strong>Production-grade autonomous sales and customer support engine for WhatsApp.</strong><br>
+    5-layer hybrid search, voice note transcription in &lt;800ms, persistent memory, and human escalation.
+  </p>
+
+  <p align="center">
+    <a href="README.md"><strong>English</strong></a> · <a href="README.es.md"><strong>Español</strong></a>
   </p>
 
   <p align="center">
