@@ -354,6 +354,17 @@ const IGNORED = new Set([
   'foto', 'fotos', 'fotico', 'foticos', 'imagen', 'imagenes',
   'cuanto', 'cuesta', 'cuestan', 'vale', 'valen', 'sale', 'salen', 'precio', 'precios', 'presio', 'presios', 'costo', 'como', 'cual', 'cuales', 'cuando', 'quien',
   'color', 'ml', 'pulgada', 'pulgadas', 'pulg', 'pies', 'pie', 'sea', 'sean', 'tenga', 'tengan', 'sirva', 'sirvan',
+  // Unidades que el cliente DICE con todas sus letras y el catalogo escribe abreviadas:
+  // "de 32 milimetros" -> "32MM", "de 450 voltios" -> "450VAC", "de 80 watts" -> "80W".
+  // Si cuentan como palabra de contenido, el ilike exige "milimetro" en la descripcion y el
+  // producto correcto no entra ni a los candidatos; peor aun, el drop-one solo suelta UNA
+  // palabra, asi que una consulta con unidad + un sinonimo fallido ya no se recupera
+  // ("candado dorado Manqui de 32 milimetros" -> el correcto dice LATONADO). El numero se
+  // conserva y lo sigue casando medPresent, que ya entiende las formas abreviadas.
+  // 'metro/metros/mts/pulgada/pies/kilo/kg/ml' ya estaban; estas faltaban.
+  'milimetro', 'milimetros', 'centimetro', 'centimetros', 'mililitro', 'mililitros',
+  'voltio', 'voltios', 'volt', 'volts', 'watt', 'watts', 'vatio', 'vatios',
+  'amperio', 'amperios', 'litro', 'litros', 'gramo', 'gramos', 'libra', 'libras', 'onza', 'onzas',
   'numero', 'numeros', 'nro', 'num',
   'disponible', 'disponibles', 'disponibilidad', 'stock',
   'rollo', 'rollos', 'saco', 'sacos', 'bolsa', 'bolsas', 'unidad', 'unidades', 'pieza', 'piezas', 'kilo', 'kilos', 'kg',
