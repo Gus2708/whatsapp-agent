@@ -147,6 +147,26 @@ test('A3 truth table: (h) OPENAI_API_BASE override -> embeddings hit the overrid
   assert.equal(result.rescate, 'inodoro'); // override no altera la adopción A3
 });
 
+test('guardia de credencial: clave sk-or- sin OPENAI_API_BASE -> no se llama a OpenAI', async () => {
+  const fake = buildFakeAxios([L1]); // ningún handler de vector: cualquier POST fallaría
+  const env = { OPENAI_API_KEY: 'sk-or-v1-clave-de-openrouter', OPENAI_API_BASE: '' };
+  const { result } = await buscarLive('tapa para el bano', { fake, env });
+  assertAllMatched(fake);
+  assert.equal(fake.requests.filter((r) => r.path.endsWith('/v1/embeddings')).length, 0);
+  assert.equal(result.productos[0].nombre, 'Tapa P/toma 270'); // cae al léxico, no rompe
+});
+
+test('guardia de credencial: clave sk-or- CON OPENAI_API_BASE -> sí se usa el override', async () => {
+  const fake = buildHybridFake([L1], { simLex: 0.4, rows: [V_DIFFCAT(0.6)] });
+  const env = { OPENAI_API_KEY: 'sk-or-v1-clave-de-openrouter', OPENAI_API_BASE: 'https://openrouter.ai/api/v1' };
+  const { result } = await buscarLive('tapa para el bano', { fake, env });
+  assertAllMatched(fake);
+  const calls = fake.requests.filter((r) => r.path.endsWith('/v1/embeddings'));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].origin, 'https://openrouter.ai');
+  assert.equal(result.rescate, 'inodoro');
+});
+
 test('A3 truth table: (i) OPENAI_API_BASE vacío -> default OpenAI (no override)', async () => {
   const fake = buildHybridFake([L1], { simLex: 0.4, rows: [V_DIFFCAT(0.6)] });
   const env = { ...OPENAI_ENV, OPENAI_API_BASE: '' };

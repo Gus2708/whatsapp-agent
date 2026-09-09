@@ -584,10 +584,20 @@ async function rescateSemantico(){
 async function buscarVectorial(_codLex){
   const _k = (typeof $env !== 'undefined' && $env && $env.OPENAI_API_KEY) || '';
   if (!_k) return { filas: [], simLex: null };
+  // Endpoint override (A-local): OPENAI_API_BASE re-apunta el POST de embeddings
+  // (p.ej. a OpenRouter). Ausente o vacio -> default OpenAI. No cambia modelo ni dims.
+  const _baseRaw = (typeof $env !== 'undefined' && $env && $env.OPENAI_API_BASE) || '';
+  const _base = _baseRaw || 'https://api.openai.com/v1';
+  // Guardia de credencial: una clave que NO es de OpenAI (p.ej. OpenRouter, "sk-or-...")
+  // nunca debe viajar a api.openai.com. Sin un OPENAI_API_BASE que la redirija al emisor
+  // correcto se omite la capa vectorial: la busqueda lexica sigue igual y el secreto no
+  // se filtra a un tercero. Medido 2026-09-08: produccion mandaba una clave sk-or-v1 al
+  // endpoint de OpenAI en cada rescate (401 -> vector muerto en silencio + fuga).
+  if (!_baseRaw && /^sk-or-/i.test(_k)) {
+    console.warn('[vectorial] clave no-OpenAI sin OPENAI_API_BASE: se omite la capa vectorial');
+    return { filas: [], simLex: null };
+  }
   try {
-    // Endpoint override (A-local): OPENAI_API_BASE re-apunta el POST de embeddings
-    // (p.ej. a OpenRouter). Ausente o vacio -> default OpenAI. No cambia modelo ni dims.
-    const _base = (typeof $env !== 'undefined' && $env && $env.OPENAI_API_BASE) || 'https://api.openai.com/v1';
     const _e = await axios.post(_base + '/embeddings',
       { model: 'text-embedding-3-small', input: String(p_busqueda).slice(0, 500), dimensions: 1536 },
       { headers: { Authorization: 'Bearer ' + _k, 'Content-Type': 'application/json' }, timeout: 9000 });
@@ -615,6 +625,11 @@ async function buscarVectorial(_codLex){
 // cliente. Medido en vivo: acierta 0.606; se equivoca 0.443, 0.399 y 0.5246
 // ("tapa para el bano" -> "Tapa P/toma 270": la puntuacion quedaba un pelo sobre el corte
 // viejo de 0.52 y el secuestro por palabra incidental no se rescataba).
+// OJO: el gate A/B de este 0.55 y de la regla A3 salio RECHAZADO (gap 4,1 < 5). Siguen
+// aqui porque son INALCANZABLES: ambas constantes solo se leen dentro del bloque
+// `if (_falta)` de rescate vectorial, y adoptar exige `_vec.length > 0`. Con la capa
+// vectorial apagada nunca se evaluan. Definir OPENAI_API_BASE las despierta a las dos de
+// golpe sin pasar por ningun gate: volver a medir el A/B antes de encender el vector.
 const UMBRAL_LEXICO_FIABLE = 0.55;
 // A3 (hibrido): similitud minima para confiar en el vector cuando reemplaza a la categoria.
 const UMBRAL_VECTOR_ADOPTAR = 0.55;
@@ -675,9 +690,13 @@ if (!_rescate && res.length > 0){
     const _vr = await buscarVectorial(res[0].codigo_interno);
     const _vec = _vr.filas;
     const _vcat = _vec.length ? norm(_vec[0].descripcion || '').split(' ')[0] : '';
-    // A3 (hibrido): se adopta el vector si lo LEXICO se equivoco (< 0.55) o si, sin
-    // medicion fiable (simLex nulo), la categoria difiere y la similitud lo respalda
-    // (>= 0.55). "disco de corte" sobrevive porque su lexico puntua 0.606: acerto.
+    // A3 (hibrido): dos ramas independientes de adopcion.
+    //  1) simLex medido y por debajo de 0.55 -> el lexico se equivoco, se adopta.
+    //  2) la categoria del vector difiere Y su similitud la respalda (>= 0.55) -> se
+    //     adopta AUNQUE simLex sea alto o nulo. Esta es la rama que recupera los ~+7
+    //     casos de categoria (ver tabla de verdad (c) y (e) en probes_hibrida.test.js);
+    //     no esta condicionada a simLex === null.
+    // "disco de corte" sobrevive porque su vector no cambia de categoria, no por su simLex.
     const _lexFalla = _vr.simLex !== null && _vr.simLex < UMBRAL_LEXICO_FIABLE;
     const _catDiff = _vcat !== _d0.split(' ')[0];
     const _vecFiable = _vec.length > 0 && Number(_vec[0].similitud) >= UMBRAL_VECTOR_ADOPTAR;

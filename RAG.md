@@ -349,3 +349,21 @@ de popularidad fijado para aislarlo.
 - **Cadena de despliegue:** `lib/serrucho-search.js` → `scratch_live/*` → `scripts/new_*.js`
   → `n8n_workflow.json` → n8n. Desplegar con `deploy_nodos.js` y cerrar siempre con
   `npm test` (los guards detectan drift entre las copias).
+- **`n8n_workflow.json` NO es el estado desplegado.** Es un artefacto de staging: un
+  resync escribe el archivo pero no publica nada. La única fuente de verdad de producción
+  es `GET http://localhost:5678/api/v1/workflows/<id>`. El 2026-09-09 auditamos los tres
+  niveles y el vivo iba tres cambios por detrás del archivo (sin A3, sin el umbral 0.55 y
+  **sin el fix de LÁMINA** que su ciclo SDD ya había archivado como *done*). Un ciclo que
+  cierra sin desplegar deja la corrección solo en el repo.
+- **A3 y `UMBRAL_LEXICO_FIABLE = 0.55` están DORMIDOS, no adoptados.** Su gate A/B salió
+  **REJECTED** (gap 4,1 < 5). Siguen en el código porque son inalcanzables: ambas
+  constantes se leen **solo** dentro del bloque `if (_falta)` de rescate vectorial, y la
+  adopción exige `_vec.length > 0`. Con la capa vectorial apagada nunca se evalúan.
+  ⚠️ **Poner `OPENAI_API_BASE` los despierta a los dos de golpe**, sin pasar por ningún
+  gate. Antes de encender el vector hay que volver a medir el A/B y decidir A3 aparte.
+- **Nunca mandar una clave que no es de OpenAI a `api.openai.com`.** Producción tenía
+  `OPENAI_API_KEY` con prefijo `sk-or-` (OpenRouter) y `OPENAI_API_BASE` vacío: cada
+  rescate le entregaba el secreto a un tercero y recibía 401, así que el vector estaba
+  muerto **en silencio** (el `catch` devuelve filas vacías, que es indistinguible de "sin
+  resultados"). `buscarVectorial` ahora corta antes de la petición si la clave es `sk-or-`
+  y no hay endpoint que la redirija.
