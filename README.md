@@ -1,15 +1,24 @@
-# 🤖 WhatsApp AI Sales Agent — Production-Ready Open-Source Engine
+<div align="center">
 
-[![Node.js 22+](https://img.shields.io/badge/Node.js-22+-green.svg)](https://nodejs.org/)
-[![Docker](https://img.shields.io/badge/Docker-Supported-blue.svg)](https://www.docker.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Powered by n8n](https://img.shields.io/badge/Powered%20by-n8n-orange.svg)](https://n8n.io/)
-[![Database: PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%20%7C%20Supabase-blue.svg)](https://supabase.com/)
-[![Next.js 14](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org/)
+  <img src="https://github.com/user-attachments/assets/ac3c26e3-547b-4787-8965-9bd38d86013a" alt="WhatsApp AI Agent Logo" width="92" height="92" style="border-radius: 20%;" />
 
-A modular, white-label, production-grade **WhatsApp AI Sales & Customer Support Agent**. Automates real-time inventory search, price quotations, voice note transcription, persistent customer memory, and seamless human escalation.
+  # WhatsApp AI Sales Agent
 
-Engineered with local-first orchestration (Docker + n8n + WAHA) and a 5-layer hybrid retrieval pipeline (Lexical + Catalog Synonyms + Fuzzy Trigrams + pgvector + Semantic Recovery LLM). Fully customizable for any commercial store or retail business via environment variables (`.env`). Includes a companion Next.js Flight Deck CRM & Operations Dashboard (PWA).
+  <p align="center">
+    <strong>Motor autónomo de ventas y atención al cliente para WhatsApp de nivel de producción.</strong><br>
+    Búsqueda híbrida en 5 capas, transcripción de notas de voz en &lt;800ms, memoria persistente y escalamiento a humanos.
+  </p>
+
+  <p align="center">
+    <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-22+-green.svg?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js 22+" /></a>
+    <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-Supported-blue.svg?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" /></a>
+    <a href="https://n8n.io/"><img src="https://img.shields.io/badge/Powered%20by-n8n-orange.svg?style=for-the-badge&logo=n8n&logoColor=white" alt="n8n" /></a>
+    <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" /></a>
+    <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-14-black.svg?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js 14" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge" alt="License: MIT" /></a>
+  </p>
+
+</div>
 
 ---
 
@@ -60,21 +69,39 @@ Link to [RAG.md](RAG.md) and [ARCHITECTURE.md](ARCHITECTURE.md) for deep details
 ---
 
 ## 🖥️ Flight Deck CRM & Operations Dashboard
-The `dashboard/` directory contains a full-featured Next.js 14 companion application:
-- **5 Operational Views** accessible via tabs (keyboard shortcuts 1-5):
-  1. **Flight Deck** — Real-time agent telemetry: KPI matrix (messages processed, latency, cost), live microservices topology map showing WAHA/n8n/Supabase/Engram health, and streaming log viewer
-  2. **WhatsApp CRM** — Live conversation workspace: conversation list with search & filters, real-time chat window with message sending, lead details pane, and silent mode toggle (bot on/off per conversation) via WAHA API
-  3. **RAG Studio** — Interactive search testing terminal: execute product queries against the live 5-layer pipeline, inspect which layers fired, view latencies, token costs, and result confidence scores
-  4. **n8n Visualizer** — Interactive node topology of the 33-node n8n workflow with zone color coding
-  5. **DevOps Console** — Infrastructure operations terminal
-- **Authentication**: Supabase Auth with Demo Mode for showcasing without credentials
-- **Progressive Web App (PWA)**: Installable on desktop and mobile, with offline support via service worker, web push notifications to staff (VAPID), custom icons and splash screens
-- **UI/UX**: Dark obsidian theme, GSAP animations, responsive design, Space Grotesk + JetBrains Mono typography, blueprint radar canvas background
-- **Tech Stack**: Next.js 14, React 18, Tailwind CSS, GSAP, Supabase JS, Lucide icons, Thinking Orbs
-- **Testing**: Vitest unit tests + Playwright E2E tests, TypeScript strict mode
-- **API Routes**: `/api/conversations` (list + send message + toggle silent), `/api/n8n` (workflow telemetry), `/api/rag` (search execution), `/api/telemetry` (KPI stream), `/api/tunnel` (dynamic Cloudflare tunnel URLs)
-- **Deployment**: Vercel-ready (vercel.json included), also runs locally on port 3001
 
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/1597cb5b-3091-45fe-8e84-21f49a11c19f" alt="Flight Deck Live Preview" width="850" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);" />
+  <p align="center"><em>Previsualización interactiva de la consola de operaciones y CRM en tiempo real.</em></p>
+</div>
+
+<br />
+
+<table border="0">
+  <tr>
+    <td width="30%" align="center" valign="middle">
+      <img src="https://github.com/user-attachments/assets/efed9599-be1e-46ed-8fe3-6694d7ffda73" alt="Flight Deck Module Badge" width="220" style="border-radius: 12px;" />
+    </td>
+    <td width="70%" valign="top">
+      The <code>dashboard/</code> directory contains a full-featured Next.js 14 companion application:
+      <ul>
+        <li><strong>Flight Deck</strong>: Real-time agent telemetry (latency, token costs, microservice topology map, streaming logs).</li>
+        <li><strong>WhatsApp CRM</strong>: Live chat workspace with lead details, manual reply, and silent mode toggling.</li>
+        <li><strong>RAG Studio</strong>: Interactive testing terminal to inspect the 5-layer retrieval engine in real time.</li>
+        <li><strong>n8n Visualizer</strong>: Interactive node topology map across all 4 execution zones.</li>
+        <li><strong>DevOps Console</strong>: Infrastructure operations terminal and tunnel monitor.</li>
+      </ul>
+    </td>
+  </tr>
+</table>
+
+**Core Capabilities & Tooling:**
+* **Authentication**: Supabase Auth with an instant Demo Mode for credential-free exploration.
+* **Progressive Web App (PWA)**: Desktop & mobile installable, offline support via service workers, and VAPID web push alerts.
+* **Modern UI/UX**: Dark obsidian theme, GSAP animations, Space Grotesk + JetBrains Mono typography, blueprint radar background.
+* **Full Stack & Tests**: Next.js 14, React 18, Tailwind CSS, Lucide icons, Vitest unit tests, and Playwright E2E suites.
+* **API Endpoints**: `/api/conversations`, `/api/n8n`, `/api/rag`, `/api/telemetry`, and `/api/tunnel`.
+  
 ---
 
 ## 🤝 Human Escalation & Help Request System
