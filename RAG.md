@@ -349,6 +349,21 @@ de popularidad fijado para aislarlo.
 - **Cadena de despliegue:** `lib/serrucho-search.js` → `scratch_live/*` → `scripts/new_*.js`
   → `n8n_workflow.json` → n8n. Desplegar con `deploy_nodos.js` y cerrar siempre con
   `npm test` (los guards detectan drift entre las copias).
+- **PostgREST corta en 1000 filas EN SILENCIO.** `?...&limit=20000` no levanta el `max-rows`
+  del servidor: devuelve 1000 filas y un `200 OK`, sin error ni warning. El diccionario de
+  catálogo (`catalogo_vocabulario`, 3.839 términos activos) llevaba cargando **1.000 (26%)**
+  y nadie podía enterarse. Para traer todo hay que paginar con `Range` hasta agotar.
+- **PERO el diccionario NO se puede cargar entero todavía — mide antes de arreglar esto.**
+  Paginarlo da **−11 casos** sobre el set de 320 (235 → 224, gana 0 y pierde 11): la
+  truncación estaba protegiendo por accidente. Causa: el LLM generó traducciones de un
+  término genérico del cliente a un **producto específico** que vio en el catálogo, en vez
+  de a una categoría — `pintura en spray → speed max` (una marca), `protector de voltaje →
+  protector regleta tomas usb`, `disco de lija → fibrodisco`, `bomba de agua → motobomba
+  gasolina`. El diccionario no traduce: **estrecha**, y mata a todos los hermanos del
+  producto al que apunta. Medido por cuántos productos casa cada `canonico`: **582 casan 0**
+  (15%), **1.699 casan 1 o 2** (44%), 748 casan 3-10, y solo **810 casan más de 10** (21%,
+  las sanas). Antes de habilitar la paginación hay que filtrar o regenerar la cola mala; un
+  criterio de corte razonable es exigir que el `canonico` case con ≥3 productos.
 - **El despliegue va en UN SOLO sentido:** `scratch_live/*` → `n8n_workflow.json` → n8n.
   `apply_workflow_hardening.js` hacía lo contrario: leía el workflow vivo, mutaba dos nodos
   y guardaba **eso** encima de `n8n_workflow.json`. El 2026-09-09 revirtió en silencio un
