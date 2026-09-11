@@ -353,6 +353,14 @@ de popularidad fijado para aislarlo.
   del servidor: devuelve 1000 filas y un `200 OK`, sin error ni warning. El diccionario de
   catálogo (`catalogo_vocabulario`, 3.839 términos activos) llevaba cargando **1.000 (26%)**
   y nadie podía enterarse. Para traer todo hay que paginar con `Range` hasta agotar.
+- **El diccionario ya NO reescribe la consulta (2026-09-11).** Se aplicaba con `String.replace`:
+  la palabra del cliente se perdía y, si el canónico era malo, nada podía recuperarla. Ahora
+  hay **dos ramas**: la del cliente manda en ranking, reglas de negocio y filtros de medida;
+  la del diccionario solo **suma candidatos** a la recuperación, y decide el ranking. Un
+  canónico malo solo puede aportar ruido descartable. Es la semántica aditiva que ya usaba
+  `ALIAS`, que se incluye a sí mismo en su lista. Medido: **235 → 238** (gana 5, pierde 2).
+  Ojo al factorizar: las dos ramas necesitan la relajación `relajarDropOne`; dándosela solo
+  a la del cliente se conservaba 1 de 4 rescates en vez de 3.
 - **PERO el diccionario NO se puede cargar entero todavía — mide antes de arreglar esto.**
   Paginarlo da **−11 casos** sobre el set de 320 (235 → 224, gana 0 y pierde 11): la
   truncación estaba protegiendo por accidente. Causa: el LLM generó traducciones de un

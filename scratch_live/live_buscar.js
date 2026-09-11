@@ -413,9 +413,26 @@ function aplicarVocabulario(t){
   return norm(t).replace(_vocabRe, (m, pre, term) => pre + (_vocabMap.get(term) || term));
 }
 
+// DOS RAMAS, NO UNA REESCRITURA.
+// El diccionario de catalogo se aplicaba SUSTITUYENDO la consulta: la palabra del cliente
+// se perdia y, si el canonico era malo, nada podia recuperarla. Y muchos canonicos son
+// malos de una forma concreta: no traducen vocabulario, AUTOCOMPLETAN la consulta con
+// atributos que el cliente nunca dijo ("pintura de caucho" -> "pintura caucho impacto mar
+// deco blanco", "apagador de luz" -> "switch doble c/tapa metalica"). Medido sobre el set
+// de 320: el diccionario gana 5 casos y rompe otros 5, y de 3.869 terminos solo 40 llegan
+// a dispararse.
+//
+// Ahora la rama del CLIENTE es la principal y manda en todo lo que decide: tokens de
+// ranking, reglas de negocio (cemento/cabilla/lamina/pintura) y filtros de medida. La rama
+// del diccionario solo se usa para SUMAR candidatos a la recuperacion (ver la union mas
+// abajo), asi que una entrada mala solo puede aportar candidatos que puntuan peor, nunca
+// destruir la consulta. Es la misma semantica aditiva que ya usa ALIAS, que se incluye a
+// si mismo en su lista de alias.
 const _pbv = aplicarVocabulario(_pb);
-const termExp = normMedida(expandir(_pbv));
-const qTokens = tokensDe(expandir(_pbv));
+const termExp = normMedida(expandir(_pb));
+const termExpVoc = normMedida(expandir(_pbv));
+const qTokens = tokensDe(expandir(_pb));
+const qTokensVoc = tokensDe(expandir(_pbv));
 const qTokensRaw = tokensDe(_pb); // SIN sinonimos: para casar contra aprendizaje/negativa guardados
 const qRawSet = new Set(qTokensRaw);
 // Un "0" suelto no es una medida: no dice nada del producto, pero casa con "AL 0%" y hacia
@@ -424,6 +441,11 @@ const qRawSet = new Set(qTokensRaw);
 const largas = qTokens.filter(w => (w.length>=3 || /\d/.test(w)) && w !== '0');
 const textLargas = largas.filter(w => !/\d/.test(w));
 const medLargas = largas.filter(w => /\d/.test(w));
+// Misma derivacion para la rama del diccionario: solo alimenta la union de candidatos.
+const textLargasVoc = qTokensVoc
+  .filter(w => (w.length>=3 || /\d/.test(w)) && w !== '0')
+  .filter(w => !/\d/.test(w));
+const _vocDifiere = textLargasVoc.join(' ') !== textLargas.join(' ');
 
 // consulta VAGA (sin ningun producto concreto): preguntar, no escalar
 if (largas.length===0) return JSON.stringify({ encontrados:0, aclarar:true, instruccion:'La consulta NO menciona ningun producto concreto. NO uses [PEDIR_AYUDA] y NO digas que no lo encontraste: preguntale al cliente con calidez QUE producto necesita (nombre del producto, y si aplica la medida o marca).', mensaje:'Consulta sin producto: "' + p_busqueda + '"' });
@@ -511,28 +533,60 @@ function casanDeVerdad(rows, tokens){
   const ok = rows.filter(r => _t.every(w => aliasDe(w).some(a => casaPalabra(a, norm(r.descripcion)))));
   return ok.length ? ok : [];
 }
+// RELAJACION drop-one, factorizada porque la usan las DOS ramas (cliente y diccionario).
+// Reintenta quitando UNA palabra a la vez, soltando primero la MENOS especifica
+// (modificadores/colores/palabras cortas) y NUNCA dejando solo modificadores. Devuelve la
+// primera tanda con resultados y que palabra hubo que ignorar (hay que confesarlo).
+async function relajarDropOne(toks){
+  if (!(toks.length>=2 && toks.length<=6)) return { rows: [], dropped: null };
+  const _esMod = w => MODIFIERS.has(w) || COLOR_STEM[w] || stemColor(w)!==w;
+  // La PRIMERA palabra de contenido es la categoria del producto; soltarla devuelve
+  // cualquier cosa que comparta el adjetivo ("tornillos galvanizados" -> Bushing Galvanizado).
+  // Orden de sacrificio: modificadores -> palabras posteriores mas cortas -> nunca la cabeza.
+  const _rank = (w,i) => (_esMod(w)?0:1000) + (i===0?100000:0) + w.length;
+  const _order = toks.map((_w,_i)=>_i).sort((a,b)=>_rank(toks[a],a)-_rank(toks[b],b));
+  for (const _i of _order){
+    const _sub = toks.filter((_w,_j)=>_j!==_i);
+    if (_sub.every(_esMod)) continue; // no busques dejando solo modificadores
+    const _r = casanDeVerdad(await ilike(_sub, 60), _sub);
+    if (_r.length>0) return { rows: _r, dropped: toks[_i] };
+  }
+  return { rows: [], dropped: null };
+}
 let res = [];
 let _fuzzy = false;
 const isPaintQuery = qTokens.includes('pintura') || /\b(pinturas?|esmalte|esmaltes|satinad\w*|caucho|oleo|anticorrosiv\w*|sellafill|imperflex|impermeabilizante|spray|aerosol)\b/.test(norm(_pb));
 const textLargasSql = isPaintQuery ? textLargas.filter(w => !['exterior','exteriores','interior','interiores','fachada','intemperie','clase','tipo','calidad'].includes(w)) : textLargas;
 if (granelIntent && textLargasSql.length>0) res = casanDeVerdad(await ilike(textLargasSql, 60, GRANEL_OR), textLargasSql);
 if (res.length===0 && textLargasSql.length>0) res = casanDeVerdad(await ilike(textLargasSql, 60), textLargasSql);
-// RELAJACION drop-one: el AND completo fallo -> reintenta quitando UNA palabra a la vez,
-// soltando primero la MENOS especifica (modificadores/colores/palabras cortas) y NUNCA
-// dejando solo modificadores. Se queda con el primer intento que traiga resultados.
+// La rama del cliente agota su cascada ANTES de mirar el diccionario: primero el AND
+// completo, y si falla, la relajacion drop-one.
 let _dropped = null; // palabra que la relajacion tuvo que ignorar (hay que confesarlo)
-if (res.length===0 && textLargas.length>=2 && textLargas.length<=6){
-  const _esMod = w => MODIFIERS.has(w) || COLOR_STEM[w] || stemColor(w)!==w;
-  // La PRIMERA palabra de contenido es la categoria del producto; soltarla devuelve
-  // cualquier cosa que comparta el adjetivo ("tornillos galvanizados" -> Bushing Galvanizado).
-  // Orden de sacrificio: modificadores -> palabras posteriores mas cortas -> nunca la cabeza.
-  const _rank = (w,i) => (_esMod(w)?0:1000) + (i===0?100000:0) + w.length;
-  const _order = textLargas.map((_w,_i)=>_i).sort((a,b)=>_rank(textLargas[a],a)-_rank(textLargas[b],b));
-  for (const _i of _order){
-    const _sub = textLargas.filter((_w,_j)=>_j!==_i);
-    if (_sub.every(_esMod)) continue; // no busques dejando solo modificadores
-    const _r = casanDeVerdad(await ilike(_sub, 60), _sub);
-    if (_r.length>0){ res=_r; _dropped=textLargas[_i]; break; }
+if (res.length===0){
+  const _rel = await relajarDropOne(textLargas);
+  if (_rel.rows.length>0){ res = _rel.rows; _dropped = _rel.dropped; }
+}
+// UNION CON LA RAMA DEL DICCIONARIO. Cuesta una consulta extra y solo corre cuando el
+// diccionario cambio algo de verdad (medido: 19% de las consultas). No se elige entre una
+// rama y otra: se SUMAN los candidatos y decide el ranking, que puntua contra lo que dijo
+// el CLIENTE. Asi los casos que el diccionario rescata siguen entrando ("bombita de agua"
+// -> BOMBA DE AGUA, que sin el traia un FILTRO), y los que arruinaba dejan de perderse
+// porque el producto correcto tambien esta en la lista ("llave de paso economica" ya no
+// queda tapada por "llave bola pvc"). Un canonico malo solo agrega ruido descartable.
+// La rama del diccionario recibe la MISMA relajacion que la del cliente: sin eso "bombita
+// de agua de medio caballo" no recupera la bomba, porque "caballo" no aparece en ninguna
+// descripcion y el AND estricto se va vacio.
+if (_vocDifiere && textLargasVoc.length>0){
+  const _tlv = isPaintQuery ? textLargasVoc.filter(w => !['exterior','exteriores','interior','interiores','fachada','intemperie','clase','tipo','calidad'].includes(w)) : textLargasVoc;
+  if (_tlv.length>0){
+    let _rv = casanDeVerdad(await ilike(_tlv, 60), _tlv);
+    if (_rv.length===0) _rv = (await relajarDropOne(_tlv)).rows;
+    if (_rv.length>0){
+      const _yaEsta = new Set(res.map(p => p.codigo_interno));
+      for (const _p of _rv){
+        if (!_yaEsta.has(_p.codigo_interno)){ _yaEsta.add(_p.codigo_interno); res.push(_p); }
+      }
+    }
   }
 }
 if (res.length===0 && largas.length>0) res = await ilike(largas, 30);
@@ -543,6 +597,9 @@ if (res.length===0){
 }
 if (res.length===0) res = await rpc(termExp);
 if (res.length===0 && termExp!==norm(_pb)) res = await rpc(norm(_pb));
+// El diccionario tambien como ultimo recurso: aqui ya fallo todo lo demas, asi que un
+// canonico aunque sea estrecho es mejor que no devolver nada.
+if (res.length===0 && termExpVoc!==termExp) res = await rpc(termExpVoc);
 // ultimo recurso: busqueda difusa pg_trgm (typos fuertes)
 if (res.length===0){ const _f = await fuzzy(norm(_pb)); if (_f.length>0){ res=_f; _fuzzy=true; } }
 if (aprBoost.length>0) res=[...aprBoost,...res];
