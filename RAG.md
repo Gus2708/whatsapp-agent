@@ -361,17 +361,22 @@ de popularidad fijado para aislarlo.
   `ALIAS`, que se incluye a sí mismo en su lista. Medido: **235 → 238** (gana 5, pierde 2).
   Ojo al factorizar: las dos ramas necesitan la relajación `relajarDropOne`; dándosela solo
   a la del cliente se conservaba 1 de 4 rescates en vez de 3.
-- **PERO el diccionario NO se puede cargar entero todavía — mide antes de arreglar esto.**
-  Paginarlo da **−11 casos** sobre el set de 320 (235 → 224, gana 0 y pierde 11): la
-  truncación estaba protegiendo por accidente. Causa: el LLM generó traducciones de un
-  término genérico del cliente a un **producto específico** que vio en el catálogo, en vez
-  de a una categoría — `pintura en spray → speed max` (una marca), `protector de voltaje →
-  protector regleta tomas usb`, `disco de lija → fibrodisco`, `bomba de agua → motobomba
-  gasolina`. El diccionario no traduce: **estrecha**, y mata a todos los hermanos del
-  producto al que apunta. Medido por cuántos productos casa cada `canonico`: **582 casan 0**
-  (15%), **1.699 casan 1 o 2** (44%), 748 casan 3-10, y solo **810 casan más de 10** (21%,
-  las sanas). Antes de habilitar la paginación hay que filtrar o regenerar la cola mala; un
-  criterio de corte razonable es exigir que el `canonico` case con ≥3 productos.
+- **No pagines el diccionario: cuesta 623 ms por búsqueda y no paga nada.** Medido
+  2026-09-11 con la semántica de unión ya en su sitio: 1.000 → 3.862 términos da **+0 casos**
+  sobre el set de 320, y ni siquiera cambia de caso (gana 0, pierde 0). El coste sí es real:
+  la carga pasa de **143 ms a 766 ms de mediana**, y se paga en CADA invocación del nodo Code
+  porque no hay caché entre mensajes. El camino feliz cuesta ~750 ms, o sea que lo duplica.
+  Solo **40 términos de 3.869 (1%)** llegan a dispararse sobre el set, así que la cola no
+  participa. Si algún día hay evidencia de que sí aporta, la forma barata de traerla entera
+  es **buscar solo los términos relevantes**: generar n-gramas de 1-3 palabras de la consulta
+  y pedirlos con `termino=in.(...)` en un solo round-trip, en vez de bajar la tabla completa.
+- **La calidad del diccionario, por si hace falta filtrarlo algún día**: el LLM generó
+  traducciones de un término genérico a un **producto específico** en vez de a una categoría
+  (`pintura en spray → speed max`, una marca). Por cuántos productos casa cada `canonico`:
+  582 casan 0 (15%), 1.699 casan 1 o 2 (44%), 748 casan 3-10, y solo 810 casan más de 10
+  (21%). Por inflación de atributos (tokens que el canónico añade sobre el término): 2.787
+  conservan (72%), 729 añaden 1, **353 añaden 2+ (9%, la clase que hacía daño)**. Desde que
+  el diccionario suma en vez de reescribir, esta contaminación ya no rompe nada.
 - **El despliegue va en UN SOLO sentido:** `scratch_live/*` → `n8n_workflow.json` → n8n.
   `apply_workflow_hardening.js` hacía lo contrario: leía el workflow vivo, mutaba dos nodos
   y guardaba **eso** encima de `n8n_workflow.json`. El 2026-09-09 revirtió en silencio un
