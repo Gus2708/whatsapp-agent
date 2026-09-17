@@ -172,7 +172,31 @@ const ALIAS = {
   'techolit':       ['techolit','techolits'],
   'acerolit':       ['acerolit','acerolits']
 };
-const aliasDe = w => ALIAS[w] || [w];
+// DEVERBALES: el cliente pide con el VERBO, el catalogo nombra con el SUSTANTIVO.
+// "resina para empalmAR" vs "KIT DE EMPALME DE RESINA": comparten la raiz "empalm" pero
+// difieren en la terminacion, y casaPalabra solo tolera SUFIJOS (token + hasta 2 letras),
+// no cambios de terminacion. Medido en vivo: "empalmar" NO casaba con el producto correcto,
+// asi que el KIT empataba en score (1, solo por "resina") con las resinas acrilicas, y el
+// desempate por ventas lo hundia al ultimo puesto de 4. El cliente estuvo 1h25 sin su
+// producto, que estaba en stock, hasta que adivino el nombre del catalogo.
+//
+// Raiz >= 4 a proposito: con 3 se generan aliases basura de palabras cortas y se reabre el
+// agujero de "pega" dentro de "pegable" que ya costo una pasada en falso. Con >= 4 quedan
+// fuera pegar/lijar/solar (raiz de 3) y entran los que importan:
+//   empalmar -> empalme · cortar -> corte · amarrar -> amarre · taladrar -> taladro
+// Los aliases son ADITIVOS (OR), como el resto del mapa: uno que no casa con nada no resta,
+// solo deja de aportar.
+function deverbales(w){
+  const m = /^(.{4,})(ar|er|ir)$/.exec(w);
+  if (!m) return [];
+  const _r = m[1];
+  // Solo -e y -o, NO -a. Medido sobre los 320: la variante en -a no rescata ningun caso y si
+  // degrada uno — "valvula de PVC de media pa' roscar" caia del puesto 1 al 4, porque
+  // roscar -> "rosca" es ubicuo en el catalogo ("C/ROSCA", "ROSCA HEMBRA") y metia ruido.
+  // Las formas deverbales que este catalogo usa de verdad terminan en -e y -o.
+  return [_r + 'e', _r + 'o'];
+}
+const aliasDe = w => { if (ALIAS[w]) return ALIAS[w]; const _d = deverbales(w); return _d.length ? [w, ..._d] : [w]; };
 const ACCENTS = {
   'fregadero': 'lavaplato','herreria': 'herrería','carbon': 'carbón','cautin': 'cautín','exhibicion': 'exhibición','gavilan': 'gavilán',
   'hidraulico': 'hidráulico','lampara': 'lámpara','periferica': 'periférica','polimero': 'polímero','presion': 'presión',
@@ -562,6 +586,7 @@ if (res.length===0 && textLargasSql.length>0) res = casanDeVerdad(await ilike(te
 // La rama del cliente agota su cascada ANTES de mirar el diccionario: primero el AND
 // completo, y si falla, la relajacion drop-one.
 let _dropped = null; // palabra que la relajacion tuvo que ignorar (hay que confesarlo)
+let _unicaPalabra = null; // si hubo que reducir la consulta a UNA sola palabra, cual fue
 if (res.length===0){
   const _rel = await relajarDropOne(textLargas);
   if (_rel.rows.length>0){ res = _rel.rows; _dropped = _rel.dropped; }
@@ -592,8 +617,24 @@ if (_vocDifiere && textLargasVoc.length>0){
 if (res.length===0 && largas.length>0) res = await ilike(largas, 30);
 if (res.length===0 && largas.length>1) res = await ilike(largas.slice(0,2), 30);
 if (res.length===0){
+  // Ultimo recurso lexico: quedarse con UNA sola palabra, probando de la mas LARGA a la mas
+  // corta. El orden por longitud parece arbitrario y NO lo es: se midieron dos alternativas
+  // sobre el set de 320, el mismo dia y contra el mismo baseline, y las dos son peores.
+  //   · por ORDEN de la consulta (la cabeza primero): 237 -> 232, pierde 5 y no gana ninguno.
+  //     En espanol coloquial la cabeza suele ser el generico o el empaque ("juego de",
+  //     "cajita de", "paño de") y la palabra larga es la especifica ("caladora", "breakers",
+  //     "gamuza"), justo al reves de lo que sugiere el resto del motor.
+  //   · por MENOS resultados (la mas discriminante): premia palabras raras pero vacias de
+  //     contenido; en "cajita para dos breakers" elige "dos" y devuelve un anillo de rosca.
+  // Si algun dia se vuelve a tocar, hay que medirlo igual: la longitud es el campeon actual.
   const _solo = textLargas.filter(w => !MODIFIERS.has(w) && !IGNORED.has(w)).sort((a,b)=>b.length-a.length);
-  for (const _w of _solo){ res = await ilike([_w], 30); if (res.length>0) break; }
+  for (const _w of _solo){
+    res = await ilike([_w], 30);
+    // Responder con 1 de N palabras es la coincidencia mas debil del motor y hay que
+    // confesarlo: SIN esta marca el bot cotizaba con total seguridad las BOMBAS que salieron
+    // de buscar solo "sumergible" a quien pidio resina para empalmar cable.
+    if (res.length>0){ if (_solo.length > 1) _unicaPalabra = _w; break; }
+  }
 }
 if (res.length===0) res = await rpc(termExp);
 if (res.length===0 && termExp!==norm(_pb)) res = await rpc(norm(_pb));
@@ -1131,5 +1172,11 @@ if (_rescate){
 } else if (_dropped){
   _out.parcial = true;
   _out.instruccion = 'OJO: NINGUN producto combina todo lo que pidio el cliente; para poder mostrarte algo tuve que IGNORAR la palabra "' + _dropped + '". Estos resultados son de la categoria correcta pero NO son "' + _dropped + '". PROHIBIDO presentarlos como si lo fueran: muestralos aclarando con honestidad que no tenemos esa variante/linea y preguntale si alguno le sirve. Si te dice que no, responde SOLO con el token [PEDIR_AYUDA].';
+} else if (_unicaPalabra){
+  // Reducir la consulta a UNA palabra es la coincidencia mas debil que devuelve este motor.
+  // Antes salia SIN marca y el bot la cotizaba con total seguridad: asi ofrecio BOMBAS
+  // SUMERGIBLES a quien pidio resina para empalmar cable.
+  _out.parcial = true;
+  _out.instruccion = 'OJO: no encontre nada que combine todo lo que pidio el cliente; estos resultados salen de buscar SOLO la palabra "' + _unicaPalabra + '", ignorando el resto de la consulta. Es la coincidencia mas debil posible. PROHIBIDO presentarlos como si fueran lo que pidio: preguntale con honestidad si alguno le sirve ANTES de cotizar. Si te dice que no, responde SOLO con el token [PEDIR_AYUDA].';
 }
 return JSON.stringify(_out);
