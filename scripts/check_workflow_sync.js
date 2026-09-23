@@ -13,6 +13,7 @@ const wantJs = {
   hacer_presupuesto: read('scratch_live/live_presupuesto.js'),
 };
 const wantSys = read('scratch_live/live_systemMessage.txt');
+const wantSanitize = read('scratch_live/live_sanitize.js').replace(/\n$/, '');
 
 const seen = new Set();
 for (const node of wf.nodes) {
@@ -22,12 +23,20 @@ for (const node of wf.nodes) {
       `n8n_workflow.json node "${p.name}" jsCode drifted from scratch_live`);
     seen.add(p.name);
   }
+  if (node.name === 'Sanitize Agent Output') {
+    assert.strictEqual(p.jsCode, wantSanitize,
+      'Sanitize Agent Output jsCode drifted from scratch_live/live_sanitize.js');
+    seen.add('sanitize');
+  }
   if (node.name === 'AI Agent') {
     assert.strictEqual(p.options && p.options.systemMessage, wantSys,
       'AI Agent systemMessage drifted from scratch_live/live_systemMessage.txt');
+    assert.strictEqual(node.onError, 'continueRegularOutput',
+      'AI Agent perdió onError=continueRegularOutput (blindaje anti-crash)');
     seen.add('sys');
   }
 }
-assert.ok(seen.has('buscar_productos') && seen.has('hacer_presupuesto') && seen.has('sys'),
-  'did not find all 3 expected nodes in n8n_workflow.json');
+assert.ok(
+  seen.has('buscar_productos') && seen.has('hacer_presupuesto') && seen.has('sys') && seen.has('sanitize'),
+  'did not find all 4 expected nodes in n8n_workflow.json');
 console.log('workflow in sync with scratch_live: OK');

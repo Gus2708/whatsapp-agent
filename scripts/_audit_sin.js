@@ -22,7 +22,10 @@
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
-const L = require(path.join(ROOT, 'lib', 'serrucho-search.js'));
+const searchLib = fs.existsSync(path.join(ROOT, 'lib', 'catalog-search.js'))
+  ? 'catalog-search.js'
+  : 'serrucho-search.js';
+const L = require(path.join(ROOT, 'lib', searchLib));
 const norm = L.norm;
 
 const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');

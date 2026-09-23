@@ -85,3 +85,34 @@ test('Láminas de colores para techo', async () => {
   const hasColor = prods.some(p => /Roj[oa]|Azul|Techolit/i.test(p.nombre));
   assert.strictEqual(hasColor, true, 'Debe sugerir láminas de colores');
 });
+
+// FIX-REGRESION-FN (change fix-regresion-fn, R-ALIAS/R-FN/R-TILDES): tabla hermética permanente.
+// La fila central ("lamina de zinc" sin color/perfil) es la regresión del alias: sin la copia
+// defensiva (`let lf = unicos.filter(() => true)` en lugar de `let lf = unicos`), el bloque final
+// (unicos.length = 0; for..of lf) auto-vacía la lista porque lf ES unicos, y la regla devuelve 0.
+// "lamina sinz" ejercita el mismo bug vía wantZinc con typo. La fila con tilde es la probe de
+// Phase C: devuelve > 0 con Phase A sola (norm() quita los acentos del query antes de
+// wantCuadrada), lo que deja Phase C como no adoptada/skipped.
+const REGRESION_LAMINA_TABLE = [
+  { q: 'lamina de zinc', min: 1, label: 'alias regression: sin sub-filtro no debe auto-vaciar (R-ALIAS)' },
+  { q: 'lamina sinz', min: 1, label: 'alias variant: "sinz" dispara wantZinc sin sub-filtro' },
+  { q: 'lamina de zinc azul', exact: 4, all: p => /Azul/i.test(p.nombre), label: 'control azul == 4' },
+  { q: 'lamina de zinc rojo', min: 1, label: 'control rojo' },
+  { q: 'lamina prepintada', min: 1, label: 'control prepintada' },
+  { q: 'lamina arquitectonica 6 metros', min: 1, some: p => /Arquitectonica|7 Canales/i.test(p.nombre), label: 'control cuadrada/arquitectonica' },
+  { q: 'tienes lamina arquitectónicas de las q mide 6 metros x 1 de ancho q presio la tienes', min: 1, label: 'tilde probe (Phase C gate)' },
+];
+
+test('LÁMINA: tabla de regresión de 7 filas (fix-regresion-fn)', async () => {
+  for (const row of REGRESION_LAMINA_TABLE) {
+    const res = await buscar(row.q);
+    const prods = res.productos || [];
+    if (row.exact !== undefined) {
+      assert.strictEqual(res.encontrados, row.exact, `${row.label}: "${row.q}"`);
+    } else {
+      assert.strictEqual(res.encontrados > 0, true, `${row.label}: "${row.q}"`);
+    }
+    if (row.all) assert.ok(prods.every(row.all), `${row.label}: todos los resultados deben cumplir`);
+    if (row.some) assert.ok(prods.some(row.some), `${row.label}: debe incluir el producto esperado`);
+  }
+});

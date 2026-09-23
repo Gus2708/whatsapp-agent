@@ -35,6 +35,34 @@
     "_origen": "lamina_search.test.js: 'lamina techo pvc azul', 'laminas de colores para techo', 'lamina prepintada azul'"
   },
   {
+    "codigo_interno": "LAM-006",
+    "descripcion": "LAMINA ZINC 3.66",
+    "precio_venta": 10.0,
+    "existencia": 15,
+    "_origen": "fix-regresion-fn: 'lamina de zinc' alias regression probe (plain zinc, no color/profile)"
+  },
+  {
+    "codigo_interno": "LAM-007",
+    "descripcion": "LAMINA ZINC ONDULADA AZUL 12 PIES 3.66",
+    "precio_venta": 12.0,
+    "existencia": 7,
+    "_origen": "fix-regresion-fn: azul control count (\"lamina de zinc azul\" == 4)"
+  },
+  {
+    "codigo_interno": "LAM-008",
+    "descripcion": "LAMINA ZINC AZUL 3.66",
+    "precio_venta": 11.0,
+    "existencia": 9,
+    "_origen": "fix-regresion-fn: azul control count (plain azul, non-ondulada)"
+  },
+  {
+    "codigo_interno": "LAM-009",
+    "descripcion": "LAMINA ZINC ONDULADA AZUL 6 MTS",
+    "precio_venta": 19.0,
+    "existencia": 5,
+    "_origen": "fix-regresion-fn: azul control count (6 MTS variant)"
+  },
+  {
     "codigo_interno": "PIN-001",
     "descripcion": "PINTURA SUN DECO CLASE A BLANCO",
     "precio_venta": 22.0,

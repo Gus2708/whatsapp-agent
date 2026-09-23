@@ -172,7 +172,31 @@ const ALIAS = {
   'techolit':       ['techolit','techolits'],
   'acerolit':       ['acerolit','acerolits']
 };
-const aliasDe = w => ALIAS[w] || [w];
+// DEVERBALES: el cliente pide con el VERBO, el catalogo nombra con el SUSTANTIVO.
+// "resina para empalmAR" vs "KIT DE EMPALME DE RESINA": comparten la raiz "empalm" pero
+// difieren en la terminacion, y casaPalabra solo tolera SUFIJOS (token + hasta 2 letras),
+// no cambios de terminacion. Medido en vivo: "empalmar" NO casaba con el producto correcto,
+// asi que el KIT empataba en score (1, solo por "resina") con las resinas acrilicas, y el
+// desempate por ventas lo hundia al ultimo puesto de 4. El cliente estuvo 1h25 sin su
+// producto, que estaba en stock, hasta que adivino el nombre del catalogo.
+//
+// Raiz >= 4 a proposito: con 3 se generan aliases basura de palabras cortas y se reabre el
+// agujero de "pega" dentro de "pegable" que ya costo una pasada en falso. Con >= 4 quedan
+// fuera pegar/lijar/solar (raiz de 3) y entran los que importan:
+//   empalmar -> empalme · cortar -> corte · amarrar -> amarre · taladrar -> taladro
+// Los aliases son ADITIVOS (OR), como el resto del mapa: uno que no casa con nada no resta,
+// solo deja de aportar.
+function deverbales(w){
+  const m = /^(.{4,})(ar|er|ir)$/.exec(w);
+  if (!m) return [];
+  const _r = m[1];
+  // Solo -e y -o, NO -a. Medido sobre los 320: la variante en -a no rescata ningun caso y si
+  // degrada uno — "valvula de PVC de media pa' roscar" caia del puesto 1 al 4, porque
+  // roscar -> "rosca" es ubicuo en el catalogo ("C/ROSCA", "ROSCA HEMBRA") y metia ruido.
+  // Las formas deverbales que este catalogo usa de verdad terminan en -e y -o.
+  return [_r + 'e', _r + 'o'];
+}
+const aliasDe = w => { if (ALIAS[w]) return ALIAS[w]; const _d = deverbales(w); return _d.length ? [w, ..._d] : [w]; };
 const ACCENTS = {
   'fregadero': 'lavaplato','herreria': 'herrería','carbon': 'carbón','cautin': 'cautín','exhibicion': 'exhibición','gavilan': 'gavilán',
   'hidraulico': 'hidráulico','lampara': 'lámpara','periferica': 'periférica','polimero': 'polímero','presion': 'presión',
@@ -354,6 +378,17 @@ const IGNORED = new Set([
   'foto', 'fotos', 'fotico', 'foticos', 'imagen', 'imagenes',
   'cuanto', 'cuesta', 'cuestan', 'vale', 'valen', 'sale', 'salen', 'precio', 'precios', 'presio', 'presios', 'costo', 'como', 'cual', 'cuales', 'cuando', 'quien',
   'color', 'ml', 'pulgada', 'pulgadas', 'pulg', 'pies', 'pie', 'sea', 'sean', 'tenga', 'tengan', 'sirva', 'sirvan',
+  // Unidades que el cliente DICE con todas sus letras y el catalogo escribe abreviadas:
+  // "de 32 milimetros" -> "32MM", "de 450 voltios" -> "450VAC", "de 80 watts" -> "80W".
+  // Si cuentan como palabra de contenido, el ilike exige "milimetro" en la descripcion y el
+  // producto correcto no entra ni a los candidatos; peor aun, el drop-one solo suelta UNA
+  // palabra, asi que una consulta con unidad + un sinonimo fallido ya no se recupera
+  // ("candado dorado Manqui de 32 milimetros" -> el correcto dice LATONADO). El numero se
+  // conserva y lo sigue casando medPresent, que ya entiende las formas abreviadas.
+  // 'metro/metros/mts/pulgada/pies/kilo/kg/ml' ya estaban; estas faltaban.
+  'milimetro', 'milimetros', 'centimetro', 'centimetros', 'mililitro', 'mililitros',
+  'voltio', 'voltios', 'volt', 'volts', 'watt', 'watts', 'vatio', 'vatios',
+  'amperio', 'amperios', 'litro', 'litros', 'gramo', 'gramos', 'libra', 'libras', 'onza', 'onzas',
   'numero', 'numeros', 'nro', 'num',
   'disponible', 'disponibles', 'disponibilidad', 'stock',
   'rollo', 'rollos', 'saco', 'sacos', 'bolsa', 'bolsas', 'unidad', 'unidades', 'pieza', 'piezas', 'kilo', 'kilos', 'kg',
@@ -402,9 +437,26 @@ function aplicarVocabulario(t){
   return norm(t).replace(_vocabRe, (m, pre, term) => pre + (_vocabMap.get(term) || term));
 }
 
+// DOS RAMAS, NO UNA REESCRITURA.
+// El diccionario de catalogo se aplicaba SUSTITUYENDO la consulta: la palabra del cliente
+// se perdia y, si el canonico era malo, nada podia recuperarla. Y muchos canonicos son
+// malos de una forma concreta: no traducen vocabulario, AUTOCOMPLETAN la consulta con
+// atributos que el cliente nunca dijo ("pintura de caucho" -> "pintura caucho impacto mar
+// deco blanco", "apagador de luz" -> "switch doble c/tapa metalica"). Medido sobre el set
+// de 320: el diccionario gana 5 casos y rompe otros 5, y de 3.869 terminos solo 40 llegan
+// a dispararse.
+//
+// Ahora la rama del CLIENTE es la principal y manda en todo lo que decide: tokens de
+// ranking, reglas de negocio (cemento/cabilla/lamina/pintura) y filtros de medida. La rama
+// del diccionario solo se usa para SUMAR candidatos a la recuperacion (ver la union mas
+// abajo), asi que una entrada mala solo puede aportar candidatos que puntuan peor, nunca
+// destruir la consulta. Es la misma semantica aditiva que ya usa ALIAS, que se incluye a
+// si mismo en su lista de alias.
 const _pbv = aplicarVocabulario(_pb);
-const termExp = normMedida(expandir(_pbv));
-const qTokens = tokensDe(expandir(_pbv));
+const termExp = normMedida(expandir(_pb));
+const termExpVoc = normMedida(expandir(_pbv));
+const qTokens = tokensDe(expandir(_pb));
+const qTokensVoc = tokensDe(expandir(_pbv));
 const qTokensRaw = tokensDe(_pb); // SIN sinonimos: para casar contra aprendizaje/negativa guardados
 const qRawSet = new Set(qTokensRaw);
 // Un "0" suelto no es una medida: no dice nada del producto, pero casa con "AL 0%" y hacia
@@ -413,6 +465,11 @@ const qRawSet = new Set(qTokensRaw);
 const largas = qTokens.filter(w => (w.length>=3 || /\d/.test(w)) && w !== '0');
 const textLargas = largas.filter(w => !/\d/.test(w));
 const medLargas = largas.filter(w => /\d/.test(w));
+// Misma derivacion para la rama del diccionario: solo alimenta la union de candidatos.
+const textLargasVoc = qTokensVoc
+  .filter(w => (w.length>=3 || /\d/.test(w)) && w !== '0')
+  .filter(w => !/\d/.test(w));
+const _vocDifiere = textLargasVoc.join(' ') !== textLargas.join(' ');
 
 // consulta VAGA (sin ningun producto concreto): preguntar, no escalar
 if (largas.length===0) return JSON.stringify({ encontrados:0, aclarar:true, instruccion:'La consulta NO menciona ningun producto concreto. NO uses [PEDIR_AYUDA] y NO digas que no lo encontraste: preguntale al cliente con calidez QUE producto necesita (nombre del producto, y si aplica la medida o marca).', mensaje:'Consulta sin producto: "' + p_busqueda + '"' });
@@ -500,38 +557,90 @@ function casanDeVerdad(rows, tokens){
   const ok = rows.filter(r => _t.every(w => aliasDe(w).some(a => casaPalabra(a, norm(r.descripcion)))));
   return ok.length ? ok : [];
 }
+// RELAJACION drop-one, factorizada porque la usan las DOS ramas (cliente y diccionario).
+// Reintenta quitando UNA palabra a la vez, soltando primero la MENOS especifica
+// (modificadores/colores/palabras cortas) y NUNCA dejando solo modificadores. Devuelve la
+// primera tanda con resultados y que palabra hubo que ignorar (hay que confesarlo).
+async function relajarDropOne(toks){
+  if (!(toks.length>=2 && toks.length<=6)) return { rows: [], dropped: null };
+  const _esMod = w => MODIFIERS.has(w) || COLOR_STEM[w] || stemColor(w)!==w;
+  // La PRIMERA palabra de contenido es la categoria del producto; soltarla devuelve
+  // cualquier cosa que comparta el adjetivo ("tornillos galvanizados" -> Bushing Galvanizado).
+  // Orden de sacrificio: modificadores -> palabras posteriores mas cortas -> nunca la cabeza.
+  const _rank = (w,i) => (_esMod(w)?0:1000) + (i===0?100000:0) + w.length;
+  const _order = toks.map((_w,_i)=>_i).sort((a,b)=>_rank(toks[a],a)-_rank(toks[b],b));
+  for (const _i of _order){
+    const _sub = toks.filter((_w,_j)=>_j!==_i);
+    if (_sub.every(_esMod)) continue; // no busques dejando solo modificadores
+    const _r = casanDeVerdad(await ilike(_sub, 60), _sub);
+    if (_r.length>0) return { rows: _r, dropped: toks[_i] };
+  }
+  return { rows: [], dropped: null };
+}
 let res = [];
 let _fuzzy = false;
 const isPaintQuery = qTokens.includes('pintura') || /\b(pinturas?|esmalte|esmaltes|satinad\w*|caucho|oleo|anticorrosiv\w*|sellafill|imperflex|impermeabilizante|spray|aerosol)\b/.test(norm(_pb));
 const textLargasSql = isPaintQuery ? textLargas.filter(w => !['exterior','exteriores','interior','interiores','fachada','intemperie','clase','tipo','calidad'].includes(w)) : textLargas;
 if (granelIntent && textLargasSql.length>0) res = casanDeVerdad(await ilike(textLargasSql, 60, GRANEL_OR), textLargasSql);
 if (res.length===0 && textLargasSql.length>0) res = casanDeVerdad(await ilike(textLargasSql, 60), textLargasSql);
-// RELAJACION drop-one: el AND completo fallo -> reintenta quitando UNA palabra a la vez,
-// soltando primero la MENOS especifica (modificadores/colores/palabras cortas) y NUNCA
-// dejando solo modificadores. Se queda con el primer intento que traiga resultados.
+// La rama del cliente agota su cascada ANTES de mirar el diccionario: primero el AND
+// completo, y si falla, la relajacion drop-one.
 let _dropped = null; // palabra que la relajacion tuvo que ignorar (hay que confesarlo)
-if (res.length===0 && textLargas.length>=2 && textLargas.length<=6){
-  const _esMod = w => MODIFIERS.has(w) || COLOR_STEM[w] || stemColor(w)!==w;
-  // La PRIMERA palabra de contenido es la categoria del producto; soltarla devuelve
-  // cualquier cosa que comparta el adjetivo ("tornillos galvanizados" -> Bushing Galvanizado).
-  // Orden de sacrificio: modificadores -> palabras posteriores mas cortas -> nunca la cabeza.
-  const _rank = (w,i) => (_esMod(w)?0:1000) + (i===0?100000:0) + w.length;
-  const _order = textLargas.map((_w,_i)=>_i).sort((a,b)=>_rank(textLargas[a],a)-_rank(textLargas[b],b));
-  for (const _i of _order){
-    const _sub = textLargas.filter((_w,_j)=>_j!==_i);
-    if (_sub.every(_esMod)) continue; // no busques dejando solo modificadores
-    const _r = casanDeVerdad(await ilike(_sub, 60), _sub);
-    if (_r.length>0){ res=_r; _dropped=textLargas[_i]; break; }
+let _unicaPalabra = null; // si hubo que reducir la consulta a UNA sola palabra, cual fue
+if (res.length===0){
+  const _rel = await relajarDropOne(textLargas);
+  if (_rel.rows.length>0){ res = _rel.rows; _dropped = _rel.dropped; }
+}
+// UNION CON LA RAMA DEL DICCIONARIO. Cuesta una consulta extra y solo corre cuando el
+// diccionario cambio algo de verdad (medido: 19% de las consultas). No se elige entre una
+// rama y otra: se SUMAN los candidatos y decide el ranking, que puntua contra lo que dijo
+// el CLIENTE. Asi los casos que el diccionario rescata siguen entrando ("bombita de agua"
+// -> BOMBA DE AGUA, que sin el traia un FILTRO), y los que arruinaba dejan de perderse
+// porque el producto correcto tambien esta en la lista ("llave de paso economica" ya no
+// queda tapada por "llave bola pvc"). Un canonico malo solo agrega ruido descartable.
+// La rama del diccionario recibe la MISMA relajacion que la del cliente: sin eso "bombita
+// de agua de medio caballo" no recupera la bomba, porque "caballo" no aparece en ninguna
+// descripcion y el AND estricto se va vacio.
+if (_vocDifiere && textLargasVoc.length>0){
+  const _tlv = isPaintQuery ? textLargasVoc.filter(w => !['exterior','exteriores','interior','interiores','fachada','intemperie','clase','tipo','calidad'].includes(w)) : textLargasVoc;
+  if (_tlv.length>0){
+    let _rv = casanDeVerdad(await ilike(_tlv, 60), _tlv);
+    if (_rv.length===0) _rv = (await relajarDropOne(_tlv)).rows;
+    if (_rv.length>0){
+      const _yaEsta = new Set(res.map(p => p.codigo_interno));
+      for (const _p of _rv){
+        if (!_yaEsta.has(_p.codigo_interno)){ _yaEsta.add(_p.codigo_interno); res.push(_p); }
+      }
+    }
   }
 }
 if (res.length===0 && largas.length>0) res = await ilike(largas, 30);
 if (res.length===0 && largas.length>1) res = await ilike(largas.slice(0,2), 30);
 if (res.length===0){
+  // Ultimo recurso lexico: quedarse con UNA sola palabra, probando de la mas LARGA a la mas
+  // corta. El orden por longitud parece arbitrario y NO lo es: se midieron dos alternativas
+  // sobre el set de 320, el mismo dia y contra el mismo baseline, y las dos son peores.
+  //   · por ORDEN de la consulta (la cabeza primero): 237 -> 232, pierde 5 y no gana ninguno.
+  //     En espanol coloquial la cabeza suele ser el generico o el empaque ("juego de",
+  //     "cajita de", "paño de") y la palabra larga es la especifica ("caladora", "breakers",
+  //     "gamuza"), justo al reves de lo que sugiere el resto del motor.
+  //   · por MENOS resultados (la mas discriminante): premia palabras raras pero vacias de
+  //     contenido; en "cajita para dos breakers" elige "dos" y devuelve un anillo de rosca.
+  // Si algun dia se vuelve a tocar, hay que medirlo igual: la longitud es el campeon actual.
   const _solo = textLargas.filter(w => !MODIFIERS.has(w) && !IGNORED.has(w)).sort((a,b)=>b.length-a.length);
-  for (const _w of _solo){ res = await ilike([_w], 30); if (res.length>0) break; }
+  for (const _w of _solo){
+    res = await ilike([_w], 30);
+    // Responder con 1 de N palabras es la coincidencia mas debil del motor y hay que
+    // confesarlo: SIN esta marca el bot cotizaba con total seguridad las BOMBAS que salieron
+    // de buscar solo "sumergible" a quien pidio resina para empalmar cable.
+    if (res.length>0){ if (_solo.length > 1) _unicaPalabra = _w; break; }
+  }
 }
 if (res.length===0) res = await rpc(termExp);
 if (res.length===0 && termExp!==norm(_pb)) res = await rpc(norm(_pb));
+// El diccionario tambien como ultimo recurso: aqui ya fallo todo lo demas, asi que un
+// canonico aunque sea estrecho es mejor que no devolver nada.
+if (res.length===0 && termExpVoc!==termExp) res = await rpc(termExpVoc);
 // ultimo recurso: busqueda difusa pg_trgm (typos fuertes)
 if (res.length===0){ const _f = await fuzzy(norm(_pb)); if (_f.length>0){ res=_f; _fuzzy=true; } }
 if (aprBoost.length>0) res=[...aprBoost,...res];
@@ -584,8 +693,21 @@ async function rescateSemantico(){
 async function buscarVectorial(_codLex){
   const _k = (typeof $env !== 'undefined' && $env && $env.OPENAI_API_KEY) || '';
   if (!_k) return { filas: [], simLex: null };
+  // Endpoint override (A-local): OPENAI_API_BASE re-apunta el POST de embeddings
+  // (p.ej. a OpenRouter). Ausente o vacio -> default OpenAI. No cambia modelo ni dims.
+  const _baseRaw = (typeof $env !== 'undefined' && $env && $env.OPENAI_API_BASE) || '';
+  const _base = _baseRaw || 'https://api.openai.com/v1';
+  // Guardia de credencial: una clave que NO es de OpenAI (p.ej. OpenRouter, "sk-or-...")
+  // nunca debe viajar a api.openai.com. Sin un OPENAI_API_BASE que la redirija al emisor
+  // correcto se omite la capa vectorial: la busqueda lexica sigue igual y el secreto no
+  // se filtra a un tercero. Medido 2026-09-08: produccion mandaba una clave sk-or-v1 al
+  // endpoint de OpenAI en cada rescate (401 -> vector muerto en silencio + fuga).
+  if (!_baseRaw && /^sk-or-/i.test(_k)) {
+    console.warn('[vectorial] clave no-OpenAI sin OPENAI_API_BASE: se omite la capa vectorial');
+    return { filas: [], simLex: null };
+  }
   try {
-    const _e = await axios.post('https://api.openai.com/v1/embeddings',
+    const _e = await axios.post(_base + '/embeddings',
       { model: 'text-embedding-3-small', input: String(p_busqueda).slice(0, 500), dimensions: 1536 },
       { headers: { Authorization: 'Bearer ' + _k, 'Content-Type': 'application/json' }, timeout: 9000 });
     const _v = _e.data && _e.data.data && _e.data.data[0] && _e.data.data[0].embedding;
@@ -609,8 +731,17 @@ async function buscarVectorial(_codLex){
   } catch (e) { console.warn('[vectorial] fallo:', e.message); return { filas: [], simLex: null }; }
 }
 // Por debajo de esto, lo que trajo la busqueda lexica no tiene que ver con lo que pidio el
-// cliente. Medido: acierta 0.606; se equivoca 0.443 y 0.399.
-const UMBRAL_LEXICO_FIABLE = 0.52;
+// cliente. Medido en vivo: acierta 0.606; se equivoca 0.443, 0.399 y 0.5246
+// ("tapa para el bano" -> "Tapa P/toma 270": la puntuacion quedaba un pelo sobre el corte
+// viejo de 0.52 y el secuestro por palabra incidental no se rescataba).
+// OJO: el gate A/B de este 0.55 y de la regla A3 salio RECHAZADO (gap 4,1 < 5). Siguen
+// aqui porque son INALCANZABLES: ambas constantes solo se leen dentro del bloque
+// `if (_falta)` de rescate vectorial, y adoptar exige `_vec.length > 0`. Con la capa
+// vectorial apagada nunca se evaluan. Definir OPENAI_API_BASE las despierta a las dos de
+// golpe sin pasar por ningun gate: volver a medir el A/B antes de encender el vector.
+const UMBRAL_LEXICO_FIABLE = 0.55;
+// A3 (hibrido): similitud minima para confiar en el vector cuando reemplaza a la categoria.
+const UMBRAL_VECTOR_ADOPTAR = 0.55;
 
 if (res.length===0){
   if (await esNoVendido()) return NO_VENDIDO_JSON();
@@ -668,12 +799,17 @@ if (!_rescate && res.length > 0){
     const _vr = await buscarVectorial(res[0].codigo_interno);
     const _vec = _vr.filas;
     const _vcat = _vec.length ? norm(_vec[0].descripcion || '').split(' ')[0] : '';
-    // Se adopta el vector solo si lo LEXICO se equivoco, medido semanticamente. Si simLex
-    // no se pudo calcular, se cae a la regla anterior (categoria distinta) para no quedarse
-    // sin criterio. "disco de corte" sobrevive porque su lexico puntua 0.606: acerto.
-    const _lexFalla = _vr.simLex !== null ? (_vr.simLex < UMBRAL_LEXICO_FIABLE)
-                                          : (_vcat !== _d0.split(' ')[0]);
-    if (_vec.length > 0 && _lexFalla){
+    // A3 (hibrido): dos ramas independientes de adopcion.
+    //  1) simLex medido y por debajo de 0.55 -> el lexico se equivoco, se adopta.
+    //  2) la categoria del vector difiere Y su similitud la respalda (>= 0.55) -> se
+    //     adopta AUNQUE simLex sea alto o nulo. Esta es la rama que recupera los ~+7
+    //     casos de categoria (ver tabla de verdad (c) y (e) en probes_hibrida.test.js);
+    //     no esta condicionada a simLex === null.
+    // "disco de corte" sobrevive porque su vector no cambia de categoria, no por su simLex.
+    const _lexFalla = _vr.simLex !== null && _vr.simLex < UMBRAL_LEXICO_FIABLE;
+    const _catDiff = _vcat !== _d0.split(' ')[0];
+    const _vecFiable = _vec.length > 0 && Number(_vec[0].similitud) >= UMBRAL_VECTOR_ADOPTAR;
+    if (_vec.length > 0 && (_lexFalla || (_catDiff && _vecFiable))){
       res = _vec;
       _rescate = { categoria: _vcat, termino: '', confianza: 4 };
     }
@@ -856,7 +992,7 @@ for(const p of res){ if(!seen.has(p.codigo_interno)){ seen.add(p.codigo_interno)
     const _esOndulada = d => /\b(ONDULAD\w*|ONDU\b|OND\b|CANAL\s+REDOND\w*|TECHOLIT|ACEROLIT)\b/i.test(d) || /\bPVC.*OND/i.test(d);
     const _esCuadrada = d => /\b(CUADRAD\w*|CUAD\b|CANAL\s+CUADRAD\w*|ARQUITECTONICA|7\s*CANALES?|PERFIL\s+MCHO|CUAD\s+MACHO)\b/i.test(d);
 
-    let lf = unicos;
+    let lf = unicos.filter(() => true);
 
     if (wantTecholit) {
       const ft = lf.filter(p => /\bTECHOLIT\b/i.test(p.descripcion));
@@ -1036,5 +1172,11 @@ if (_rescate){
 } else if (_dropped){
   _out.parcial = true;
   _out.instruccion = 'OJO: NINGUN producto combina todo lo que pidio el cliente; para poder mostrarte algo tuve que IGNORAR la palabra "' + _dropped + '". Estos resultados son de la categoria correcta pero NO son "' + _dropped + '". PROHIBIDO presentarlos como si lo fueran: muestralos aclarando con honestidad que no tenemos esa variante/linea y preguntale si alguno le sirve. Si te dice que no, responde SOLO con el token [PEDIR_AYUDA].';
+} else if (_unicaPalabra){
+  // Reducir la consulta a UNA palabra es la coincidencia mas debil que devuelve este motor.
+  // Antes salia SIN marca y el bot la cotizaba con total seguridad: asi ofrecio BOMBAS
+  // SUMERGIBLES a quien pidio resina para empalmar cable.
+  _out.parcial = true;
+  _out.instruccion = 'OJO: no encontre nada que combine todo lo que pidio el cliente; estos resultados salen de buscar SOLO la palabra "' + _unicaPalabra + '", ignorando el resto de la consulta. Es la coincidencia mas debil posible. PROHIBIDO presentarlos como si fueran lo que pidio: preguntale con honestidad si alguno le sirve ANTES de cotizar. Si te dice que no, responde SOLO con el token [PEDIR_AYUDA].';
 }
 return JSON.stringify(_out);

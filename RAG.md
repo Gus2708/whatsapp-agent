@@ -1,4 +1,4 @@
-# Pipeline RAG — Cómo el Agente Encuentra un Producto
+# RAG del Agente de Ventas — cómo encuentra un producto
 
 Documento de referencia para **investigar mejoras**. No describe lo que se quiso construir,
 sino lo que hay, con los números que lo respaldan y los caminos que se probaron y no
@@ -52,7 +52,7 @@ Y una señal transversal que **reordena** el resultado de cualquier capa:
 
 | Tabla | Filas | Qué guarda | Quién la mantiene |
 | :--- | ---: | :--- | :--- |
-| `productos` | 7.650 | Catálogo, sincronizado desde ERP / Base de Datos | backend de sincronización |
+| `productos` | 7.650 | Catálogo, sincronizado desde HybridLite | backend POS / ERP |
 | `catalogo_vocabulario` | 3.495 | `termino → canonico` coloquial | `generar_vocabulario.js` |
 | `catalogo_vocab_categorias` | ~710 | Hash md5 **por categoría** | idem |
 | `productos_embedding` | 7.650 | `vector(1536)` + HNSW coseno | `generar_embeddings.js` |
@@ -114,15 +114,46 @@ Vocabulario y ranking por ventas **sí se mantienen solos**, incrementales por h
 | + embeddings v2 (texto enriquecido) | 75,9% | 6,6% |
 | + ranking por ventas | 76,9% | 6,6% |
 | + descripciones (v3) | **76,9%** | **6,3%** |
+| + intento 4 de plan 006 (`0c31b52`) — **medición 2026-09-07** | 72,2% | 9,7% |
+| + A3 adopción híbrida + recalibración — **medición 2026-09-08** (vec-new, override local OpenRouter) | 76,3% (244) | 7,2% (23) |
+
+> ⚠️ **Dos mediciones que no hay que confundir (corrección de atribución):**
+>
+> 1. **2026-09-07** — el intento 4 (`0c31b52`) dio **72,2% en AMBOS lados** (vec y sinvec,
+>    gap 0). Hoy sabemos que esa corrida corrió el camino **frío**: la clave de OpenAI estaba
+>    vacía y el egress está geo-bloqueado por OpenAI; sin vector vivo, ambos lados ejecutan el
+>    mismo código léxico → gap 0 idéntico. Ese A/B **NO prueba** "la capa vectorial no aporta
+>    tras el intento 4"; solo prueba que se midió sin vector. El +7 histórico quedaba sin
+>    explicación, y el veredicto REJECTED de aquel día se basaba en una medición vector-OFF.
+> 2. **2026-09-08** (cambio `rrf-reintento`, A3 + umbral recalibrado + override local
+>    `OPENAI_API_BASE`→OpenRouter): **vec-new 244 (76,3%) vs sinvec-new 231 (72,2%) → gap
+>    4,1 pts < 5 → REJECTED**, pero ahora con el vector **vivo**: **+13 aciertos reales
+>    atribuibles a la capa vectorial** (244 vs 231), calibró el umbral con el datapoint vivo
+>    (simLex "tapa" = 0.5246 → `UMBRAL_LEXICO_FIABLE` 0.52→**0.55**).
+>
+> Fase 4 (Phase C): la caída 246→231 **no se reproduce caliente** en el código — las 4
+> corridas A/B calientes de `b439c4a` y `c33e0b0` (before/after, cuerpos portados) dieron
+> todas **243/320, after==before** → ambos sospechosos **inocentes**. La caída queda como
+> deuda de investigación de causa externa (reconstrucción nocturna de popularidad/vocabulario
+> o entorno). El gate sigue < 5 → el RRF queda diferido (ver §7).
 
 ### Aporte aislado de la capa vectorial (A/B sobre el mismo set)
 
 | | Recall | Fallos |
 | :--- | ---: | ---: |
-| Con vector | 246 (76,9%) | 20 (6,3%) |
-| Sin vector (control) | 239 (74,7%) | 24 (7,5%) |
+| Con vector (histórico) | 246 (76,9%) | 20 (6,3%) |
+| Sin vector (control, histórico) | 239 (74,7%) | 24 (7,5%) |
+| Con vector — 2026-09-07 (vec, frío: sin clave/egress bloqueado) | 231 (72,2%) | 31 (9,7%) |
+| Sin vector — 2026-09-07 (sinvec, frío) | 231 (72,2%) | 31 (9,7%) |
+| Con vector + A3 — 2026-09-08 (vec-new, vivo) | **244 (76,3%)** | 23 (7,2%) |
+| Sin vector — 2026-09-08 (sinvec-new) | 231 (72,2%) | 31 (9,7%) |
 
-**+7 aciertos atribuibles al vector.**
+**Corrección de atribución (2026-09-08)**: el "+7 aciertos del vector" histórico se confirmó
+y amplió con medición caliente real: **+13 aciertos** (244 vs 231, buckets 133/171 · 15/26 ·
+96/123 vs 124/171 · 14/26 · 93/123). La medición del 2026-09-07 (gap 0) fue **sin vector**
+(clave vacía + egress geo-bloqueado por OpenAI), no un efecto de `0c31b52` sobre la capa
+vectorial. El gate A/B **sigue REJECTED** (4,1 pts < 5): el aporte es real pero no cruza la
+barra de adopción → sin deploy; RRF diferido (ver §7).
 
 ### Margen señal/ruido — la métrica que decide
 
@@ -236,6 +267,28 @@ node scripts/_test_fallos_reales.js --prod      # consultas que de verdad escala
 6. **El set de 320 muestrea AL AZAR**, inventario muerto incluido, así que **subestima el
    ranking por ventas**. Un cambio puede bajar ese número y aun así ser correcto para el
    negocio.
+7. **No confundir una corrida sin vector con una prueba de que el vector no aporta.**
+   OpenAI geo-bloquea este egress (`Country, region, or territory not supported`) y la clave
+   puede estar vacía sin que el harness proteste: un A/B con gap 0 puede ser «medí sin vector
+   dos veces» (exactamente lo que pasó el 2026-09-07, ver §3). Para medir caliente desde acá
+   hay que apuntar el override local `OPENAI_API_BASE=https://openrouter.ai/api/v1` con
+   `OPENAI_API_KEY` de OpenRouter (embedding `text-embedding-3-small`, dims 1536 compatible).
+   El override es **local y de dev**: el cuerpo desplegado en n8n no lleva esa línea (deploy
+   empuja solo el cuerpo, nunca `.env`).
+8. **Los 2 FN históricos de LÁMINA quedaron resueltos por `fix-regresion-fn` (2026-09-08).**
+   El baseline pre-cambio (`b1e8823`, medido 2026-09-08) tenía `#11 "Que precio este tipo de
+   sinz de 6 metros"` y `#28 "lamina de zinc"` como FALSO-NEGATIVO (0 resultados) por un
+   alias de array en la regla LÁMINA (`let lf = unicos`): sin sub-filtro que reasignara
+   `lf`, el bloque final (líneas 907-909) vaciaba `unicos` y la regla devolvía 0 — no era
+   la capa léxica sino el idiom del array. Con la copia defensiva
+   (`unicos.filter(() => true)`, mismo idioma que CEMENTO/CABILLA/PINTURA) la regresión de
+   86 casos mide **FN 2→0** y #28 queda sin flags. #11 conserva `🟡 parcial` (no era FN: ver
+   §7): la medida ("6" en `medLargas`) y el ranking por existencia mandan mallas/alambrón
+   a top-4 — deuda de la capa de medidas/ranking, distinta del alias y fuera del alcance de
+   `fix-regresion-fn`. El criterio operativo **no introducir FN nuevos** sigue vigente.
+   **Phase C (tildes) NO se adoptó**: la probe live "tienes lamina arquitectónicas…" dio
+   4 encontrados estrechando a arquitectónica/canal cuadrado con Fase A sola — `norm()`
+   quita los acentos del query antes de `wantCuadrada`, así que las tildes no rompen nada.
 
 ---
 
@@ -243,18 +296,41 @@ node scripts/_test_fallos_reales.js --prod      # consultas que de verdad escala
 
 **En orden de retorno esperado:**
 
-1. **Fusión híbrida RRF** — la mayor pendiente. Hoy el vector **reemplaza** lo léxico
-   (`res = _vec`) en vez de combinarse: es todo-o-nada, y un producto que sale 3º en léxico y
-   2º en vector no sube por consenso. Plan completo en
+1. **Fusión híbrida RRF — DIFERIDA** (medición 2026-09-08: gate 4,1 pts < 5 tras A3). Hoy el
+   vector **reemplaza** lo léxico (`res = _vec`) en vez de combinarse: es todo-o-nada, y un
+   producto que sale 3º en léxico y 2º en vector no sube por consenso. **Prerrequisito
+   obligatorio antes de reintentar: dedupe por familia de productos** (el RRF mezcla rank
+   posiciones; sin dedupe, las familias con muchas variantes — láminas, tubos, cementos —
+   saturan los top-N y el recall medido se degrada). Solo tiene sentido si un gate ≥ 5 lo
+   habilita; con el gate < 5 correr RRF es medir un cambio no habilitado. Plan en
    [`plans/006-fusion-hibrida-rrf.md`](plans/006-fusion-hibrida-rrf.md).
-2. **Auditar el resto de `SIN`** — `_audit_sin.js` marcó **21 entradas «a revisar»** que
+2. **[RESUELTO] Cerrar los 2 FN de LÁMINA** (`fix-regresion-fn`, 2026-09-08) — la causa
+   era un alias de array en la regla LÁMINA (`let lf = unicos`, línea 867): sin sub-filtro
+   que reasignara `lf`, el bloque final vaciaba `unicos` y devolvía 0. Con la copia
+   defensiva `.filter(() => true)` la regresión mide **FN 2→0** (#28 sin flags; #11 pasa de
+   FALSO-NEGATIVO a `🟡 parcial`). **Queda pendiente el `parcial` de #11**: "sinz de 6
+   metros" devuelve top-4 de mallas/alambrón porque el filtro de medida ("6" en
+   `medLargas`) + ranking por existencia ganan a la lámina de zinc de 6 mts. Deuda de la
+   capa de medidas/ranking (no del alias), fuera del alcance de `fix-regresion-fn`; atacar
+   con un sub-filtro de material zinc (`wantZinc`, hoy calculado y sin uso) o con el filtro
+   de medida más estricto. *(Archive 2026-09-09: ciclo SDD de `fix-regresion-fn` cerrado con
+   PASS WITH WARNINGS, FN 0 doblemente confirmado; la deuda del `parcial` de #11 sigue
+   siendo esta entrada.)*
+3. **Auditar el resto de `SIN`** — `_audit_sin.js` marcó **21 entradas «a revisar»** que
    nadie ha mirado. Las 5 «dañinas» ya se corrigieron y cada una valía aciertos reales.
-3. **Presupuesto sobre listas largas** — es menos preciso que la búsqueda suelta, y ahí están
+4. **Presupuesto sobre listas largas** — es menos preciso que la búsqueda suelta, y ahí están
    los pedidos grandes. `SIN` exige subcadena **contigua**, así que `tubo electrico →
    tubo electricidad` no aplica a «tubo **pvc** electrico».
-4. **Muestreo del harness ponderado por ventas** — cambio de metodología, no de código.
-5. **Modelo de embeddings** — nunca se probó `text-embedding-3-large` ni otras dimensiones.
+5. **Muestreo del harness ponderado por ventas** — cambio de metodología, no de código.
+6. **Modelo de embeddings** — nunca se probó `text-embedding-3-large` ni otras dimensiones.
    Barato de probar, y el margen dirá enseguida si aporta.
+
+**Investigación abierta (deuda, no urgente)**: la caída 246→231 del recall histórico **no se
+reproduce caliente** en el código (Phase C: `b439c4a` y `c33e0b0` inocentes, 4 corridas
+243/320 with after==before). Sospecha principal: la reconstrucción nocturna de
+`producto_popularidad` y `catalogo_vocabulario` (workflow cron 3:00) cambia rankings y
+equivalencias entre mediciones sin tocar una línea de código — hay que medir con el snapshot
+de popularidad fijado para aislarlo.
 
 **Probablemente NO valga la pena** (evidencia en §5): enriquecer más el texto embebido.
 
@@ -273,3 +349,56 @@ node scripts/_test_fallos_reales.js --prod      # consultas que de verdad escala
 - **Cadena de despliegue:** `lib/catalog-search.js` → `scratch_live/*` → `scripts/new_*.js`
   → `n8n_workflow.json` → n8n. Desplegar con `deploy_nodos.js` y cerrar siempre con
   `npm test` (los guards detectan drift entre las copias).
+- **PostgREST corta en 1000 filas EN SILENCIO.** `?...&limit=20000` no levanta el `max-rows`
+  del servidor: devuelve 1000 filas y un `200 OK`, sin error ni warning. El diccionario de
+  catálogo (`catalogo_vocabulario`, 3.839 términos activos) llevaba cargando **1.000 (26%)**
+  y nadie podía enterarse. Para traer todo hay que paginar con `Range` hasta agotar.
+- **El diccionario ya NO reescribe la consulta (2026-09-11).** Se aplicaba con `String.replace`:
+  la palabra del cliente se perdía y, si el canónico era malo, nada podía recuperarla. Ahora
+  hay **dos ramas**: la del cliente manda en ranking, reglas de negocio y filtros de medida;
+  la del diccionario solo **suma candidatos** a la recuperación, y decide el ranking. Un
+  canónico malo solo puede aportar ruido descartable. Es la semántica aditiva que ya usaba
+  `ALIAS`, que se incluye a sí mismo en su lista. Medido: **235 → 238** (gana 5, pierde 2).
+  Ojo al factorizar: las dos ramas necesitan la relajación `relajarDropOne`; dándosela solo
+  a la del cliente se conservaba 1 de 4 rescates en vez de 3.
+- **No pagines el diccionario: cuesta 623 ms por búsqueda y no paga nada.** Medido
+  2026-09-11 con la semántica de unión ya en su sitio: 1.000 → 3.862 términos da **+0 casos**
+  sobre el set de 320, y ni siquiera cambia de caso (gana 0, pierde 0). El coste sí es real:
+  la carga pasa de **143 ms a 766 ms de mediana**, y se paga en CADA invocación del nodo Code
+  porque no hay caché entre mensajes. El camino feliz cuesta ~750 ms, o sea que lo duplica.
+  Solo **40 términos de 3.869 (1%)** llegan a dispararse sobre el set, así que la cola no
+  participa. Si algún día hay evidencia de que sí aporta, la forma barata de traerla entera
+  es **buscar solo los términos relevantes**: generar n-gramas de 1-3 palabras de la consulta
+  y pedirlos con `termino=in.(...)` en un solo round-trip, en vez de bajar la tabla completa.
+- **La calidad del diccionario, por si hace falta filtrarlo algún día**: el LLM generó
+  traducciones de un término genérico a un **producto específico** en vez de a una categoría
+  (`pintura en spray → speed max`, una marca). Por cuántos productos casa cada `canonico`:
+  582 casan 0 (15%), 1.699 casan 1 o 2 (44%), 748 casan 3-10, y solo 810 casan más de 10
+  (21%). Por inflación de atributos (tokens que el canónico añade sobre el término): 2.787
+  conservan (72%), 729 añaden 1, **353 añaden 2+ (9%, la clase que hacía daño)**. Desde que
+  el diccionario suma en vez de reescribir, esta contaminación ya no rompe nada.
+- **El despliegue va en UN SOLO sentido:** `scratch_live/*` → `n8n_workflow.json` → n8n.
+  `apply_workflow_hardening.js` hacía lo contrario: leía el workflow vivo, mutaba dos nodos
+  y guardaba **eso** encima de `n8n_workflow.json`. El 2026-09-09 revirtió en silencio un
+  matcher ya montado (guardia de credencial + fix de LÁMINA) mientras desplegaba solo el
+  nodo Sanitize, y ninguna guarda lo detectó porque el archivo quedó coherente consigo
+  mismo. Ahora el script publica el archivo canónico, exige que la guarda de sync pase
+  antes de tocar nada y **nunca escribe** `n8n_workflow.json`.
+- **`n8n_workflow.json` NO es el estado desplegado.** Es un artefacto de staging: un
+  resync escribe el archivo pero no publica nada. La única fuente de verdad de producción
+  es `GET http://localhost:5678/api/v1/workflows/<id>`. El 2026-09-09 auditamos los tres
+  niveles y el vivo iba tres cambios por detrás del archivo (sin A3, sin el umbral 0.55 y
+  **sin el fix de LÁMINA** que su ciclo SDD ya había archivado como *done*). Un ciclo que
+  cierra sin desplegar deja la corrección solo en el repo.
+- **A3 y `UMBRAL_LEXICO_FIABLE = 0.55` están DORMIDOS, no adoptados.** Su gate A/B salió
+  **REJECTED** (gap 4,1 < 5). Siguen en el código porque son inalcanzables: ambas
+  constantes se leen **solo** dentro del bloque `if (_falta)` de rescate vectorial, y la
+  adopción exige `_vec.length > 0`. Con la capa vectorial apagada nunca se evalúan.
+  ⚠️ **Poner `OPENAI_API_BASE` los despierta a los dos de golpe**, sin pasar por ningún
+  gate. Antes de encender el vector hay que volver a medir el A/B y decidir A3 aparte.
+- **Nunca mandar una clave que no es de OpenAI a `api.openai.com`.** Producción tenía
+  `OPENAI_API_KEY` con prefijo `sk-or-` (OpenRouter) y `OPENAI_API_BASE` vacío: cada
+  rescate le entregaba el secreto a un tercero y recibía 401, así que el vector estaba
+  muerto **en silencio** (el `catch` devuelve filas vacías, que es indistinguible de "sin
+  resultados"). `buscarVectorial` ahora corta antes de la petición si la clave es `sk-or-`
+  y no hay endpoint que la redirija.

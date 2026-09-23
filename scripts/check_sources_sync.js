@@ -3,11 +3,14 @@
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
-const L = require('../lib/catalog-search.js');
-
 const root = path.join(__dirname, '..');
 // Normalize CRLF->LF: the Windows checkout is CRLF, but Function.prototype.toString() is always LF.
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8').replace(/\r\n/g, '\n');
+
+const searchLibPath = fs.existsSync(path.join(root, 'lib', 'catalog-search.js'))
+  ? '../lib/catalog-search.js'
+  : '../lib/serrucho-search.js';
+const L = require(searchLibPath);
 
 // (a) dev copies must equal the live dumps (the source of truth)
 assert.strictEqual(
@@ -22,8 +25,10 @@ assert.strictEqual(
 // (b) each lib FUNCTION's source must appear verbatim in the live dumps
 const buscar = read('scratch_live/live_buscar.js');
 const presupuesto = read('scratch_live/live_presupuesto.js');
+// aliasDe esta en la lista a proposito: scoreMatch depende de el, asi que dos copias del
+// mismo scoreMatch pueden comportarse distinto sin que nada chille.
 const sharedFns = ['nUSD', 'nBs', 'nBsInt', 'tc', 'norm', 'normMedida',
-  'medPresent', 'stemColor', 'singular', 'expandir', 'esGranel', 'scoreMatch'];
+  'medPresent', 'stemColor', 'singular', 'expandir', 'esGranel', 'aliasDe', 'scoreMatch'];
 for (const name of sharedFns) {
   assert.ok(
     buscar.includes(L[name].toString().replace(/\r\n/g, '\n')),
@@ -33,7 +38,7 @@ for (const name of sharedFns) {
 // presupuesto tambien duplica scoreMatch/expandir (y por tanto ALIAS/aliasDe, del que scoreMatch
 // depende): un drift aqui paso desapercibido una vez (scoreMatch referenciaba aliasDe sin que
 // existiera en este archivo -> ReferenceError en vivo en cuanto un item tenia 2+ candidatos).
-const presupuestoFns = ['norm', 'normMedida', 'medPresent', 'stemColor', 'singular', 'expandir', 'esGranel', 'scoreMatch'];
+const presupuestoFns = ['norm', 'normMedida', 'medPresent', 'stemColor', 'singular', 'expandir', 'esGranel', 'aliasDe', 'scoreMatch'];
 for (const name of presupuestoFns) {
   assert.ok(
     presupuesto.includes(L[name].toString().replace(/\r\n/g, '\n')),

@@ -1,5 +1,6 @@
 // Regenerate the stale code in n8n_workflow.json from the canonical scratch_live dumps.
-// Only touches: buscar_productos jsCode, hacer_presupuesto jsCode, AI Agent systemMessage.
+// Only touches: buscar_productos jsCode, hacer_presupuesto jsCode, AI Agent systemMessage,
+// Sanitize Agent Output jsCode.
 const fs = require('fs');
 const path = require('path');
 const root = path.join(__dirname, '..');
@@ -12,22 +13,24 @@ const wf = JSON.parse(fs.readFileSync(wfPath, 'utf8'));
 const buscar = read('scratch_live/live_buscar.js');
 const presupuesto = read('scratch_live/live_presupuesto.js');
 const systemMessage = read('scratch_live/live_systemMessage.txt');
+const sanitize = read('scratch_live/live_sanitize.js').replace(/\n$/, '');
 
 let updated = 0;
 for (const node of wf.nodes) {
   const p = node.parameters || {};
   if (p.name === 'buscar_productos') { p.jsCode = buscar; updated++; }
   else if (p.name === 'hacer_presupuesto') { p.jsCode = presupuesto; updated++; }
+  else if (node.name === 'Sanitize Agent Output') { p.jsCode = sanitize; updated++; }
   else if (node.name === 'AI Agent' && p.options && 'systemMessage' in p.options) {
     p.options.systemMessage = systemMessage; updated++;
   }
 }
-if (updated !== 3) {
-  console.error('expected to update 3 nodes, updated ' + updated + ' — aborting, no file written');
+if (updated !== 4) {
+  console.error('expected to update 4 nodes, updated ' + updated + ' — aborting, no file written');
   process.exit(1);
 }
 if (wf.activeVersion && wf.activeVersion.nodes) {
   wf.activeVersion.nodes = JSON.parse(JSON.stringify(wf.nodes));
 }
 fs.writeFileSync(wfPath, JSON.stringify(wf, null, 2) + '\n');
-console.log('regenerated workflow: 3 nodes updated');
+console.log('regenerated workflow: 4 nodes updated');

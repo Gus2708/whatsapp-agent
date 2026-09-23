@@ -104,3 +104,15 @@ test('scoreMatch: "all tokens matched" bonus rewards full coverage over partial'
   const partial = L.scoreMatch('CEMENTO BLANCO', ['cemento', 'gris']);
   assert.strictEqual(full - partial >= 50, true, 'matching every query token must add the +50 "all" bonus over a partial match');
 });
+
+test('aliasDe & deverbales: matches verbs with catalog nouns', () => {
+  const empalmar = L.aliasDe('empalmar');
+  assert.ok(empalmar.includes('empalme'));
+  assert.ok(empalmar.includes('empalmo'));
+
+  const cortar = L.aliasDe('cortar');
+  assert.ok(cortar.includes('corte'));
+
+  const acerolit = L.aliasDe('acerolit');
+  assert.ok(acerolit.includes('acerolits'));
+});

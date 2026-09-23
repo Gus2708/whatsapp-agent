@@ -14,6 +14,48 @@
 - **Depends on**: none
 - **Category**: search-quality
 - **Planned at**: commit `3ac8a1d`, 2026-08-29
+- **Result (medido 2026-09-07, veredicto gate A/B)**: **REJECTED — diferencia < 5 puntos**.
+  Ejecutado vía change `search-accuracy` (openspec). El desglose queda como métrica permanente.
+- **Re-medición 2026-09-08 (cambio `rrf-reintento`, vector VIVO vía override local OpenRouter)**:
+  **REJECTED de nuevo — gap 4,1 pts < 5**, pero con corrección de atribución: el gap 0 del
+  07-09 fue medición **sin vector** (clave vacía + egress geo-bloqueado por OpenAI), no un
+  efecto del código. Con el vector vivo el aporte es **+13 aciertos reales** (244 vs 231).
+
+### Resultado por bucket (mismo set cacheado de 320, código actual `0c31b52`)
+
+| Bucket | Casos | Recall exacto | Fallos |
+|---|---|---:|---:|---:|
+| vendido < 1 año | 171 | 72,5% (124/171) | — |
+| venta > 1 año | 26 | 53,8% (14/26) | — |
+| sin historial | 123 | 75,6% (93/123) | — |
+| **Global** | **320** | **72,2% (231/320)** | 9,7% (31/320) |
+
+> ⚠️ **Re-medición 2026-09-08 (A3 + recalibración, vector vivo vía OpenRouter):**
+>
+> | Bucket | vec-new (con vector) | sinvec-new (sin vector) |
+> |---|---|---|
+> | vendido < 1 año | 133/171 (77,8%) | 124/171 (72,5%) |
+> | venta > 1 año | 15/26 (57,7%) | 14/26 (53,8%) |
+> | sin historial | 96/123 (78,0%) | 93/123 (75,6%) |
+> | **Global** | **244/320 (76,3%)** | **231/320 (72,2%)** |
+>
+> **Corrección de atribución**: la medición 2026-09-07 (231/320 en ambos lados, gap 0) corrió
+> el camino **frío** — OPENAI_API_KEY vacía y egress geo-bloqueado por OpenAI; ambos lados
+> ejecutaron el mismo código léxico, por eso el gap 0 idéntico. NO es evidencia de que
+> «el intento 4 neutralizó el vector». Con el vector vivo el aporte es **+13 aciertos reales**,
+> mayormente en el bucket frío (sin historial: +3) y el vivo (+9). El desempate por ventas
+> sigue **sin hundir** el stock frío (el bucket vivo rinde mejor que en el 07-09 incluso sin
+> vector). Veredicto final: **REJECTED — gap 4,1 pts < 5** (y `vec-new` 244 < 246), sin
+> deploy; el RRF queda diferido con prerrequisito de dedupe por familia (plan 006).
+>
+> **Phase C (aislamiento de la caída)**: la caída histórica 246→231 **no se reproduce
+> caliente** — 4 corridas A/B de `b439c4a` y `c33e0b0` (before/after, cuerpos portados) dieron
+> todas **243/320 con after==before** → ambos sospechosos **inocentes**. Deuda de
+> investigación externa: sospecha principal la reconstrucción nocturna de popularidad y
+> vocabulario (workflow cron 3:00) que cambia rankings/equivalencias entre mediciones sin tocar
+> código. La regresión de 86 casos tiene 2 FN pre-existentes (baseline `b1e8823` idéntico,
+> delta 0): `#11 "sinz de 6 metros"` y `#28 "lamina de zinc"` (ver RAG.md §7). El gate se
+> re-midió con el override local `OPENAI_API_BASE`→OpenRouter (ver RAG.md §6 regla 7).
 
 ## Por qué importa
 
