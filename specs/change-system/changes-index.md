@@ -1,6 +1,9 @@
 project: whatsapp-agent
 active_changes: []
 archived_recent:
+- change: jev-construction-estimator
+  archived_at: '2026-09-28T20:36:58.651868+00:00'
+  archive_path: specs/changes/archive/2026-09-28-jev-construction-estimator
 - change: jev-multi-item-quotes
   archived_at: '2026-09-28T19:24:32.715804+00:00'
   archive_path: specs/changes/archive/2026-09-28-jev-multi-item-quotes
