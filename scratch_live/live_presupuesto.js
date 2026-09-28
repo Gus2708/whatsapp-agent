@@ -388,6 +388,40 @@ function scoreMatch(descripcion, qTokens, context){
 
   return s;
 }
+
+const PROBLEM_SOLUTIONS = {
+  goteras_impermeabilizacion: {
+    department: 'techos_laminas',
+    searchTerms: ['cemento plastico', 'manto asfaltico', 'cinta manto', 'primer asfaltico', 'pintura impermeabilizante']
+  },
+  fuga_agua_plomeria: {
+    department: 'plomeria_griferia',
+    searchTerms: ['pega pvc', 'teflon', 'soldadura liquida']
+  },
+  sellado_grietas_ventanas: {
+    department: 'fijacion_tornilleria',
+    searchTerms: ['silicon transparente', 'adhesivo sellador', 'silicon gris']
+  },
+  oxido_corrosion: {
+    department: 'pinturas',
+    searchTerms: ['fondo anticorrosivo', 'desoxidante', 'cepillo alambre']
+  },
+  fijacion_sin_taladrar: {
+    department: 'fijacion_tornilleria',
+    searchTerms: ['cero clavos', 'pega blanca', 'adhesivo de montaje']
+  },
+  preparacion_pared: {
+    department: 'pinturas',
+    searchTerms: ['pasta profesional', 'yeso', 'cemento blanco', 'lija']
+  }
+};
+
+function resolveProblemSolutions(intent) {
+  if (!intent || intent === 'ninguno_o_especifico') return null;
+  const target = PROBLEM_SOLUTIONS[intent];
+  return target ? { intent, department: target.department, searchTerms: [...target.searchTerms] } : null;
+}
+
 function parseItems(str){
   const partes = str.split(/[,;\n]+/).map(s=>s.trim()).filter(Boolean);
   const out = [];

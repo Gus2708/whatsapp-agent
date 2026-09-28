@@ -397,6 +397,40 @@ function scoreMatch(descripcion, qTokens, context){
 
   return s;
 }
+
+const PROBLEM_SOLUTIONS = {
+  goteras_impermeabilizacion: {
+    department: 'techos_laminas',
+    searchTerms: ['cemento plastico', 'manto asfaltico', 'cinta manto', 'primer asfaltico', 'pintura impermeabilizante']
+  },
+  fuga_agua_plomeria: {
+    department: 'plomeria_griferia',
+    searchTerms: ['pega pvc', 'teflon', 'soldadura liquida']
+  },
+  sellado_grietas_ventanas: {
+    department: 'fijacion_tornilleria',
+    searchTerms: ['silicon transparente', 'adhesivo sellador', 'silicon gris']
+  },
+  oxido_corrosion: {
+    department: 'pinturas',
+    searchTerms: ['fondo anticorrosivo', 'desoxidante', 'cepillo alambre']
+  },
+  fijacion_sin_taladrar: {
+    department: 'fijacion_tornilleria',
+    searchTerms: ['cero clavos', 'pega blanca', 'adhesivo de montaje']
+  },
+  preparacion_pared: {
+    department: 'pinturas',
+    searchTerms: ['pasta profesional', 'yeso', 'cemento blanco', 'lija']
+  }
+};
+
+function resolveProblemSolutions(intent) {
+  if (!intent || intent === 'ninguno_o_especifico') return null;
+  const target = PROBLEM_SOLUTIONS[intent];
+  return target ? { intent, department: target.department, searchTerms: [...target.searchTerms] } : null;
+}
+
 function parseItems(str){
   const partes = str.split(/[,;\n]+/).map(s=>s.trim()).filter(Boolean);
   const out = [];
@@ -415,8 +449,8 @@ function parseItems(str){
 async function getRecargo(){ try { const r = await axios.get(SB+'/rest/v1/presupuesto_config?id=eq.1&select=markup_porcentaje',{headers:H}); const p = r.data && r.data[0] && Number(r.data[0].markup_porcentaje); return (p!=null && !isNaN(p)) ? 1+(p/100) : 1.30; } catch(e){ return 1.30; } }
 async function getTasa(){ try { const r = await axios.get(SB+'/rest/v1/tazas?nombre=eq.actual&select=bcv_usd',{headers:H}); return r.data && r.data[0] && Number(r.data[0].bcv_usd); } catch(e){ return null; } }
 
-const { p_busqueda, marcas_excluidas, department, department_confidence, material } = (typeof query === 'object' && query !== null) ? query : { p_busqueda: query };
-const _alignment = (department || material) ? { department, department_confidence, material } : null;
+const { p_busqueda, marcas_excluidas, department, department_confidence, material, problem_intent, problem_intent_confidence } = (typeof query === 'object' && query !== null) ? query : { p_busqueda: query };
+const _alignment = (department || material || problem_intent) ? { department, department_confidence, material, problem_intent, problem_intent_confidence } : null;
 
 function triggerAutomejora(motivo, extra){
   try {
@@ -836,6 +870,20 @@ if (res.length===0){
       _rescate = { categoria: norm(_vecFiltered[0].descripcion).split(' ')[0], termino: '', confianza: 4 };
     }
   }
+  if (res.length === 0 && _alignment && _alignment.problem_intent && _alignment.problem_intent !== 'ninguno_o_especifico' &&
+      (_alignment.problem_intent_confidence === undefined || Number(_alignment.problem_intent_confidence) >= 0.80)) {
+    const _solTarget = resolveProblemSolutions(_alignment.problem_intent);
+    if (_solTarget && Array.isArray(_solTarget.searchTerms)) {
+      for (const term of _solTarget.searchTerms) {
+        const _solRows = await rpc(term);
+        if (_solRows && _solRows.length > 0) {
+          res = _solRows;
+          _rescate = { categoria: _solTarget.department, termino: term, confianza: 5 };
+          break;
+        }
+      }
+    }
+  }
   const _rs = res.length===0 ? await rescateSemantico() : null;
   if (_rs){
     const _rr2 = await rpc(_rs.categoria);
@@ -900,6 +948,24 @@ if (!_rescate && res.length > 0){
     if (_vec.length > 0 && !_deptConflict && (_lexFalla || (_catDiff && _vecFiable))){
       res = _vec;
       _rescate = { categoria: _vcat, termino: '', confianza: 4 };
+    }
+  }
+}
+
+if (!_rescate && _alignment && _alignment.problem_intent && _alignment.problem_intent !== 'ninguno_o_especifico' &&
+    (_alignment.problem_intent_confidence === undefined || Number(_alignment.problem_intent_confidence) >= 0.80)) {
+  const _solTarget = resolveProblemSolutions(_alignment.problem_intent);
+  if (_solTarget && Array.isArray(_solTarget.searchTerms)) {
+    const _currentDept = res.length ? detectProductDepartment(res[0].descripcion) : 'unclear';
+    if (_currentDept !== _solTarget.department) {
+      for (const term of _solTarget.searchTerms) {
+        const _solRows = await rpc(term);
+        if (_solRows && _solRows.length > 0) {
+          res = _solRows;
+          _rescate = { categoria: _solTarget.department, termino: term, confianza: 5 };
+          break;
+        }
+      }
     }
   }
 }

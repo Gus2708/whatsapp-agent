@@ -110,5 +110,40 @@
     "precio_venta": 25.0,
     "existencia": 6,
     "_origen": "paint_search.test.js: Liliana incident (Floripaint) and 'pintura floripaint clase b'"
+  },
+  {
+    "codigo_interno": "IMP-001",
+    "descripcion": "CEMENTO PLASTICO COVO 1 GAL",
+    "precio_venta": 14.5,
+    "existencia": 8,
+    "_origen": "problem-search.test.js: leak repair"
+  },
+  {
+    "codigo_interno": "IMP-002",
+    "descripcion": "MANTO ASFALTICO 3MM COVO",
+    "precio_venta": 24.0,
+    "existencia": 5,
+    "_origen": "problem-search.test.js: leak repair"
+  },
+  {
+    "codigo_interno": "PLO-001",
+    "descripcion": "PEGA SOLDADURA PVC 118ML TUBRICA",
+    "precio_venta": 4.2,
+    "existencia": 12,
+    "_origen": "problem-search.test.js: plumbing leak"
+  },
+  {
+    "codigo_interno": "PLO-002",
+    "descripcion": "CINTA TEFLON 1/2 PROFESIONAL",
+    "precio_venta": 1.0,
+    "existencia": 20,
+    "_origen": "problem-search.test.js: plumbing leak"
+  },
+  {
+    "codigo_interno": "PIN-008",
+    "descripcion": "FONDO ANTICORROSIVO GRIS SUN DECO 1 GAL",
+    "precio_venta": 18.0,
+    "existencia": 6,
+    "_origen": "problem-search.test.js: rust protection"
   }
 ]
