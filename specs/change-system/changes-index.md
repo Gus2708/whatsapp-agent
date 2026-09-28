@@ -1,6 +1,9 @@
 project: whatsapp-agent
 active_changes: []
 archived_recent:
+- change: jev-department-attributes
+  archived_at: '2026-09-28T19:03:17.075777+00:00'
+  archive_path: specs/changes/archive/2026-09-28-jev-department-attributes
 - change: pwa-dashboard
   archived_at: '2026-09-28T09:45:50.983095+00:00'
   archive_path: specs/changes/archive/2026-09-28-pwa-dashboard

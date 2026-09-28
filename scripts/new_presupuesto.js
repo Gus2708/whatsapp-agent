@@ -295,17 +295,17 @@ function esGranel(desc){ const d=norm(desc); return /(^| )x ?(mtrs|mtr|mts|mt|me
 function detectProductDepartment(desc){
   const d = norm(desc);
   if (/\b(techo|acerolit|techolit|policarbonato|teja|cumbrera|manto|primer asfaltico)\b/.test(d)) return 'techos_laminas';
-  if (/\blamina\b/.test(d) && /\b(zinc|galv|galvanizada|ondulad|cuadrad|canal|arquitectonica|prepintada|aluminio|cal)\b/.test(d) && !/\b(hierro|hp|cr|negra|lisa)\b/.test(d)) return 'techos_laminas';
+  if (/\blaminas?\b/.test(d) && /\b(zinc|galv|galvanizada|ondulad|cuadrad|canal|arquitectonica|prepintada|aluminio|cal)\b/.test(d) && !/\b(hierro|hp|cr|negra|lisa)\b/.test(d)) return 'techos_laminas';
   if (/\bgancho\s+(p\/|para\s+)?techo\b/.test(d)) return 'techos_laminas';
 
-  if (/\btubo\b/.test(d) && /\b(electricidad|conduit|luz)\b/.test(d)) return 'electricidad_cables';
+  if (/\btubos?\b/.test(d) && /\b(electricidad|conduit|luz)\b/.test(d)) return 'electricidad_cables';
   if (/\b(cable|thwn|thw|breaker|tomacorriente|interruptor|apagador|suiche|switch|cajetin|bombillo|reflector|lampara|teipe|fotocelda|balastro|socate|enchufe|voltaje)\b/.test(d)) return 'electricidad_cables';
 
   if (/\b(pintura|esmalte|satinad|caucho|oleo|anticorrosiv|brocha|rodillo|thinner|solvente|tirro|imperflex|sellafill)\b/.test(d)) return 'pinturas';
 
   if (/\b(griferia|fregadero|lavamano|sanitario|inodoro|sifon|grifo|flanche|tanque|valvula|presostato|flotante)\b/.test(d)) return 'plomeria_griferia';
   if (/\b(codo|tee|adaptador|union)\b/.test(d) && /\b(pvc|cpvc|aguas?|presion|rosca)\b/.test(d)) return 'plomeria_griferia';
-  if (/\btubo\b/.test(d) && /\b(pvc|cpvc|aguas?|sanitari|cloaca|desague)\b/.test(d)) return 'plomeria_griferia';
+  if (/\btubos?\b/.test(d) && /\b(pvc|cpvc|aguas?|sanitari|cloaca|desague)\b/.test(d)) return 'plomeria_griferia';
   if (/\bllave\b/.test(d) && /\b(paso|chorro|bola|esfera|jardin)\b/.test(d)) return 'plomeria_griferia';
   if (/\b(pega|soldadura)\s+(pvc|cpvc)\b/.test(d)) return 'plomeria_griferia';
 
@@ -319,10 +319,10 @@ function detectProductDepartment(desc){
 
   if (/\b(alambre\s+(de\s+)?pua|aspersor|fumigadora|machete|rastrillo|malla\s+pollito|malla\s+gallinero)\b/.test(d)) return 'agro_jardin';
 
-  if (/\b(cabilla|viga|alambron|perfil|cercha|pletina|angulo|electrosoldada|truckson)\b/.test(d)) return 'hierro_perfiles';
-  if (/\btubo\b/.test(d) && /\b(herreria|estructural|hierro|redondo|cuadrado|rectangular)\b/.test(d)) return 'hierro_perfiles';
+  if (/\b(cabillas?|viga|alambron|perfil|cercha|pletina|angulo|electrosoldada|truckson)\b/.test(d)) return 'hierro_perfiles';
+  if (/\btubos?\b/.test(d) && /\b(herreria|estructural|hierro|redondo|cuadrado|rectangular)\b/.test(d)) return 'hierro_perfiles';
   if (/\bmalla\b/.test(d)) return 'hierro_perfiles';
-  if (/\blamina\b/.test(d) && /\b(hierro|hp|cr|negra|lisa)\b/.test(d)) return 'hierro_perfiles';
+  if (/\blaminas?\b/.test(d) && /\b(hierro|hp|cr|negra|lisa)\b/.test(d)) return 'hierro_perfiles';
 
   return 'unclear';
 }
@@ -383,6 +383,18 @@ function scoreMatch(descripcion, qTokens, context){
         if (prodDept === dept && !matConflict) s += 40;
         else if (prodDept !== dept) s -= 80;
       }
+    }
+    if (context.attributes && typeof context.attributes === 'object') {
+      const attrs = context.attributes;
+      if (attrs.length) {
+        const rawLen = attrs.length.replace(/m$/, '');
+        if (medPresent(rawLen, nd)) s += 50;
+      }
+      if (attrs.dimension && medPresent(attrs.dimension, nd)) s += 50;
+      if (attrs.thickness && medPresent(attrs.thickness, nd)) s += 50;
+      if (attrs.diameter && medPresent(attrs.diameter, nd)) s += 50;
+      if (attrs.presentation && nd.includes(attrs.presentation)) s += 50;
+      if (attrs.grade_class && new RegExp('(?:^|\\s)(?:clase|tipo|)\\s*' + attrs.grade_class + '(?:\\s|$)', 'i').test(nd)) s += 50;
     }
   }
 

@@ -1,8 +1,20 @@
 // Observational only. This node cannot change the original context, query or action.
 // BEGIN JEV FUNCTIONS
 function productAttributes(value) {
-  const allowed = { variant: /^(thwn|thhn)$/, gauge: /^\d{1,2}$/,
-    color: /^(azul|rojo|negro|blanco|verde|amarillo)$/, presentation: /^(metro|rollo)$/ };
+  const allowed = {
+    variant: /^(thwn|thhn)$/,
+    gauge: /^\d{1,2}$/,
+    color: /^(azul|rojo|negro|blanco|verde|amarillo|gris)$/,
+    presentation: /^(metro|rollo|cuñete|cunete|galon|cuarto)$/,
+    length: /^(6m|3\.66m|3\.05m|2\.44m|\d+(\.\d+)?m)$/,
+    caliber: /^\d{1,2}$/,
+    dimension: /^\d+(?:-\d+\/\d+)?x\d+(?:-\d+\/\d+)?$/,
+    thickness: /^\d+(\.\d+)?mm$/,
+    grade_class: /^(a|b|c)$/,
+    finish: /^(caucho|aceite|satinada|satinado|brillante|mate|esmalte)$/,
+    diameter: /^(\d+\/\d+|\d+-\d+\/\d+|\d+(\.\d+)?)$/,
+    usage: /^(agua fria|agua caliente|aguas negras|ventilacion)$/
+  };
   return Object.fromEntries(Object.entries(allowed).filter(([key, pattern]) =>
     typeof value?.[key] === 'string' && pattern.test(value[key])).map(([key]) => [key, value[key]]));
 }

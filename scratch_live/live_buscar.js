@@ -304,17 +304,17 @@ function esGranel(desc){ const d=norm(desc); return /(^| )x ?(mtrs|mtr|mts|mt|me
 function detectProductDepartment(desc){
   const d = norm(desc);
   if (/\b(techo|acerolit|techolit|policarbonato|teja|cumbrera|manto|primer asfaltico)\b/.test(d)) return 'techos_laminas';
-  if (/\blamina\b/.test(d) && /\b(zinc|galv|galvanizada|ondulad|cuadrad|canal|arquitectonica|prepintada|aluminio|cal)\b/.test(d) && !/\b(hierro|hp|cr|negra|lisa)\b/.test(d)) return 'techos_laminas';
+  if (/\blaminas?\b/.test(d) && /\b(zinc|galv|galvanizada|ondulad|cuadrad|canal|arquitectonica|prepintada|aluminio|cal)\b/.test(d) && !/\b(hierro|hp|cr|negra|lisa)\b/.test(d)) return 'techos_laminas';
   if (/\bgancho\s+(p\/|para\s+)?techo\b/.test(d)) return 'techos_laminas';
 
-  if (/\btubo\b/.test(d) && /\b(electricidad|conduit|luz)\b/.test(d)) return 'electricidad_cables';
+  if (/\btubos?\b/.test(d) && /\b(electricidad|conduit|luz)\b/.test(d)) return 'electricidad_cables';
   if (/\b(cable|thwn|thw|breaker|tomacorriente|interruptor|apagador|suiche|switch|cajetin|bombillo|reflector|lampara|teipe|fotocelda|balastro|socate|enchufe|voltaje)\b/.test(d)) return 'electricidad_cables';
 
   if (/\b(pintura|esmalte|satinad|caucho|oleo|anticorrosiv|brocha|rodillo|thinner|solvente|tirro|imperflex|sellafill)\b/.test(d)) return 'pinturas';
 
   if (/\b(griferia|fregadero|lavamano|sanitario|inodoro|sifon|grifo|flanche|tanque|valvula|presostato|flotante)\b/.test(d)) return 'plomeria_griferia';
   if (/\b(codo|tee|adaptador|union)\b/.test(d) && /\b(pvc|cpvc|aguas?|presion|rosca)\b/.test(d)) return 'plomeria_griferia';
-  if (/\btubo\b/.test(d) && /\b(pvc|cpvc|aguas?|sanitari|cloaca|desague)\b/.test(d)) return 'plomeria_griferia';
+  if (/\btubos?\b/.test(d) && /\b(pvc|cpvc|aguas?|sanitari|cloaca|desague)\b/.test(d)) return 'plomeria_griferia';
   if (/\bllave\b/.test(d) && /\b(paso|chorro|bola|esfera|jardin)\b/.test(d)) return 'plomeria_griferia';
   if (/\b(pega|soldadura)\s+(pvc|cpvc)\b/.test(d)) return 'plomeria_griferia';
 
@@ -328,10 +328,10 @@ function detectProductDepartment(desc){
 
   if (/\b(alambre\s+(de\s+)?pua|aspersor|fumigadora|machete|rastrillo|malla\s+pollito|malla\s+gallinero)\b/.test(d)) return 'agro_jardin';
 
-  if (/\b(cabilla|viga|alambron|perfil|cercha|pletina|angulo|electrosoldada|truckson)\b/.test(d)) return 'hierro_perfiles';
-  if (/\btubo\b/.test(d) && /\b(herreria|estructural|hierro|redondo|cuadrado|rectangular)\b/.test(d)) return 'hierro_perfiles';
+  if (/\b(cabillas?|viga|alambron|perfil|cercha|pletina|angulo|electrosoldada|truckson)\b/.test(d)) return 'hierro_perfiles';
+  if (/\btubos?\b/.test(d) && /\b(herreria|estructural|hierro|redondo|cuadrado|rectangular)\b/.test(d)) return 'hierro_perfiles';
   if (/\bmalla\b/.test(d)) return 'hierro_perfiles';
-  if (/\blamina\b/.test(d) && /\b(hierro|hp|cr|negra|lisa)\b/.test(d)) return 'hierro_perfiles';
+  if (/\blaminas?\b/.test(d) && /\b(hierro|hp|cr|negra|lisa)\b/.test(d)) return 'hierro_perfiles';
 
   return 'unclear';
 }
@@ -392,6 +392,18 @@ function scoreMatch(descripcion, qTokens, context){
         if (prodDept === dept && !matConflict) s += 40;
         else if (prodDept !== dept) s -= 80;
       }
+    }
+    if (context.attributes && typeof context.attributes === 'object') {
+      const attrs = context.attributes;
+      if (attrs.length) {
+        const rawLen = attrs.length.replace(/m$/, '');
+        if (medPresent(rawLen, nd)) s += 50;
+      }
+      if (attrs.dimension && medPresent(attrs.dimension, nd)) s += 50;
+      if (attrs.thickness && medPresent(attrs.thickness, nd)) s += 50;
+      if (attrs.diameter && medPresent(attrs.diameter, nd)) s += 50;
+      if (attrs.presentation && nd.includes(attrs.presentation)) s += 50;
+      if (attrs.grade_class && new RegExp('(?:^|\\s)(?:clase|tipo|)\\s*' + attrs.grade_class + '(?:\\s|$)', 'i').test(nd)) s += 50;
     }
   }
 
@@ -501,6 +513,107 @@ function resolveDynamicSolutions(intentOrAction, department, customTerms) {
   return null;
 }
 
+const CANONICAL_COLORS = {
+  blanc: 'blanco',
+  negr: 'negro',
+  roj: 'rojo',
+  amarill: 'amarillo',
+  azul: 'azul',
+  verde: 'verde',
+  gris: 'gris',
+  marron: 'marron',
+  naranja: 'naranja'
+};
+
+function extractDepartmentAttributes(query, department) {
+  if (!query || typeof query !== 'string') return {};
+  const nq = norm(query);
+  const mq = normMedida(query);
+  const dept = department || detectProductDepartment(query);
+  const checkAll = !dept || dept === 'unclear';
+  const out = {};
+
+  if (checkAll || dept === 'techos_laminas') {
+    const m6 = /\b(6\s*(?:m|mts|mtrs|metros?)|6m)\b/i.test(nq);
+    const m12 = /\b(12\s*(?:pies?|ft|p)|3\.6[06]\s*(?:m|mts|mtrs|metros?)?)\b/i.test(nq);
+    const m10 = /\b(10\s*(?:pies?|ft|p)|3\.0[05]\s*(?:m|mts|mtrs|metros?)?)\b/i.test(nq);
+    const m8 = /\b(8\s*(?:pies?|ft|p)|2\.4[04]\s*(?:m|mts|mtrs|metros?)?)\b/i.test(nq);
+    if (m6) out.length = '6m';
+    else if (m12) out.length = '3.66m';
+    else if (m10) out.length = '3.05m';
+    else if (m8) out.length = '2.44m';
+    else {
+      const genM = /\b(\d+(?:\.\d+)?)\s*(?:m|mts|mtrs|metros?)\b/i.exec(nq);
+      if (genM) out.length = `${genM[1]}m`;
+    }
+
+    const calMatch = /\b(?:cal(?:ibre)?\.?\s*(\d{1,2})|0\.(\d{2}))\b/i.exec(nq);
+    if (calMatch) {
+      out.caliber = calMatch[1] || calMatch[2];
+    }
+  }
+
+  if (checkAll || dept === 'hierro_perfiles') {
+    const dimMatch = /\b(\d+(?:-\d+\/\d+)?)\s*x\s*(\d+(?:-\d+\/\d+)?)\b/i.exec(mq);
+    if (dimMatch) {
+      out.dimension = `${dimMatch[1]}x${dimMatch[2]}`;
+    }
+
+    const thickMatch = /\b(?:(?:cal(?:ibre)?\.?\s*)?(\d+(?:\.\d+)?)\s*(?:mm|milimetros?)|(?:de\s+)?(\d+\.\d+)\s*(?:mm)?)\b/i.exec(nq);
+    if (thickMatch) {
+      const val = thickMatch[1] || thickMatch[2];
+      if (val) {
+        const num = parseFloat(val);
+        out.thickness = Number.isInteger(num) ? `${num}.0mm` : `${num}mm`;
+      }
+    }
+  }
+
+  if (checkAll || dept === 'pinturas') {
+    if (/\b(cunete|cuñete|tobo)\b/i.test(nq)) out.presentation = 'cuñete';
+    else if (/\bgalon\b/i.test(nq)) out.presentation = 'galon';
+    else if (/\bcuarto\b/i.test(nq)) out.presentation = 'cuarto';
+
+    const classMatch = /\b(?:clase|tipo)\s*([abc])\b/i.exec(nq);
+    if (classMatch) {
+      out.grade_class = classMatch[1].toLowerCase();
+    }
+
+    if (/\bcaucho\b/i.test(nq)) out.finish = 'caucho';
+    else if (/\baceite\b/i.test(nq)) out.finish = 'aceite';
+    else if (/\bsatinad[ao]\b/i.test(nq)) out.finish = 'satinada';
+    else if (/\bbrillante\b/i.test(nq)) out.finish = 'brillante';
+    else if (/\bmate\b/i.test(nq)) out.finish = 'mate';
+    else if (/\besmalte\b/i.test(nq)) out.finish = 'esmalte';
+
+    const tokens = nq.split(/\s+/);
+    for (const t of tokens) {
+      const st = stemColor(t);
+      if (CANONICAL_COLORS[st]) {
+        out.color = CANONICAL_COLORS[st];
+        break;
+      }
+    }
+  }
+
+  if (checkAll || dept === 'plomeria_griferia') {
+    let diamMatch = /\b(1\/2|3\/4|5\/8|3\/8|1-1\/2|1-1\/4)\b/i.exec(nq);
+    if (!diamMatch) {
+      diamMatch = /\b([1-6])\s*(?:pulg(?:adas?)?|"|''|\b(?=\s*(?:de\s+)?(?:pulg|aguas?|pvc)))/i.exec(nq);
+    }
+    if (diamMatch) {
+      out.diameter = diamMatch[1];
+    }
+
+    if (/\bagua\s*fria\b/i.test(nq)) out.usage = 'agua fria';
+    else if (/\bagua\s*caliente\b/i.test(nq)) out.usage = 'agua caliente';
+    else if (/\baguas?\s*negras?\b/i.test(nq)) out.usage = 'aguas negras';
+    else if (/\bventilacion\b/i.test(nq)) out.usage = 'ventilacion';
+  }
+
+  return out;
+}
+
 function parseItems(str){
   const partes = str.split(/[,;\n]+/).map(s=>s.trim()).filter(Boolean);
   const out = [];
@@ -520,7 +633,11 @@ async function getRecargo(){ try { const r = await axios.get(SB+'/rest/v1/presup
 async function getTasa(){ try { const r = await axios.get(SB+'/rest/v1/tazas?nombre=eq.actual&select=bcv_usd',{headers:H}); return r.data && r.data[0] && Number(r.data[0].bcv_usd); } catch(e){ return null; } }
 
 const { p_busqueda, marcas_excluidas, department, department_confidence, material, problem_intent, problem_intent_confidence, solution_terms, solution_terms_confidence } = (typeof query === 'object' && query !== null) ? query : { p_busqueda: query };
-const _alignment = (department || material || problem_intent || solution_terms) ? { department, department_confidence, material, problem_intent, problem_intent_confidence, solution_terms, solution_terms_confidence } : null;
+const _detectedDept = (department && department !== 'unclear') ? department : detectProductDepartment(p_busqueda);
+const _deptAttrs = extractDepartmentAttributes(p_busqueda, _detectedDept);
+const _alignment = (department || material || problem_intent || solution_terms || Object.keys(_deptAttrs).length > 0)
+  ? { department: _detectedDept, department_confidence, material, problem_intent, problem_intent_confidence, solution_terms, solution_terms_confidence, attributes: _deptAttrs }
+  : null;
 
 function triggerAutomejora(motivo, extra){
   try {
@@ -1388,6 +1505,15 @@ const productos = unicos.slice(0,4).map(p=>{
 });
 const _out = { encontrados:productos.length, tasa_bcv:tasa, productos };
 
+const isRoofSheet = (_detectedDept === 'techos_laminas' || detectProductDepartment(_pb) === 'techos_laminas') &&
+  /\blaminas?\b/i.test(norm(_pb)) && !/\b(hierro|hp|cr|negra|lisa)\b/i.test(norm(_pb));
+const hasDimension = !!(_deptAttrs && (_deptAttrs.length || _deptAttrs.dimension)) || medLargas.length > 0;
+
+if (isRoofSheet && !hasDimension && unicos.length > 0) {
+  _out.aclarar = true;
+  _out.instruccion = 'Tenemos láminas de zinc de 6 metros, 12 pies (3.66m), 10 pies (3.05m) y 8 pies (2.44m). Pregúntale al cliente qué largo necesita.';
+}
+
 // ¿el mejor resultado es de OTRA categoria? (no comparte NINGUNA palabra con lo pedido: coincidio de casualidad)
 let _weak = false;
 // _rescate excluido igual que _fuzzy: por definicion un rescate semantico devuelve algo que
@@ -1427,7 +1553,7 @@ if (_rescate){
   _out.parcial = true;
   _out.instruccion = 'OJO: no encontre nada que combine todo lo que pidio el cliente; estos resultados salen de buscar SOLO la palabra "' + _unicaPalabra + '", ignorando el resto de la consulta. Es la coincidencia mas debil posible. PROHIBIDO presentarlos como si fueran lo que pidio: preguntale con honestidad si alguno le sirve ANTES de cotizar. Si te dice que no, responde SOLO con el token [PEDIR_AYUDA].';
 }
-Object.assign(_out, searchDecision(_rescate ? 'semantic' : _weak ? 'weak' : medMismatch ? 'measure_mismatch' :
+Object.assign(_out, searchDecision(_out.aclarar ? 'vague' : _rescate ? 'semantic' : _weak ? 'weak' : medMismatch ? 'measure_mismatch' :
   medParcial ? 'multiple_measures' : _fuzzy ? 'approximate' : _dropped ? 'relaxed' :
   _unicaPalabra ? 'single_word' : productos.length ? 'exact' : 'missing'));
 return JSON.stringify(_out);
