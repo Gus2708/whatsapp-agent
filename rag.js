@@ -899,6 +899,16 @@ async function buscar(consulta) {
     }
     console.log('   ' + c.darkGray('╰' + '─'.repeat(W - 6)));
   }
+
+  if (r.kit_sugerido) {
+    console.log('\n   ' + c.ok('◆') + ' ' + c.bold(c.ok('Kit complementario sugerido:')) + ' ' + c.num(r.kit_sugerido.nombre));
+    console.log('   ' + c.darkGray('─'.repeat(W - 6)));
+    for (const it of (r.kit_sugerido.items || [])) {
+      console.log('   ' + c.darkGray('│') + ' ' + c.gray(`• ${it.cantidad} ${it.unidad} de ${it.nombre}`));
+    }
+    console.log('   ' + c.darkGray('│') + ' ' + c.cyan(`Cotización: "${r.kit_sugerido.items_presupuesto}"`));
+    console.log('   ' + c.darkGray('╰' + '─'.repeat(W - 6)));
+  }
   return 0;
 }
 
