@@ -2,6 +2,49 @@
 // 1) Si el LLM filtra una tool-call o entra en bucle, reemplaza por un fallback amable.
 // 2) Si el agente marcó [RESERVA: ...], quita el marcador (el cliente NUNCA lo ve) y registra
 //    la reserva en atenciones_pendientes para que la app avise al empleado (nombre + producto).
+// BEGIN CONVERSATION FUNCTIONS
+function searchDecision(status) {
+  const action = { exact: 'show_results', vague: 'clarify', missing: 'handoff', weak: 'handoff',
+    not_sold: 'unavailable' }[status] || 'confirm';
+  return { decision_version: 1, action, match_status: status, requires_confirmation: action === 'confirm' };
+}
+
+function searchGuard(steps) {
+  const clarify = '¿Qué producto necesitas exactamente? Indícame el nombre y la medida, por favor.';
+  if (!Array.isArray(steps) || steps.length > 100) return clarify;
+  const latest = new Map();
+  for (const [index, step] of steps.entries()) {
+    if (typeof step?.action?.tool !== 'string') return clarify;
+    if (step?.action?.tool !== 'buscar_productos') continue;
+    const query = step.action.toolInput?.p_busqueda;
+    const key = typeof query === 'string' ? query.trim().toLowerCase() : index;
+    latest.set(key, step.observation);
+  }
+  let response = null;
+  for (const observation of latest.values()) {
+    let result;
+    try {
+      if (typeof observation !== 'string' || observation.length > 20000) return clarify;
+      result = JSON.parse(observation);
+    } catch (_) { return clarify; }
+    const statuses = ['exact', 'vague', 'missing', 'weak', 'not_sold', 'semantic', 'measure_mismatch',
+      'multiple_measures', 'approximate', 'relaxed', 'single_word'];
+    if (!result || result.decision_version !== 1 || !statuses.includes(result.match_status)) return clarify;
+    const expected = searchDecision(result.match_status);
+    if (result.action !== expected.action || result.requires_confirmation !== expected.requires_confirmation) return clarify;
+    if (result.action === 'handoff') return '[PEDIR_AYUDA]';
+    if (result.action === 'clarify') response = clarify;
+    if (result.action === 'unavailable') response = 'Ese producto no lo trabajamos. ¿Qué otro producto necesitas?';
+    if (result.action === 'confirm') {
+      const names = Array.isArray(result.productos) ? result.productos.slice(0, 4)
+        .map(p => typeof p?.nombre === 'string' ? p.nombre.replace(/[\[\]\r\n]/g, '').slice(0, 120) : '').filter(Boolean) : [];
+      response = names.length ? 'No encontré una coincidencia exacta. ¿Te sirve alguna de estas opciones?\n' +
+        names.map(name => '• ' + name).join('\n') : clarify;
+    }
+  }
+  return response;
+}
+// END CONVERSATION FUNCTIONS
 const axios = require('axios');
 const SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';
 const ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';
@@ -23,6 +66,22 @@ let telefono = null, pushName = null;
 try { const p = $('Webhook Trigger').first().json.body.payload; telefono = p && p.from; pushName = (p && p._data && p._data.pushName) || (p && p.notifyName) || (p && p.pushName) || null; } catch (e) {}
 
 for (const item of items) {
+  let context;
+  try { context = $('Prepare Conversation Context').first().json.conversation_context; } catch (_) {}
+  // With returnIntermediateSteps enabled, tool-free turns return an empty array.
+  // A missing trace is an unsupported runtime contract, not proof of no tool calls.
+  const guarded = context?.action === 'clarify'
+    ? '¿Qué producto necesitas exactamente? Indícame el nombre y la medida, por favor.'
+    : !item.json.error && typeof item.json.output === 'string' && item.json.output.trim()
+      ? searchGuard(item.json.intermediateSteps) : null;
+  delete item.json.intermediateSteps;
+  delete item.json.jev_shadow;
+  // Explicit human escalation retains precedence; uncertain results never trigger reservations.
+  if (guarded && !String(item.json.output || '').includes('[ESCALAR_HUMANO]')) {
+    item.json.output = guarded;
+    item.json._decision_guarded = true;
+    continue;
+  }
   // 0) Blindaje ante errores o respuestas vacías del AI Agent
   if (item.json?.error || !item.json?.output || typeof item.json.output !== 'string' || !item.json.output.trim()) {
     // console.error (no warn): el AI Agent lleva onError:continueRegularOutput, asi que la

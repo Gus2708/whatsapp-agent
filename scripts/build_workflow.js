@@ -1,35 +1,15 @@
-// Regenerate the stale code in n8n_workflow.json from the canonical scratch_live dumps.
-// Only touches: buscar_productos jsCode, hacer_presupuesto jsCode, AI Agent systemMessage,
-// Sanitize Agent Output jsCode.
-const fs = require('fs');
-const path = require('path');
+// Build from the user-selected published snapshot, never from stale development dumps.
+const fs = require('node:fs');
+const path = require('node:path');
+require('./build_conversation_sources');
+require('./build_jev_sources');
+const { buildWorkflow } = require('../lib/workflow-overlay');
+const baseline = require('../workflows/production-baseline.json');
 const root = path.join(__dirname, '..');
-// Normalize CRLF->LF so the embedded code is clean LF and matches the guard.
-const read = (p) => fs.readFileSync(path.join(root, p), 'utf8').replace(/\r\n/g, '\n');
-
-const wfPath = path.join(root, 'n8n_workflow.json');
-const wf = JSON.parse(fs.readFileSync(wfPath, 'utf8'));
-
-const buscar = read('scratch_live/live_buscar.js');
-const presupuesto = read('scratch_live/live_presupuesto.js');
-const systemMessage = read('scratch_live/live_systemMessage.txt');
-// Trailing newline stripped: the n8n Code node stores the body without it, and leaving it
-// in would make check_workflow_sync report a permanent one-character drift.
-const sanitize = read('scratch_live/live_sanitize.js').replace(/\n$/, '');
-
-let updated = 0;
-for (const node of wf.nodes) {
-  const p = node.parameters || {};
-  if (p.name === 'buscar_productos') { p.jsCode = buscar; updated++; }
-  else if (p.name === 'hacer_presupuesto') { p.jsCode = presupuesto; updated++; }
-  else if (node.name === 'Sanitize Agent Output') { p.jsCode = sanitize; updated++; }
-  else if (node.name === 'AI Agent' && p.options && 'systemMessage' in p.options) {
-    p.options.systemMessage = systemMessage; updated++;
-  }
-}
-if (updated !== 4) {
-  console.error('expected to update 4 nodes, updated ' + updated + ' — aborting, no file written');
-  process.exit(1);
-}
-fs.writeFileSync(wfPath, JSON.stringify(wf, null, 2) + '\n');
-console.log('regenerated workflow: 4 nodes updated');
+const read = file => fs.readFileSync(path.join(root, file), 'utf8').replace(/\r\n/g, '\n');
+const workflow = buildWorkflow(baseline, {
+  context: read('scratch_live/live_conversation_context.js'),
+  jev: read('scratch_live/live_jev_shadow.js'),
+});
+fs.writeFileSync(path.join(root, 'n8n_workflow.json'), JSON.stringify(workflow, null, 2) + '\n');
+console.log('Built inactive workflow from selected production baseline with pilot overlay');

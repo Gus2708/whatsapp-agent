@@ -1,0 +1,859 @@
+{
+  "mode": "provider",
+  "corpus": "jev-synthetic-v2",
+  "contract": "jev-shadow-v1",
+  "total": 30,
+  "provider_calls": 30,
+  "valid_responses": 30,
+  "accepted_responses": 19,
+  "intent_accuracy": 0.8333333333333334,
+  "continuation_accuracy": 0.9,
+  "accuracy_denominator": 30,
+  "rule_comparable_rows": 5,
+  "latency_p95_ms": 480,
+  "input_tokens": 20628,
+  "output_tokens": 3371,
+  "estimated_cost_usd": null,
+  "rows": [
+    {
+      "id": "cable-new",
+      "expected": {
+        "intent": "product_inquiry",
+        "continuation": "new"
+      },
+      "rule_action": "search",
+      "rule_continuation": "new",
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": true,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "ok",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 651,
+        "request_attempted": true,
+        "intent": "product_inquiry",
+        "intent_confidence": 0.82,
+        "intent_probability": 0.85,
+        "continuation": "new",
+        "continuation_confidence": 0.97,
+        "continuation_probability": 0.98,
+        "input_tokens": 670,
+        "output_tokens": 113,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "cable-gauge",
+      "expected": {
+        "intent": "product_inquiry",
+        "continuation": "continue"
+      },
+      "rule_action": "search",
+      "rule_continuation": "continue",
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": true,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "low_confidence",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 407,
+        "request_attempted": true,
+        "intent": "product_inquiry",
+        "intent_confidence": 0.36,
+        "intent_probability": 0.46,
+        "continuation": "continue",
+        "continuation_confidence": 0.18,
+        "continuation_probability": 0.45,
+        "input_tokens": 699,
+        "output_tokens": 113,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "cable-roll",
+      "expected": {
+        "intent": "product_inquiry",
+        "continuation": "continue"
+      },
+      "rule_action": "search",
+      "rule_continuation": "continue",
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": false,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "low_confidence",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 294,
+        "request_attempted": true,
+        "intent": "general",
+        "intent_confidence": 0.35,
+        "intent_probability": 0.44,
+        "continuation": "new",
+        "continuation_confidence": 0.27,
+        "continuation_probability": 0.52,
+        "input_tokens": 698,
+        "output_tokens": 111,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "missing-reference",
+      "expected": {
+        "intent": "unclear",
+        "continuation": "unclear"
+      },
+      "rule_action": "clarify",
+      "rule_continuation": "unclear",
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": true,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "low_confidence",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 345,
+        "request_attempted": true,
+        "intent": "unclear",
+        "intent_confidence": 0.7,
+        "intent_probability": 0.75,
+        "continuation": "unclear",
+        "continuation_confidence": 0.57,
+        "continuation_probability": 0.72,
+        "input_tokens": 661,
+        "output_tokens": 113,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "orphan-gauge",
+      "expected": {
+        "intent": "product_inquiry",
+        "continuation": "unclear"
+      },
+      "rule_action": "clarify",
+      "rule_continuation": "unclear",
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": true,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "low_confidence",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 480,
+        "request_attempted": true,
+        "intent": "unclear",
+        "intent_confidence": 0.42,
+        "intent_probability": 0.51,
+        "continuation": "unclear",
+        "continuation_confidence": 0.79,
+        "continuation_probability": 0.86,
+        "input_tokens": 664,
+        "output_tokens": 113,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "budget",
+      "expected": {
+        "intent": "quote",
+        "continuation": "new"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "ok",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 294,
+        "request_attempted": true,
+        "intent": "quote",
+        "intent_confidence": 0.93,
+        "intent_probability": 0.95,
+        "continuation": "new",
+        "continuation_confidence": 0.99,
+        "continuation_probability": 0.99,
+        "input_tokens": 681,
+        "output_tokens": 111,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "correction",
+      "expected": {
+        "intent": "correction",
+        "continuation": "continue"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "ok",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 356,
+        "request_attempted": true,
+        "intent": "correction",
+        "intent_confidence": 0.99,
+        "intent_probability": 0.99,
+        "continuation": "continue",
+        "continuation_confidence": 0.98,
+        "continuation_probability": 0.98,
+        "input_tokens": 704,
+        "output_tokens": 113,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "greeting",
+      "expected": {
+        "intent": "general",
+        "continuation": "new"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "ok",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 352,
+        "request_attempted": true,
+        "intent": "general",
+        "intent_confidence": 1,
+        "intent_probability": 1,
+        "continuation": "new",
+        "continuation_confidence": 1,
+        "continuation_probability": 1,
+        "input_tokens": 664,
+        "output_tokens": 111,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "hours",
+      "expected": {
+        "intent": "store_info",
+        "continuation": "new"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "ok",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 377,
+        "request_attempted": true,
+        "intent": "store_info",
+        "intent_confidence": 1,
+        "intent_probability": 1,
+        "continuation": "new",
+        "continuation_confidence": 0.89,
+        "continuation_probability": 0.93,
+        "input_tokens": 666,
+        "output_tokens": 112,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "human",
+      "expected": {
+        "intent": "human_request",
+        "continuation": "new"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "ok",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 258,
+        "request_attempted": true,
+        "intent": "human_request",
+        "intent_confidence": 0.95,
+        "intent_probability": 0.96,
+        "continuation": "new",
+        "continuation_confidence": 0.94,
+        "continuation_probability": 0.96,
+        "input_tokens": 667,
+        "output_tokens": 112,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "colloquial",
+      "expected": {
+        "intent": "product_inquiry",
+        "continuation": "new"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "ok",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 458,
+        "request_attempted": true,
+        "intent": "product_inquiry",
+        "intent_confidence": 0.98,
+        "intent_probability": 0.98,
+        "continuation": "new",
+        "continuation_confidence": 0.75,
+        "continuation_probability": 0.83,
+        "input_tokens": 669,
+        "output_tokens": 113,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "topic-change",
+      "expected": {
+        "intent": "product_inquiry",
+        "continuation": "new"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "low_confidence",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 258,
+        "request_attempted": true,
+        "intent": "product_inquiry",
+        "intent_confidence": 0.42,
+        "intent_probability": 0.5,
+        "continuation": "continue",
+        "continuation_confidence": 0.3,
+        "continuation_probability": 0.53,
+        "input_tokens": 690,
+        "output_tokens": 113,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "injection",
+      "expected": {
+        "intent": "unclear",
+        "continuation": "unclear"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "low_confidence",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 375,
+        "request_attempted": true,
+        "intent": "unclear",
+        "intent_confidence": 0.8,
+        "intent_probability": 0.84,
+        "continuation": "new",
+        "continuation_confidence": 0.43,
+        "continuation_probability": 0.62,
+        "input_tokens": 672,
+        "output_tokens": 112,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "delivery",
+      "expected": {
+        "intent": "store_info",
+        "continuation": "new"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "ok",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 308,
+        "request_attempted": true,
+        "intent": "store_info",
+        "intent_confidence": 0.98,
+        "intent_probability": 0.99,
+        "continuation": "new",
+        "continuation_confidence": 0.87,
+        "continuation_probability": 0.92,
+        "input_tokens": 667,
+        "output_tokens": 112,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "color-followup",
+      "expected": {
+        "intent": "product_inquiry",
+        "continuation": "continue"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "ok",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 308,
+        "request_attempted": true,
+        "intent": "correction",
+        "intent_confidence": 0.78,
+        "intent_probability": 0.81,
+        "continuation": "continue",
+        "continuation_confidence": 0.8,
+        "continuation_probability": 0.87,
+        "input_tokens": 698,
+        "output_tokens": 113,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "color-orphan",
+      "expected": {
+        "intent": "unclear",
+        "continuation": "unclear"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "low_confidence",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 333,
+        "request_attempted": true,
+        "intent": "unclear",
+        "intent_confidence": 0.37,
+        "intent_probability": 0.47000000000000003,
+        "continuation": "unclear",
+        "continuation_confidence": 0.82,
+        "continuation_probability": 0.88,
+        "input_tokens": 663,
+        "output_tokens": 113,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "gauge-short",
+      "expected": {
+        "intent": "product_inquiry",
+        "continuation": "continue"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "low_confidence",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 333,
+        "request_attempted": true,
+        "intent": "unclear",
+        "intent_confidence": 0.32,
+        "intent_probability": 0.43,
+        "continuation": "continue",
+        "continuation_confidence": 0.32,
+        "continuation_probability": 0.55,
+        "input_tokens": 699,
+        "output_tokens": 112,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "roll-question",
+      "expected": {
+        "intent": "product_inquiry",
+        "continuation": "continue"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "low_confidence",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 329,
+        "request_attempted": true,
+        "intent": "quote",
+        "intent_confidence": 0.62,
+        "intent_probability": 0.67,
+        "continuation": "continue",
+        "continuation_confidence": 0.44,
+        "continuation_probability": 0.63,
+        "input_tokens": 702,
+        "output_tokens": 111,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "stock-followup",
+      "expected": {
+        "intent": "product_inquiry",
+        "continuation": "continue"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "low_confidence",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 249,
+        "request_attempted": true,
+        "intent": "product_inquiry",
+        "intent_confidence": 0.83,
+        "intent_probability": 0.85,
+        "continuation": "continue",
+        "continuation_confidence": 0.32,
+        "continuation_probability": 0.55,
+        "input_tokens": 699,
+        "output_tokens": 113,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "reference-orphan",
+      "expected": {
+        "intent": "product_inquiry",
+        "continuation": "unclear"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "ok",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 247,
+        "request_attempted": true,
+        "intent": "product_inquiry",
+        "intent_confidence": 0.88,
+        "intent_probability": 0.9,
+        "continuation": "unclear",
+        "continuation_confidence": 0.88,
+        "continuation_probability": 0.92,
+        "input_tokens": 664,
+        "output_tokens": 114,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "correction-gauge",
+      "expected": {
+        "intent": "correction",
+        "continuation": "continue"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "ok",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 245,
+        "request_attempted": true,
+        "intent": "correction",
+        "intent_confidence": 0.97,
+        "intent_probability": 0.97,
+        "continuation": "continue",
+        "continuation_confidence": 0.97,
+        "continuation_probability": 0.98,
+        "input_tokens": 707,
+        "output_tokens": 113,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "correction-color",
+      "expected": {
+        "intent": "correction",
+        "continuation": "continue"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "ok",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 378,
+        "request_attempted": true,
+        "intent": "correction",
+        "intent_confidence": 1,
+        "intent_probability": 1,
+        "continuation": "continue",
+        "continuation_confidence": 0.96,
+        "continuation_probability": 0.97,
+        "input_tokens": 705,
+        "output_tokens": 113,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "quote-followup",
+      "expected": {
+        "intent": "quote",
+        "continuation": "continue"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "ok",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 266,
+        "request_attempted": true,
+        "intent": "quote",
+        "intent_confidence": 0.95,
+        "intent_probability": 0.95,
+        "continuation": "continue",
+        "continuation_confidence": 0.92,
+        "continuation_probability": 0.95,
+        "input_tokens": 705,
+        "output_tokens": 111,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "topic-paint-explicit",
+      "expected": {
+        "intent": "product_inquiry",
+        "continuation": "new"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "low_confidence",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 292,
+        "request_attempted": true,
+        "intent": "product_inquiry",
+        "intent_confidence": 0.68,
+        "intent_probability": 0.73,
+        "continuation": "new",
+        "continuation_confidence": 0.48,
+        "continuation_probability": 0.66,
+        "input_tokens": 702,
+        "output_tokens": 113,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "topic-bulb",
+      "expected": {
+        "intent": "product_inquiry",
+        "continuation": "new"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "ok",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 229,
+        "request_attempted": true,
+        "intent": "product_inquiry",
+        "intent_confidence": 0.82,
+        "intent_probability": 0.86,
+        "continuation": "new",
+        "continuation_confidence": 0.89,
+        "continuation_probability": 0.93,
+        "input_tokens": 703,
+        "output_tokens": 113,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "topic-hours-context",
+      "expected": {
+        "intent": "store_info",
+        "continuation": "new"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "ok",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 299,
+        "request_attempted": true,
+        "intent": "store_info",
+        "intent_confidence": 1,
+        "intent_probability": 1,
+        "continuation": "new",
+        "continuation_confidence": 0.96,
+        "continuation_probability": 0.98,
+        "input_tokens": 702,
+        "output_tokens": 112,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "topic-address-context",
+      "expected": {
+        "intent": "store_info",
+        "continuation": "new"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "ok",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 278,
+        "request_attempted": true,
+        "intent": "store_info",
+        "intent_confidence": 1,
+        "intent_probability": 1,
+        "continuation": "new",
+        "continuation_confidence": 0.87,
+        "continuation_probability": 0.91,
+        "input_tokens": 700,
+        "output_tokens": 112,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "topic-human-context",
+      "expected": {
+        "intent": "human_request",
+        "continuation": "new"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "ok",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 469,
+        "request_attempted": true,
+        "intent": "human_request",
+        "intent_confidence": 1,
+        "intent_probability": 1,
+        "continuation": "new",
+        "continuation_confidence": 0.9,
+        "continuation_probability": 0.94,
+        "input_tokens": 701,
+        "output_tokens": 112,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "thanks-context",
+      "expected": {
+        "intent": "general",
+        "continuation": "new"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "ok",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 433,
+        "request_attempted": true,
+        "intent": "general",
+        "intent_confidence": 1,
+        "intent_probability": 1,
+        "continuation": "new",
+        "continuation_confidence": 0.93,
+        "continuation_probability": 0.95,
+        "input_tokens": 699,
+        "output_tokens": 111,
+        "estimated_cost_usd": null
+      }
+    },
+    {
+      "id": "new-cable-explicit",
+      "expected": {
+        "intent": "product_inquiry",
+        "continuation": "new"
+      },
+      "rule_action": "pass",
+      "rule_continuation": null,
+      "rule_intent_agreement": null,
+      "rule_continuation_agreement": null,
+      "jev": {
+        "contract": "jev-shadow-v1",
+        "status": "ok",
+        "provider": "vercel",
+        "model": "typesafe-ai/jev",
+        "elapsed_ms": 335,
+        "request_attempted": true,
+        "intent": "product_inquiry",
+        "intent_confidence": 0.71,
+        "intent_probability": 0.74,
+        "continuation": "new",
+        "continuation_confidence": 0.74,
+        "continuation_probability": 0.83,
+        "input_tokens": 707,
+        "output_tokens": 113,
+        "estimated_cost_usd": null
+      }
+    }
+  ]
+}
