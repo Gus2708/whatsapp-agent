@@ -141,7 +141,20 @@ try {
 }
 
 # ---------------------------------------------------------------------------
-# 4) Recuperacion de mensajes pendientes (en segundo plano).
+# 4) Ejecutar Watchdog de WAHA para asegurar que la sesión esté iniciada
+# ---------------------------------------------------------------------------
+try {
+    $watchdogScript = Join-Path $ProjectDir "waha_watchdog.ps1"
+    if (Test-Path $watchdogScript) {
+        Log "Ejecutando watchdog para iniciar sesion de WhatsApp de inmediato..."
+        & $watchdogScript
+    }
+} catch {
+    Log "ERROR ejecutando watchdog al arrancar: $($_.Exception.Message)"
+}
+
+# ---------------------------------------------------------------------------
+# 4.5) Recuperacion de mensajes pendientes (en segundo plano).
 #    catchup_serrucho.ps1 espera a que la sesion de WhatsApp este WORKING y
 #    responde, con disculpa y espaciado, los mensajes que llegaron mientras
 #    el agente estuvo apagado. Se lanza async para no demorar el arranque.
@@ -159,19 +172,6 @@ try {
     }
 } catch {
     Log "ERROR lanzando la recuperacion: $($_.Exception.Message)"
-}
-
-# ---------------------------------------------------------------------------
-# 4.5) Ejecutar Watchdog de WAHA para iniciar la sesión de inmediato
-# ---------------------------------------------------------------------------
-try {
-    $watchdogScript = Join-Path $ProjectDir "waha_watchdog.ps1"
-    if (Test-Path $watchdogScript) {
-        Log "Ejecutando watchdog para iniciar sesion de WhatsApp de inmediato..."
-        & $watchdogScript
-    }
-} catch {
-    Log "ERROR ejecutando watchdog al arrancar: $($_.Exception.Message)"
 }
 
 # ---------------------------------------------------------------------------
