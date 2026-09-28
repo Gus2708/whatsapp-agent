@@ -347,7 +347,7 @@ function parseItems(str){
 async function getRecargo(){ try { const r = await axios.get(SB+'/rest/v1/presupuesto_config?id=eq.1&select=markup_porcentaje',{headers:H}); const p = r.data && r.data[0] && Number(r.data[0].markup_porcentaje); return (p!=null && !isNaN(p)) ? 1+(p/100) : 1.30; } catch(e){ return 1.30; } }
 async function getTasa(){ try { const r = await axios.get(SB+'/rest/v1/tazas?nombre=eq.actual&select=bcv_usd',{headers:H}); return r.data && r.data[0] && Number(r.data[0].bcv_usd); } catch(e){ return null; } }
 
-const { p_busqueda } = query;
+const { p_busqueda, marcas_excluidas } = (typeof query === 'object' && query !== null) ? query : { p_busqueda: query };
 
 function triggerAutomejora(motivo, extra){
   try {
@@ -1055,6 +1055,17 @@ if (granelIntent){
 if (rolloIntent && !granelIntent){
   const r = unicos.filter(p => !esGranel(p.descripcion));
   if (r.length>0){ unicos.length=0; for(const x of r) unicos.push(x); }
+}
+
+// Filtro de MARCAS EXCLUIDAS: si el cliente rechazo una marca previa ("otra marca"), descarta esa marca
+if (Array.isArray(marcas_excluidas) && marcas_excluidas.length > 0) {
+  const normExcl = marcas_excluidas.map(m => norm(m)).filter(Boolean);
+  const sinExcl = unicos.filter(p => {
+    const nd = norm(p.descripcion);
+    return !normExcl.some(m => new RegExp('(^|[^a-z0-9])' + m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-z0-9]|$)').test(nd));
+  });
+  unicos.length = 0;
+  for (const x of sinExcl) unicos.push(x);
 }
 
 // Filtro de MEDIDA: si el cliente dio medidas, deja solo los que las cumplen TODAS.
