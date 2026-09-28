@@ -124,6 +124,162 @@ async function classifyShadow({ message, previous, env = {}, transport, now = Da
     return finish(['ETIMEDOUT', 'ECONNABORTED', 'ERR_CANCELED'].includes(error?.code) ? 'timeout' : 'transport_error');
   } finally { clearTimeout(timer); }
 }
+
+function getStoreData() {
+  return {
+    name: 'Ferretería El Serrucho 🪚',
+    location: 'Estamos ubicados en Mene Mauroa, Estado Falcón, Venezuela.',
+    pickup_and_delivery: 'Puedes retirar tus compras directamente en nuestra tienda física. Además, contamos con servicio de transporte de materiales a $10 dentro del casco central de Mene Mauroa (para zonas fuera del casco central, la tarifa la confirma un asesor).',
+    hours: 'Atendemos de lunes a sábado de 8:00 AM a 6:00 PM (con descanso para almuerzo de 1:00 PM a 2:00 PM). Domingos y feriados permanecemos cerrados.',
+    payments: 'Aceptamos pagos en dólares en efectivo (USD), bolívares en efectivo, Pago Móvil y transferencia bancaria a la tasa oficial del Banco Central de Venezuela (BCV). También aceptamos Zelle para compras a partir de $20.00 USD. Para concretar el pago, un empleado te atiende enseguida o puedes pasar por la tienda física.',
+    returns: 'Aceptamos cambios y devoluciones hasta 7 días continuos desde la fecha de compra, presentando el producto sellado en su empaque original y la factura de compra.'
+  };
+}
+
+function getStoreInfo(topic = 'general') {
+  const data = getStoreData();
+  const normalized = String(topic || '').toLowerCase().trim();
+
+  if (normalized.includes('horario') || normalized.includes('hora') || normalized.includes('abren') || normalized.includes('cierran')) {
+    return `🕒 *Horario de Atención*\n${data.hours}`;
+  }
+  if (normalized.includes('ubicacion') || normalized.includes('direccion') || normalized.includes('donde') || normalized.includes('llegar')) {
+    return `📍 *Ubicación y Entregas*\n${data.location}\n${data.pickup_and_delivery}`;
+  }
+  if (normalized.includes('pago') || normalized.includes('bcv') || normalized.includes('zelle') || normalized.includes('transferencia') || normalized.includes('dolar')) {
+    return `💳 *Métodos de Pago*\n${data.payments}`;
+  }
+  if (normalized.includes('envio') || normalized.includes('delivery') || normalized.includes('transporte')) {
+    return `🚚 *Transporte y Retiro*\n${data.pickup_and_delivery}`;
+  }
+  if (normalized.includes('devolucion') || normalized.includes('cambio') || normalized.includes('garantia')) {
+    return `📦 *Políticas de Devolución*\n${data.returns}`;
+  }
+
+  // Fallback to full card
+  return `ℹ️ *Información - ${data.name}*\n\n` +
+    `📍 *Ubicación:* ${data.location}\n` +
+    `🕒 *Horario:* ${data.hours}\n` +
+    `💳 *Pagos:* ${data.payments}\n` +
+    `🚚 *Entregas:* ${data.pickup_and_delivery}`;
+}
+
+function formatStoreInfoReply(topic = 'general', options = {}) {
+  const base = getStoreInfo(topic);
+  const closing = options.includeHelpPrompt !== false
+    ? '\n\n¿En qué producto o cotización te podemos ayudar hoy? 👨🏻‍🔧'
+    : '';
+  return `${base}${closing}`;
+}
+
+function detectStoreInfoTopic(text) {
+  if (!text || typeof text !== 'string') return null;
+  const t = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  if (/\b(horario|horarios|a que hora|que hora abren|abren hoy|estan abiertos|hasta que hora)\b/.test(t)) {
+    return 'horario';
+  }
+  if (/\b(donde estan|donde queda|ubicacion|direccion|como llegar|estan en mene mauroa)\b/.test(t)) {
+    return 'ubicacion';
+  }
+  if (/\b(metodos? de pago|formas? de pago|aceptan zelle|pago movil|tasa bcv|como pagar|aceptan dolares|reciben bolivares)\b/.test(t)) {
+    return 'pagos';
+  }
+  if (/\b(hacen delivery|costo del envio|transporte|traen a domicilio|hacen envios)\b/.test(t)) {
+    return 'delivery';
+  }
+  if (/\b(politica de devolucion|garantia|hacen cambios|cambiar producto)\b/.test(t)) {
+    return 'devoluciones';
+  }
+  if (/\b(informacion de la tienda|datos de la tienda|quienes son)\b/.test(t)) {
+    return 'general';
+  }
+
+  return null;
+}
+
+function fastRouter({ message, jev, context, options = {} } = {}) {
+  const raw = String(message || '');
+  const text = raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+  const minConfidence = Number(options.minConfidence || 0.85);
+
+  // 1. Guarded Jev Classification Path
+  if (jev && jev.status === 'ok' && typeof jev.intent === 'string') {
+    const confidence = Number(jev.intent_confidence ?? jev.confidence ?? 0);
+    if (confidence >= minConfidence) {
+      if (jev.intent === 'store_info') {
+        const topic = detectStoreInfoTopic(text) || 'general';
+        return {
+          fast_path: true,
+          action: 'respond',
+          topic,
+          reply: formatStoreInfoReply(topic),
+          confidence
+        };
+      }
+      if (jev.intent === 'general') {
+        const isClosing = /\b(?:gracias|muchas gracias|agradecido|listo gracias|chao|adios|hasta luego)\b/.test(text);
+        const reply = isClosing
+          ? '¡A tu orden siempre! 😊 Recuerda que en *Ferretería El Serrucho* estamos para servirte. ¡Que tengas un excelente día! 👨🏻‍🔧'
+          : '¡Hola! 👋 Te atiende *Perucho* 👨🏻‍🔧 de *Ferretería El Serrucho* 🪚 en Mene Mauroa. ¿En qué producto o material te podemos ayudar hoy? 😊';
+        return {
+          fast_path: true,
+          action: 'respond',
+          reply,
+          confidence
+        };
+      }
+      if (jev.intent === 'quote') {
+        return {
+          fast_path: true,
+          action: 'quote_handoff',
+          query: raw,
+          confidence
+        };
+      }
+      if (jev.intent === 'human_request') {
+        return {
+          fast_path: true,
+          action: 'handoff',
+          query: raw,
+          reply: '[PEDIR_AYUDA]',
+          confidence
+        };
+      }
+    }
+  }
+
+  // 2. Rule-Based Fallback Path (when Jev is absent, disabled, or failed)
+  const humanRequest = /\b(?:hablar con (?:un |una )?(?:humano|persona|asesor|empleado)|comunicame con (?:un |una )?(?:humano|persona|asesor|empleado)|pasame con (?:un |una )?(?:humano|persona|asesor|empleado)|atencion humana|asesor humano)\b/.test(text) ||
+    (/\b(?:humano|asesor|empleado)\b/.test(text) && /\b(?:quiero|puedo|favor|por favor|necesito|hablar|contactar)\b/.test(text));
+  if (humanRequest) {
+    return {
+      fast_path: true,
+      action: 'handoff',
+      query: raw,
+      reply: '[PEDIR_AYUDA]',
+      source: 'fallback'
+    };
+  }
+
+  const storeTopic = detectStoreInfoTopic(text);
+  if (storeTopic) {
+    return {
+      fast_path: true,
+      action: 'respond',
+      topic: storeTopic,
+      reply: formatStoreInfoReply(storeTopic),
+      source: 'fallback'
+    };
+  }
+
+  // 3. Fail-Closed Fallthrough to standard AI Agent
+  return {
+    fast_path: false,
+    action: 'pass',
+    query: raw
+  };
+}
 // END JEV FUNCTIONS
 const original = $input.first().json;
 const config = {};
@@ -161,4 +317,12 @@ const metadata = await classifyShadow({ message: latest,
     return { status: response.status, body: response.data };
   },
 });
-return [{ json: { ...original, jev_shadow: metadata } }];
+let updatedContext = original.conversation_context;
+if (typeof fastRouter === 'function') {
+  const route = fastRouter({ message: latest, jev: metadata, context: updatedContext });
+  if (route && route.fast_path) {
+    updatedContext = { ...(updatedContext || {}), ...route };
+  }
+}
+return [{ json: { ...original, jev_shadow: metadata, conversation_context: updatedContext } }];
+

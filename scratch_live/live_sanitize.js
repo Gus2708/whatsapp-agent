@@ -66,14 +66,20 @@ let telefono = null, pushName = null;
 try { const p = $('Webhook Trigger').first().json.body.payload; telefono = p && p.from; pushName = (p && p._data && p._data.pushName) || (p && p.notifyName) || (p && p.pushName) || null; } catch (e) {}
 
 for (const item of items) {
-  let context;
-  try { context = $('Prepare Conversation Context').first().json.conversation_context; } catch (_) {}
+  let context = item?.json?.conversation_context;
+  if (!context) {
+    try { context = $('Prepare Conversation Context').first().json.conversation_context; } catch (_) {}
+  }
   // With returnIntermediateSteps enabled, tool-free turns return an empty array.
   // A missing trace is an unsupported runtime contract, not proof of no tool calls.
-  const guarded = context?.action === 'clarify'
-    ? '¿Qué producto necesitas exactamente? Indícame el nombre y la medida, por favor.'
-    : !item.json.error && typeof item.json.output === 'string' && item.json.output.trim()
-      ? searchGuard(item.json.intermediateSteps) : null;
+  const guarded = context?.action === 'respond'
+    ? context.reply
+    : context?.action === 'handoff'
+      ? (context.reply || '[PEDIR_AYUDA]')
+      : context?.action === 'clarify'
+        ? '¿Qué producto necesitas exactamente? Indícame el nombre y la medida, por favor.'
+        : !item.json.error && typeof item.json.output === 'string' && item.json.output.trim()
+          ? searchGuard(item.json.intermediateSteps) : null;
   delete item.json.intermediateSteps;
   delete item.json.jev_shadow;
   // Explicit human escalation retains precedence; uncertain results never trigger reservations.

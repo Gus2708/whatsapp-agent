@@ -20,4 +20,7 @@ active_changes:
   next_phase: plan
   decision_state: specs/changes/brand-alternatives-routing/decision-state.md
   updated_at: '2026-09-28T07:55:42.015317+00:00'
-archived_recent: []
+archived_recent:
+- change: jev-agent-improvements
+  archived_at: '2026-09-28T08:17:12.267476+00:00'
+  archive_path: specs/changes/archive/2026-09-28-jev-agent-improvements
