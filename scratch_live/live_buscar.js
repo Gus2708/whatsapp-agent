@@ -425,10 +425,80 @@ const PROBLEM_SOLUTIONS = {
   }
 };
 
+const ACTION_SOLUTIONS = {
+  pegar_adherir: {
+    construccion_aridos: ['pega piso', 'cemento blanco', 'pego gris'],
+    plomeria_griferia: ['pega pvc', 'teflon', 'soldadura liquida'],
+    fijacion_tornilleria: ['cero clavos', 'pega blanca', 'adhesivo de montaje', 'silicon'],
+    _default: ['pega piso', 'pega pvc', 'cero clavos']
+  },
+  lubricar_destrabar: {
+    herramientas_discos: ['aflojatodo', 'grasa', 'aceite 3 en 1'],
+    seguridad_cerraduras: ['aflojatodo', 'grafito en polvo', 'aceite multiuso'],
+    _default: ['aflojatodo', 'grasa multiuso', 'aceite lubricante']
+  },
+  destapar_drenar: {
+    plomeria_griferia: ['destapador de caneria', 'chupa', 'sifon lavaplatos'],
+    _default: ['destapador', 'chupa poceta', 'sifon']
+  },
+  limpiar_desoxidar: {
+    pinturas: ['fondo anticorrosivo', 'desoxidante', 'cepillo alambre'],
+    hierro_perfiles: ['desoxidante', 'cepillo de alambre', 'fondo'],
+    _default: ['desoxidante', 'fondo anticorrosivo', 'desengrasante']
+  },
+  aislar_proteger: {
+    techos_laminas: ['pintura termica', 'manto aluminio', 'aislante termico'],
+    electricidad_cables: ['teipe negro', 'cinta aislante', 'termoencogible'],
+    _default: ['aislante termico', 'manto aluminio', 'cinta aislante']
+  },
+  impermeabilizar_sellar: {
+    techos_laminas: ['cemento plastico', 'manto asfaltico', 'cinta manto', 'primer asfaltico'],
+    fijacion_tornilleria: ['silicon transparente', 'adhesivo sellador'],
+    plomeria_griferia: ['cuello cera', 'teflon', 'silicon'],
+    _default: ['cemento plastico', 'silicon transparente', 'manto asfaltico']
+  },
+  resanar_emparejar: {
+    pinturas: ['pasta profesional', 'yeso', 'lija'],
+    construccion_aridos: ['cemento blanco', 'yeso', 'pasta profesional'],
+    _default: ['pasta profesional', 'yeso', 'cemento blanco']
+  }
+};
+
 function resolveProblemSolutions(intent) {
   if (!intent || intent === 'ninguno_o_especifico') return null;
   const target = PROBLEM_SOLUTIONS[intent];
   return target ? { intent, department: target.department, searchTerms: [...target.searchTerms] } : null;
+}
+
+function resolveDynamicSolutions(intentOrAction, department, customTerms) {
+  if (Array.isArray(customTerms) && customTerms.length > 0) {
+    const cleanTerms = customTerms.map(t => norm(t)).filter(Boolean);
+    if (cleanTerms.length > 0) {
+      return { department: department || 'unclear', searchTerms: cleanTerms };
+    }
+    return null;
+  }
+  if (!intentOrAction || intentOrAction === 'ninguno_o_especifico') return null;
+
+  if (PROBLEM_SOLUTIONS[intentOrAction]) {
+    const staticTarget = PROBLEM_SOLUTIONS[intentOrAction];
+    return {
+      department: department || staticTarget.department,
+      searchTerms: [...staticTarget.searchTerms]
+    };
+  }
+
+  const actionTarget = ACTION_SOLUTIONS[intentOrAction];
+  if (actionTarget) {
+    const deptKey = department && actionTarget[department] ? department : '_default';
+    const terms = actionTarget[deptKey] || actionTarget._default;
+    return {
+      department: department || (deptKey !== '_default' ? deptKey : 'unclear'),
+      searchTerms: [...terms]
+    };
+  }
+
+  return null;
 }
 
 function parseItems(str){
@@ -449,8 +519,8 @@ function parseItems(str){
 async function getRecargo(){ try { const r = await axios.get(SB+'/rest/v1/presupuesto_config?id=eq.1&select=markup_porcentaje',{headers:H}); const p = r.data && r.data[0] && Number(r.data[0].markup_porcentaje); return (p!=null && !isNaN(p)) ? 1+(p/100) : 1.30; } catch(e){ return 1.30; } }
 async function getTasa(){ try { const r = await axios.get(SB+'/rest/v1/tazas?nombre=eq.actual&select=bcv_usd',{headers:H}); return r.data && r.data[0] && Number(r.data[0].bcv_usd); } catch(e){ return null; } }
 
-const { p_busqueda, marcas_excluidas, department, department_confidence, material, problem_intent, problem_intent_confidence } = (typeof query === 'object' && query !== null) ? query : { p_busqueda: query };
-const _alignment = (department || material || problem_intent) ? { department, department_confidence, material, problem_intent, problem_intent_confidence } : null;
+const { p_busqueda, marcas_excluidas, department, department_confidence, material, problem_intent, problem_intent_confidence, solution_terms, solution_terms_confidence } = (typeof query === 'object' && query !== null) ? query : { p_busqueda: query };
+const _alignment = (department || material || problem_intent || solution_terms) ? { department, department_confidence, material, problem_intent, problem_intent_confidence, solution_terms, solution_terms_confidence } : null;
 
 function triggerAutomejora(motivo, extra){
   try {
@@ -870,9 +940,9 @@ if (res.length===0){
       _rescate = { categoria: norm(_vecFiltered[0].descripcion).split(' ')[0], termino: '', confianza: 4 };
     }
   }
-  if (res.length === 0 && _alignment && _alignment.problem_intent && _alignment.problem_intent !== 'ninguno_o_especifico' &&
+  if (res.length === 0 && _alignment && (_alignment.problem_intent || _alignment.solution_terms) && _alignment.problem_intent !== 'ninguno_o_especifico' &&
       (_alignment.problem_intent_confidence === undefined || Number(_alignment.problem_intent_confidence) >= 0.80)) {
-    const _solTarget = resolveProblemSolutions(_alignment.problem_intent);
+    const _solTarget = resolveDynamicSolutions(_alignment.problem_intent, _alignment.department, _alignment.solution_terms);
     if (_solTarget && Array.isArray(_solTarget.searchTerms)) {
       for (const term of _solTarget.searchTerms) {
         const _solRows = await rpc(term);
@@ -952,9 +1022,9 @@ if (!_rescate && res.length > 0){
   }
 }
 
-if (!_rescate && _alignment && _alignment.problem_intent && _alignment.problem_intent !== 'ninguno_o_especifico' &&
+if (!_rescate && _alignment && (_alignment.problem_intent || _alignment.solution_terms) && _alignment.problem_intent !== 'ninguno_o_especifico' &&
     (_alignment.problem_intent_confidence === undefined || Number(_alignment.problem_intent_confidence) >= 0.80)) {
-  const _solTarget = resolveProblemSolutions(_alignment.problem_intent);
+  const _solTarget = resolveDynamicSolutions(_alignment.problem_intent, _alignment.department, _alignment.solution_terms);
   if (_solTarget && Array.isArray(_solTarget.searchTerms)) {
     const _currentDept = res.length ? detectProductDepartment(res[0].descripcion) : 'unclear';
     if (_currentDept !== _solTarget.department) {
