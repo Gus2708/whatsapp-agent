@@ -34,7 +34,7 @@ for (const name of sharedFns) {
     `lib.${name} source not found verbatim in scratch_live/live_buscar.js (lib drifted)`
   );
 }
-const buscarOnlyFns = ['detectConstructionTask', 'estimateConstructionMaterials'];
+const buscarOnlyFns = ['detectConstructionTask', 'estimateConstructionMaterials', 'getInstallationKit', 'detectInstallationQuery', 'findComplementaryKit'];
 for (const name of buscarOnlyFns) {
   assert.ok(
     buscar.includes(L[name].toString().replace(/\r\n/g, '\n')),
