@@ -1,4 +1,4 @@
-change: brand-alternatives-routing
+change: pwa-dashboard
 flow: brief
 mode: standard
 pace: semi-supervised
@@ -15,11 +15,11 @@ review_hard_limit_files: 25
 delivery:
   model: whole
   whole_pr:
-    branch: feature/brand-alternatives-routing
-    base: perucho
+    branch: feature/pwa-dashboard
+    base: main
     draft_pr: true
-    status: not_ready
-    url: null
+    status: created
+    url: https://github.com/Gus2708/whatsapp-agent/pull/new
   feature_base_branch: null
   base_branch: null
   feature_pr:
@@ -30,8 +30,8 @@ delivery:
   next_slice: null
   reopen_unit: null
   slices: []
-current_phase: verify
-next_phase: verify
+current_phase: archive
+next_phase: null
 status:
   plan: done
   exploration: pending
@@ -41,19 +41,19 @@ status:
   tasks: pending
   apply: done
   verify: done
-  archive: pending
+  archive: done
 artifacts:
-  intent: null
+  intent: intent.md
   exploration: null
   correction: null
   proposal: null
   spec: []
   design: null
-  tasks: null
+  tasks: tasks.md
   refactor: null
   verify_report: null
   archive_report: null
 decisions: []
 open_questions: []
 blocked_reasons: []
-updated_at: '2026-09-28T07:55:42.008204+00:00'
+updated_at: '2026-09-28T09:45:50.977692+00:00'

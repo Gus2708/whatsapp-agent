@@ -1,26 +1,12 @@
 project: whatsapp-agent
-active_changes:
-- change: pwa-dashboard
-  flow: brief
-  pace: semi-supervised
-  mode: standard
-  verbosity: concise
-  status: verify
-  current_phase: plan
-  next_phase: plan
-  decision_state: specs/changes/pwa-dashboard/decision-state.md
-  updated_at: '2026-09-04T08:09:50.157553+00:00'
-- change: brand-alternatives-routing
-  flow: brief
-  pace: semi-supervised
-  mode: standard
-  verbosity: concise
-  status: verify
-  current_phase: plan
-  next_phase: plan
-  decision_state: specs/changes/brand-alternatives-routing/decision-state.md
-  updated_at: '2026-09-28T07:55:42.015317+00:00'
+active_changes: []
 archived_recent:
+- change: pwa-dashboard
+  archived_at: '2026-09-28T09:45:50.983095+00:00'
+  archive_path: specs/changes/archive/2026-09-28-pwa-dashboard
+- change: brand-alternatives-routing
+  archived_at: '2026-09-28T09:45:12.328086+00:00'
+  archive_path: specs/changes/archive/2026-09-28-brand-alternatives-routing
 - change: jev-dynamic-solution-extraction
   archived_at: '2026-09-28T09:40:09.257472+00:00'
   archive_path: specs/changes/archive/2026-09-28-jev-dynamic-solution-extraction
