@@ -505,17 +505,67 @@ function resolveDynamicSolutions(intentOrAction, department, customTerms) {
 }
 
 function parseItems(str){
-  const partes = str.split(/[,;\n]+/).map(s=>s.trim()).filter(Boolean);
+  if (!str || typeof str !== 'string') return [];
+  const WORD_NUMS = {
+    un: 1, una: 1, uno: 1,
+    dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10,
+    medio: 0.5
+  };
+  const lines = str.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const rawParts = [];
+  const conjLookahead = '(?=' +
+    '\\d+(?:\\.\\d+)?(?:\\s|$)' + '|' +
+    '(?:un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|medio)(?:\\s|$)' + '|' +
+    '(?:sacos?|tubos?|laminas?|láminas?|cabillas?|rollos?|cuñetes?|cunetes?|galones?|bombillos?|codos?|pegas?|teflon|manto)(?:\\s|$)' +
+  ')';
+  const splitRe = new RegExp('[,;]+|\\s+(?:y|e|con|mas|más|ademas|además|tambien|también)\\s+' + conjLookahead, 'gi');
+
+  for (const line of lines) {
+    const cleanLine = line
+      .replace(/^[\s\-*•·–—]+/, '')
+      .replace(/^\s*\d+[\.\)]\s+/, '')
+      .trim();
+    if (!cleanLine) continue;
+
+    const tokens = cleanLine.split(splitRe).map(t => t.trim()).filter(Boolean);
+    for (const t of tokens) {
+      rawParts.push(t);
+    }
+  }
+
   const out = [];
-  for (let p of partes){
-    let nombre=p, cant=1;
+  for (let p of rawParts) {
+    p = p.replace(/^[\s\-*•·–—]+/, '').replace(/^\s*\d+[\.\)]\s+/, '').trim();
+    if (!p) continue;
+
+    let nombre = p, cant = 1;
     let m = p.match(/^(.*?)[:=]\s*(\d+(?:\.\d+)?)\s*$/);
     if (!m) m = p.match(/^(.*?)\s+x\s*(\d+(?:\.\d+)?)\s*$/i);
-    if (!m){ const m2=p.match(/^(\d+(?:\.\d+)?)\s+(.*)$/); if(m2){ cant=Number(m2[1]); nombre=m2[2]; } }
-    if (m){ nombre=m[1].trim(); cant=Number(m[2]); }
-    nombre = nombre.replace(/^((sacos?|unidades?|uds?|piezas?|metros?|mts|de|del|la|el|los|las)\s+)+/i,'').trim();
-    if (nombre) out.push({ nombre, cantidad: cant>0?cant:1 });
+    if (!m) m = p.match(/^(.*?)\s*\(\s*(\d+(?:\.\d+)?)\s*\)\s*$/);
+
+    if (m) {
+      nombre = m[1].trim();
+      cant = Number(m[2]);
+    } else {
+      const m2 = p.match(/^(\d+(?:\.\d+)?)\s*(?:x\s*)?(.*)$/i);
+      if (m2) {
+        cant = Number(m2[1]);
+        nombre = m2[2];
+      } else {
+        const mw = p.match(/^(un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|medio)\s+(.*)$/i);
+        if (mw) {
+          cant = WORD_NUMS[mw[1].toLowerCase()] || 1;
+          nombre = mw[2];
+        }
+      }
+    }
+
+    nombre = nombre.replace(/^((sacos?|unidades?|uds?|piezas?|metros?|mts|de|del|la|el|los|las)\s+)+/i, '').trim();
+    if (nombre) {
+      out.push({ nombre, cantidad: cant > 0 ? cant : 1 });
+    }
   }
+
   return out;
 }
 
