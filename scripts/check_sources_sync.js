@@ -51,3 +51,15 @@ assert.ok(
 );
 
 console.log('sources in sync: OK');
+for (const [name, fn] of Object.entries(require('../lib/jev-shadow'))) {
+  assert.ok(read('scratch_live/live_jev_shadow.js').includes(fn.toString().replace(/\r\n/g, '\n')), `Jev ${name} source drifted`);
+}
+const conversation = require('../lib/conversation-context');
+for (const [file, names] of Object.entries({
+  'live_conversation_context.js': ['resolveConversation'],
+  'live_buscar.js': ['searchDecision'],
+  'live_sanitize.js': ['searchDecision', 'searchGuard'],
+})) {
+  for (const name of names) assert.ok(read('scratch_live/' + file).includes(conversation[name].toString().replace(/\r\n/g, '\n')),
+    `conversation.${name} source drifted in ${file}`);
+}

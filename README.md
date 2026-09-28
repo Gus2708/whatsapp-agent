@@ -18,6 +18,7 @@
     <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-Supported-blue.svg?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" /></a>
     <a href="https://n8n.io/"><img src="https://img.shields.io/badge/Powered%20by-n8n-orange.svg?style=for-the-badge&logo=n8n&logoColor=white" alt="n8n" /></a>
     <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" /></a>
+    <a href="docs/jev-shadow-pilot.md"><img src="https://img.shields.io/badge/Jev%20AI-Decision%20Engine-7928CA?style=for-the-badge" alt="Jev AI Decision Engine" /></a>
     <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-14-black.svg?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js 14" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge" alt="License: MIT" /></a>
   </p>
@@ -49,11 +50,12 @@ graph TD
 | WhatsApp HTTP API | WAHA (Docker, engine NOWEB) | Multi-device session emulation and webhook delivery |
 | Workflow Orchestrator | n8n (Docker) | Event management, state routing, rate limiting, and tool dispatch |
 | LLM Reasoning | OpenRouter / OpenAI | Multi-turn reasoning and tool invocation |
+| Decision Modeling | TypeSafe Jev / Vercel AI Gateway | Sub-second intent classification & shadow evaluation pilot |
 | Voice Transcription | Groq Whisper | Audio note transcription in <800ms |
 | Database & Search | Supabase (PostgreSQL + pg_trgm + pgvector) | Inventory catalog, order queue, and hybrid vector search |
-| Long-Term Memory | Engram | Persistent cross-session customer facts and preferences |
+| State & Long-Term Memory | Engram + In-Memory Session Context | Customer profiling & 30-min TTL conversational attribute cache |
 | Flight Deck & CRM | Next.js 14 (App Router + Tailwind + GSAP + PWA) | Live telemetry, chat operations queue, RAG studio, DevOps console |
-| Runtime | Node.js 22+ | CLI tools, sync guards, recovery engine |
+| Runtime & Testing | Node.js 22+ (Native Test Runner) | CLI tools, sync guards, recovery engine, 150+ hermetic tests |
 
 ---
 
@@ -69,6 +71,41 @@ graph TD
 | ★ | Sales Popularity | Weighted purchase frequency | Reranks by purchase frequency |
 
 Link to [RAG.md](RAG.md) and [ARCHITECTURE.md](ARCHITECTURE.md) for deep details.
+
+---
+
+## ⚡ Cutting-Edge Decision Modeling: Jev Shadow Pilot & Context Engine
+
+In high-throughput conversational AI, large foundation models (e.g., GPT-4o, Claude) introduce substantial latency (1,000–3,000ms) and token costs for micro-decisions like intent routing or clarification. 
+
+To solve this, this repository implements a **Sub-Second Decision Modeling Engine** featuring an enterprise **Shadow Pilot** powered by **TypeSafe Jev** (and Vercel AI Gateway), coupled with a deterministic **Conversation Context Resolver**:
+
+```mermaid
+flowchart LR
+    Msg["📱 Customer Message"] --> Ctx["🧠 Context Engine<br/>(30m TTL · Session-Isolated)"]
+    Ctx --> Shadow["⚡ Jev Shadow Observer<br/>(TypeSafe AI / Vercel Gateway)"]
+    Shadow -.-> Eval["📊 Synthetic Eval Harness<br/>(Latency · Cost · Accuracy)"]
+    Ctx --> Agent["🤖 Production AI Agent<br/>(GPT-5.6 / Claude)"]
+    Agent --> Guard["🛡️ Decision Guard & Sanitizer<br/>(Suppresses Unguaranteed Prices)"]
+    Guard --> Out["💬 Customer WhatsApp Reply"]
+```
+
+### Key Engineering Highlights for Hiring Teams & AI Architects:
+
+1. **Jev Sub-Second Decision Engine ([`lib/jev-shadow.js`](lib/jev-shadow.js))**:
+   - **Zero-Risk Shadow Deployment**: Evaluates `typesafe-ai/jev` in the background with a strict 1,500ms timeout budget without intercepting or altering customer responses (`JEV_MODE=off` by default).
+   - **Enterprise PII & Privacy Redaction**: Automatically scrubs phone numbers, emails, URLs, bank credentials, currency amounts, and self-introductions before calling external APIs.
+   - **Dual-Provider Architecture**: Native abstraction supporting both direct **TypeSafe API** (`api.typesafe.ai/v1/systemone`) and **Vercel AI Gateway** (`ai-gateway.vercel.sh`).
+   - **Hermetic Synthetic Evaluation ([`scripts/evaluate_jev.js`](scripts/evaluate_jev.js))**: Built-in 30-case Spanish benchmark tracking intent agreement, confidence calibration, token consumption, and P95 latency.
+
+2. **Deterministic Context Engine ([`lib/conversation-context.js`](lib/conversation-context.js))**:
+   - **Multi-Turn Disambiguation**: Tracks technical product specifications (cable caliber, wire insulation, presentation, colors) across turns (e.g., *"y en calibre 8?"* → preserves THW/por metro context).
+   - **Zero Hallucination with 30m TTL**: In-memory state machine isolated per WAHA session and chat ID. Ambiguities or session resets safely trigger clarification rather than hallucinating product matches.
+
+3. **Typed Search Guardrails & Anti-Hallucination Sanitizer**:
+   - `buscar_productos` returns verified contract schemas (`match_status: exact | vague | missing`).
+   - Approximate product matches strictly suppress pricing and force confirmation dialogs, protecting margins and customer trust.
+   - Sanitizer verifies intermediate tool executions and strips internal traces before dispatch.
 
 ---
 
@@ -267,6 +304,14 @@ npm test
 | `dashboard/components/pwa/` | PWA service worker registration |
 | `dashboard/app/api/` | Next.js API routes (conversations, n8n, rag, telemetry, tunnel) |
 | `lib/catalog-search.js` | Canonical core search engine and AST normalizer |
+| `lib/conversation-context.js` | Deterministic short-term conversation state engine & cable query parser |
+| `lib/jev-shadow.js` | Jev decision model shadow observer with PII redactor |
+| `lib/workflow-overlay.js` | n8n workflow overlay generator for baseline-safe extensions |
+| `scripts/evaluate_jev.js` | Synthetic evaluation harness (latency, cost, accuracy) for Jev |
+| `docs/jev-shadow-pilot.md` | Engineering specification for Jev shadow pilot & privacy model |
+| `docs/conversation-context-pilot.md` | Specification for short-term state resolver & typed search guards |
+| `docs/production-workflow-baseline.md` | Sanitized baseline documentation & reproducibility criteria |
+| `workflows/production-baseline.json` | Published production n8n baseline (40 nodes, env-parameterized) |
 | `rag.js` | RAG evaluation suite runner |
 | `scripts/` | 120+ operational scripts: patches, tests, workflow builders, embedding generators |
 | `workflows/` | Auxiliary n8n workflows (auto-improvement, help forwarding, vocabulary) |

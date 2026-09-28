@@ -18,6 +18,7 @@
     <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-Soportado-blue.svg?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" /></a>
     <a href="https://n8n.io/"><img src="https://img.shields.io/badge/Potenciado%20por-n8n-orange.svg?style=for-the-badge&logo=n8n&logoColor=white" alt="n8n" /></a>
     <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" /></a>
+    <a href="docs/jev-shadow-pilot.md"><img src="https://img.shields.io/badge/Jev%20AI-Motor%20de%20Decisi%C3%B3n-7928CA?style=for-the-badge" alt="Jev AI Motor de Decisión" /></a>
     <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-14-black.svg?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js 14" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/Licencia-MIT-yellow.svg?style=for-the-badge" alt="Licencia: MIT" /></a>
   </p>
@@ -49,11 +50,12 @@ graph TD
 | HTTP API WhatsApp | WAHA (Docker, motor NOWEB) | Emulación de sesiones multidispositivo y despacho de webhooks |
 | Orquestador de Flujos | n8n (Docker) | Gestión de eventos, enrutamiento de estado, rate limiting y despacho de herramientas |
 | Razonamiento LLM | OpenRouter / OpenAI | Razonamiento multiturno e invocación de herramientas |
+| Modelado de Decisiones | TypeSafe Jev / Vercel AI Gateway | Clasificación de intenciones sub-segundo y piloto de evaluación shadow |
 | Transcripción de Voz | Groq Whisper | Transcripción de notas de audio en <800ms |
 | Base de Datos y Búsqueda | Supabase (PostgreSQL + pg_trgm + pgvector) | Catálogo de inventario, cola de pedidos y búsqueda vectorial híbrida |
-| Memoria a Largo Plazo | Engram | Hechos y preferencias persistentes de clientes entre sesiones |
+| Estado y Memoria | Engram + Contexto de Sesión en Memoria | Perfilado de clientes y caché de atributos con TTL de 30 minutos |
 | Flight Deck & CRM | Next.js 14 (App Router + Tailwind + GSAP + PWA) | Telemetría en vivo, cola de operaciones de chat, estudio RAG, consola DevOps |
-| Runtime | Node.js 22+ | Herramientas de CLI, guardias de sincronización, motor de recuperación |
+| Runtime y Testing | Node.js 22+ (Native Test Runner) | Herramientas de CLI, guardias de sincronización, recuperación, 150+ tests herméticos |
 
 ---
 
@@ -69,6 +71,41 @@ graph TD
 | ★ | Popularidad de Ventas | Frecuencia de compra ponderada | Reordena resultados según histórico de ventas |
 
 Ver [RAG.md](RAG.md) y [ARCHITECTURE.md](ARCHITECTURE.md) para detalles profundos de arquitectura.
+
+---
+
+## ⚡ Modelado de Decisiones de Vanguardia: Piloto Jev Shadow y Motor de Contexto
+
+En sistemas de IA conversacional de alto tráfico, los modelos fundacionales pesados (GPT-4o, Claude) introducen latencias elevadas (1.000–3.000ms) y costos de inferencia significativos en micro-decisiones de ruteo o aclaración.
+
+Para optimizar esto a nivel de arquitectura empresarial, el agente implementa un **Motor de Modelado de Decisiones Sub-Segundo** con un **Piloto Shadow** basado en **TypeSafe Jev** (y Vercel AI Gateway), desacoplado de la inferencia del cliente y respaldado por un **Resolvedor Determinista de Contexto**:
+
+```mermaid
+flowchart LR
+    Msg["📱 Mensaje del Cliente"] --> Ctx["🧠 Motor de Contexto<br/>(30m TTL · Aislamiento por Sesión)"]
+    Ctx --> Shadow["⚡ Observador Jev Shadow<br/>(TypeSafe AI / Vercel Gateway)"]
+    Shadow -.-> Eval["📊 Harness de Evaluación Sintética<br/>(Latencia · Costo · Precisión)"]
+    Ctx --> Agent["🤖 Agente IA Producción<br/>(GPT-5.6 / Claude)"]
+    Agent --> Guard["🛡️ Guard de Decisiones y Sanitizador<br/>(Suprime Precios No Confirmados)"]
+    Guard --> Out["💬 Respuesta WhatsApp al Cliente"]
+```
+
+### Aspectos Técnicos Destacados para Equipos de Selección y Arquitectos de IA:
+
+1. **Motor de Decisiones Sub-Segundo Jev ([`lib/jev-shadow.js`](lib/jev-shadow.js))**:
+   - **Despliegue Shadow sin Riesgo Operativo**: Evalúa `typesafe-ai/jev` en segundo plano con un presupuesto de tiempo estricto (1.500ms) sin alterar respuestas ni ruteo de negocio (`JEV_MODE=off` por defecto).
+   - **Anonimización y Redacción de PII Empresarial**: Sanitizador previo que enmascara números de teléfono, correos, URLs, credenciales bancarias, montos de dinero y presentaciones personales antes de llamar a APIs externas.
+   - **Arquitectura Dual-Provider**: Abstracción nativa compatible con **TypeSafe API** directa (`api.typesafe.ai/v1/systemone`) y **Vercel AI Gateway** (`ai-gateway.vercel.sh`).
+   - **Evaluación Sintética Hermética ([`scripts/evaluate_jev.js`](scripts/evaluate_jev.js))**: Benchmark integrado con 30 casos en español que mide concordancia de intención, calibración de confianza, uso de tokens y latencia P95.
+
+2. **Motor de Contexto Determinista ([`lib/conversation-context.js`](lib/conversation-context.js))**:
+   - **Desambiguación Multiturno sin Alucinaciones**: Rastrea atributos técnicos de producto (calibre de cables, aislamiento, presentación, colores) entre turnos (ej. *"¿y en calibre 8?"* → conserva contexto de tipo THW/por metro).
+   - **Máquina de Estado en Memoria con TTL de 30 min**: Aislada por sesión de WAHA y chat ID. Las ambigüedades o reinicios de sesión solicitan aclaración controlada en lugar de inferir productos incorrectos.
+
+3. **Guardias de Decisión Estructurada y Sanitización Anti-Alucinaciones**:
+   - `buscar_productos` devuelve contratos validados por esquema (`match_status: exact | vague | missing`).
+   - Las coincidencias aproximadas suprimen estrictamente precios y exigen confirmación del cliente, protegiendo márgenes comerciales.
+   - El sanitizador valida pasos intermedios de herramientas y elimina trazas internas antes del despacho final.
 
 ---
 
@@ -266,6 +303,14 @@ npm test
 | `dashboard/components/pwa/` | Registro de service worker PWA |
 | `dashboard/app/api/` | Rutas API de Next.js (conversaciones, n8n, rag, telemetría, túnel) |
 | `lib/catalog-search.js` | Motor de búsqueda canónico y normalizador AST |
+| `lib/conversation-context.js` | Motor determinista de estado de conversación y parseador de cables |
+| `lib/jev-shadow.js` | Observador en modo sombra para modelo de decisión Jev con redactor de PII |
+| `lib/workflow-overlay.js` | Generador de overlay sobre workflows n8n sin afectar la línea base |
+| `scripts/evaluate_jev.js` | Harness de evaluación sintética (latencia, costo, precisión) para Jev |
+| `docs/jev-shadow-pilot.md` | Especificación técnica del piloto Jev shadow y modelo de privacidad |
+| `docs/conversation-context-pilot.md` | Especificación del resolvedor de contexto y guardias de búsqueda |
+| `docs/production-workflow-baseline.md` | Documentación de línea base de producción y reproducibilidad |
+| `workflows/production-baseline.json` | Línea base publicada de n8n (40 nodos, parametrizada por variables) |
 | `rag.js` | Ejecutor de suites de evaluación RAG |
 | `scripts/` | Más de 120 scripts operativos: parches, pruebas, constructores de flujos, generadores de embeddings |
 | `workflows/` | Flujos auxiliares de n8n (auto-mejora, reenvío de ayuda, vocabulario) |

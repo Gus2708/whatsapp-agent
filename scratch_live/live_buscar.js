@@ -3,6 +3,13 @@ const axios = require('axios');
 const SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || (typeof process !== 'undefined' && process.env.SUPABASE_URL) || '';
 const ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || (typeof process !== 'undefined' && process.env.SUPABASE_ANON_KEY) || '';
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', 'User-Agent': 'WhatsAppBot/1.0 (Agent)' };
+// BEGIN CONVERSATION FUNCTIONS
+function searchDecision(status) {
+  const action = { exact: 'show_results', vague: 'clarify', missing: 'handoff', weak: 'handoff',
+    not_sold: 'unavailable' }[status] || 'confirm';
+  return { decision_version: 1, action, match_status: status, requires_confirmation: action === 'confirm' };
+}
+// END CONVERSATION FUNCTIONS
 function nUSD(n){ const r = Math.round(Number(n)*100)/100; return Number.isInteger(r) ? String(r) : r.toFixed(2); }
 function nBs(n){ return (Math.round(Number(n)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function nBsInt(n){ return Math.round(Number(n)).toLocaleString('en-US'); }
@@ -472,7 +479,7 @@ const textLargasVoc = qTokensVoc
 const _vocDifiere = textLargasVoc.join(' ') !== textLargas.join(' ');
 
 // consulta VAGA (sin ningun producto concreto): preguntar, no escalar
-if (largas.length===0) return JSON.stringify({ encontrados:0, aclarar:true, instruccion:'La consulta NO menciona ningun producto concreto. NO uses [PEDIR_AYUDA] y NO digas que no lo encontraste: preguntale al cliente con calidez QUE producto necesita (nombre del producto, y si aplica la medida o marca).', mensaje:'Consulta sin producto: "' + p_busqueda + '"' });
+if (largas.length===0) return JSON.stringify({ ...searchDecision('vague'), encontrados:0, aclarar:true, instruccion:'La consulta NO menciona ningun producto concreto. NO uses [PEDIR_AYUDA] y NO digas que no lo encontraste: preguntale al cliente con calidez QUE producto necesita (nombre del producto, y si aplica la medida o marca).', mensaje:'Consulta sin producto: "' + p_busqueda + '"' });
 
 // APRENDIZAJE: productos que un empleado ya eligio para consultas como esta
 let aprBoost=[];
@@ -519,7 +526,7 @@ async function esNoVendido(){
   }catch(e){}
   return false;
 }
-const NO_VENDIDO_JSON = () => JSON.stringify({ encontrados:0, no_vendido:true, instruccion:'Un empleado ya CONFIRMO antes que este producto NO lo trabajamos. NO uses [PEDIR_AYUDA]: dile al cliente con calidez y honestidad que ese producto no lo manejamos y ofrecele ayudar con otra cosa de la ferreteria.', mensaje:'"' + p_busqueda + '" esta marcado como no vendido.' });
+const NO_VENDIDO_JSON = () => JSON.stringify({ ...searchDecision('not_sold'), encontrados:0, no_vendido:true, instruccion:'Un empleado ya CONFIRMO antes que este producto NO lo trabajamos. NO uses [PEDIR_AYUDA]: dile al cliente con calidez y honestidad que ese producto no lo manejamos y ofrecele ayudar con otra cosa de la ferreteria.', mensaje:'"' + p_busqueda + '" esta marcado como no vendido.' });
 
 // Si un empleado YA marco esta consulta como "no la vendemos" y no hay aprendizaje que la
 // resuelva, cortamos aqui. El aprendizaje manda sobre el negativo: si un empleado eligio un
@@ -770,7 +777,7 @@ if (res.length===0){
   }
   if (res.length===0) {
     triggerAutomejora('encontrados_cero');
-    return JSON.stringify({ encontrados:0, instruccion:'NO encontre este producto. Tu UNICA respuesta valida ahora es el token [PEDIR_AYUDA] (escribelo solo, exactamente asi, sin saludo ni nada mas). PROHIBIDO sugerir alternativas, pedir que reformule o decir que no lo tenemos: un empleado lo elegira y se lo enviara al cliente.', mensaje:'No encontre "' + p_busqueda + '" en el catalogo.' });
+    return JSON.stringify({ ...searchDecision('missing'), encontrados:0, instruccion:'NO encontre este producto. Tu UNICA respuesta valida ahora es el token [PEDIR_AYUDA] (escribelo solo, exactamente asi, sin saludo ni nada mas). PROHIBIDO sugerir alternativas, pedir que reformule o decir que no lo tenemos: un empleado lo elegira y se lo enviara al cliente.', mensaje:'No encontre "' + p_busqueda + '" en el catalogo.' });
   }
 }
 
@@ -1179,4 +1186,7 @@ if (_rescate){
   _out.parcial = true;
   _out.instruccion = 'OJO: no encontre nada que combine todo lo que pidio el cliente; estos resultados salen de buscar SOLO la palabra "' + _unicaPalabra + '", ignorando el resto de la consulta. Es la coincidencia mas debil posible. PROHIBIDO presentarlos como si fueran lo que pidio: preguntale con honestidad si alguno le sirve ANTES de cotizar. Si te dice que no, responde SOLO con el token [PEDIR_AYUDA].';
 }
+Object.assign(_out, searchDecision(_rescate ? 'semantic' : _weak ? 'weak' : medMismatch ? 'measure_mismatch' :
+  medParcial ? 'multiple_measures' : _fuzzy ? 'approximate' : _dropped ? 'relaxed' :
+  _unicaPalabra ? 'single_word' : productos.length ? 'exact' : 'missing'));
 return JSON.stringify(_out);
