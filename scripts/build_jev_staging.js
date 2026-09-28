@@ -12,7 +12,7 @@ return [{ json: { body: { payload: { body: 'y el #8' } }, output: 'Synthetic rep
   conversation_context: { action: 'search', query: 'cable thwn #8 azul por metro',
     previous_product: { variant: 'thwn', gauge: '12', color: 'azul', presentation: 'metro' },
     state: { gauge: '8', confirmed: false } } } }];`, 1),
-    code('Jev Shadow Decision', fs.readFileSync(path.join(__dirname, '../scratch_live/live_jev_shadow.js'), 'utf8'), 2),
+    code('Jev Shadow Decision', fs.readFileSync(path.join(__dirname, '../scratch_live/live_jev_shadow.js'), 'utf8').replace(/\r\n/g, '\n'), 2),
     code('Assert Observation Only', `const original = $('Transcribir Nota de Voz').first().json;
 const { jev_shadow, ...rest } = $input.first().json;
 if (JSON.stringify(rest) !== JSON.stringify(original)) throw Error('Shadow mutated original fields');
