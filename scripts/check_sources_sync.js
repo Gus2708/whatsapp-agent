@@ -26,7 +26,8 @@ const presupuesto = read('scratch_live/live_presupuesto.js');
 // mismo scoreMatch pueden comportarse distinto sin que nada chille. Paso de verdad —
 // "empalmar" gano su alias "empalme" en buscar y NO en presupuesto, y ninguna guarda lo vio.
 const sharedFns = ['nUSD', 'nBs', 'nBsInt', 'tc', 'norm', 'normMedida',
-  'medPresent', 'stemColor', 'singular', 'expandir', 'esGranel', 'aliasDe', 'scoreMatch'];
+  'medPresent', 'stemColor', 'singular', 'expandir', 'esGranel', 'aliasDe',
+  'detectProductDepartment', 'detectProductMaterial', 'scoreMatch'];
 for (const name of sharedFns) {
   assert.ok(
     buscar.includes(L[name].toString().replace(/\r\n/g, '\n')),
@@ -36,7 +37,8 @@ for (const name of sharedFns) {
 // presupuesto tambien duplica scoreMatch/expandir (y por tanto ALIAS/aliasDe, del que scoreMatch
 // depende): un drift aqui paso desapercibido una vez (scoreMatch referenciaba aliasDe sin que
 // existiera en este archivo -> ReferenceError en vivo en cuanto un item tenia 2+ candidatos).
-const presupuestoFns = ['norm', 'normMedida', 'medPresent', 'stemColor', 'singular', 'expandir', 'esGranel', 'aliasDe', 'scoreMatch'];
+const presupuestoFns = ['norm', 'normMedida', 'medPresent', 'stemColor', 'singular', 'expandir', 'esGranel', 'aliasDe',
+  'detectProductDepartment', 'detectProductMaterial', 'scoreMatch'];
 for (const name of presupuestoFns) {
   assert.ok(
     presupuesto.includes(L[name].toString().replace(/\r\n/g, '\n')),

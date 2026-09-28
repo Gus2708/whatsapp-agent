@@ -37,14 +37,37 @@ function jevQuestions() {
       new: 'Self-contained new request, topic change, or social/store conversation.',
       unclear: 'Ambiguous reference without sufficient prior product context, or conflicting evidence.',
     } },
+    department: { type: 'choice', instructions, criteria: {
+      techos_laminas: 'Techos, laminas de zinc, acerolit, policarbonato, tejas y complementos de techado.',
+      electricidad_cables: 'Cables electricos (THW, THHN), breakers, tomacorrientes, iluminacion y material electrico.',
+      hierro_perfiles: 'Perfiles estructurales, tubos de hierro, vigas, cabillas, herreria y mallas.',
+      plomeria_griferia: 'Tuberias de agua (PVC, CPVC), llaves, griferia, conexiones sanitarias y tanques.',
+      pinturas: 'Pinturas de caucho, esmalte, anticorrosivos, solventes, brochas y rodillos.',
+      herramientas_discos: 'Herramientas manuales, electricas, discos de corte, desbaste, lijas y accesorios.',
+      construccion_aridos: 'Cemento, cal, yeso, pegas para ceramica, arena, bloques y materiales de construccion.',
+      fijacion_tornilleria: 'Tornillos, tuercas, arandelas, remaches, clavos y anclajes.',
+      seguridad_cerraduras: 'Cerraduras, candados, cerrojos, manillas y articulos de seguridad.',
+      agro_jardin: 'Mangueras de jardin, aspersores, herramientas agricolas, alambre de puas y bombas de agua.',
+      unclear: 'El mensaje no especifica un producto ferretero o pertenece a otra area no listada.',
+    } },
+    material: { type: 'choice', instructions, criteria: {
+      madera: 'El producto o accesorio debe ser especificamente para trabajar sobre o fabricado en madera.',
+      metal: 'El producto o accesorio debe ser especificamente para trabajar sobre o fabricado en metal o hierro.',
+      concreto: 'El producto o accesorio debe ser para concreto, mamposteria, piedra o construccion.',
+      general_o_no_aplica: 'No se especifica un material restrictivo, o aplica para multiples materiales o propositos generales.',
+    } },
   };
 }
 
 function validateJevResponse(body, model) {
   if (!body || JSON.stringify(body).length > 16000 || body.model !== model) return false;
   const questions = jevQuestions();
+  for (const name of ['intent', 'continuation']) {
+    if (!body.answers?.[name]) return false;
+  }
   for (const name of Object.keys(questions)) {
     const answer = body.answers?.[name];
+    if (!answer) continue;
     const labels = Object.keys(questions[name].criteria);
     if (answer?.type !== 'choice' || !labels.includes(answer.choice) ||
       !Number.isFinite(answer.confidence) || answer.confidence < 0 || answer.confidence > 1) return false;
@@ -63,8 +86,10 @@ async function classifyShadow({ message, previous, env = {}, transport, now = Da
   const started = now();
   const result = { contract: 'jev-shadow-v1', status: 'disabled', provider: null, model: null, elapsed_ms: 0, request_attempted: false,
     intent: null, intent_confidence: null, intent_probability: null, continuation: null,
-    continuation_confidence: null, continuation_probability: null, input_tokens: null,
-    output_tokens: null, estimated_cost_usd: null };
+    continuation_confidence: null, continuation_probability: null,
+    department: null, department_confidence: null, department_probability: null,
+    material: null, material_confidence: null, material_probability: null,
+    input_tokens: null, output_tokens: null, estimated_cost_usd: null };
   let timer;
   const finish = status => ({ ...result, status, elapsed_ms: Math.max(0, now() - started) });
   try {
@@ -111,10 +136,12 @@ async function classifyShadow({ message, previous, env = {}, transport, now = Da
       try { body = JSON.parse(body); } catch (_) { return finish('invalid_response'); }
     }
     if (!validateJevResponse(body, model)) return finish('invalid_response');
-    for (const name of ['intent', 'continuation']) {
-      result[name] = body.answers[name].choice;
-      result[name + '_confidence'] = body.answers[name].confidence;
-      result[name + '_probability'] = body.answers[name].probabilities[body.answers[name].choice];
+    for (const name of ['intent', 'continuation', 'department', 'material']) {
+      if (body.answers[name]) {
+        result[name] = body.answers[name].choice;
+        result[name + '_confidence'] = body.answers[name].confidence;
+        result[name + '_probability'] = body.answers[name].probabilities[body.answers[name].choice];
+      }
     }
     result.input_tokens = body.usage.input_tokens;
     result.output_tokens = body.usage.output_tokens;
@@ -129,7 +156,7 @@ function getStoreData() {
   return {
     name: 'Ferretería El Serrucho 🪚',
     location: 'Estamos ubicados en Mene Mauroa, Estado Falcón, Venezuela.',
-    pickup_and_delivery: 'Puedes retirar tus compras directamente en nuestra tienda física. Además, contamos con servicio de transporte de materiales a $10 dentro del casco central de Mene Mauroa (para zonas fuera del casco central, la tarifa la confirma un asesor).',
+    pickup_and_delivery: 'Puedes retirar compras generales en la tienda física. Todo lo que es hierros (tubos, láminas, cerchas, cabillas, etc.) y cemento está en nuestro galpón aparte en La Compañía; allí se retiran y de allí salen los envíos. Contamos con transporte de materiales a $10 en el centro de Mene Mauroa (fuera del Mene debe preguntar). En cualquier caso, antes de pagar el envío el cliente siempre debe hablar con un empleado.',
     hours: 'Atendemos de lunes a sábado de 8:00 AM a 6:00 PM (con descanso para almuerzo de 1:00 PM a 2:00 PM). Domingos y feriados permanecemos cerrados.',
     payments: 'Aceptamos pagos en dólares en efectivo (USD), bolívares en efectivo, Pago Móvil y transferencia bancaria a la tasa oficial del Banco Central de Venezuela (BCV). También aceptamos Zelle para compras a partir de $20.00 USD. Para concretar el pago, un empleado te atiende enseguida o puedes pasar por la tienda física.',
     returns: 'Aceptamos cambios y devoluciones hasta 7 días continuos desde la fecha de compra, presentando el producto sellado en su empaque original y la factura de compra.'
@@ -179,7 +206,7 @@ function detectStoreInfoTopic(text) {
   if (/\b(horario|horarios|a que hora|que hora abren|abren hoy|estan abiertos|hasta que hora)\b/.test(t)) {
     return 'horario';
   }
-  if (/\b(donde estan|donde queda|ubicacion|direccion|como llegar|estan en mene mauroa)\b/.test(t)) {
+  if (/\b(donde estan|donde queda|ubicacion|direccion|como llegar|estan en mene mauroa|galpon|almacen|la compania|la compañia)\b/.test(t)) {
     return 'ubicacion';
   }
   if (/\b(metodos? de pago|formas? de pago|aceptan zelle|pago movil|tasa bcv|como pagar|aceptan dolares|reciben bolivares)\b/.test(t)) {

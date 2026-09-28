@@ -28,7 +28,7 @@ test('shadow node preserves all original fields, route and outputs across disabl
         assert.equal(options.timeout, 1500);
         assert.doesNotMatch(JSON.stringify(body), /Private Name|private-id|untouched/);
         const answers = Object.fromEntries(Object.entries(jevQuestions()).map(([name, q]) => {
-          const choice = name === 'intent' ? 'product_inquiry' : 'continue';
+          const choice = name === 'intent' ? 'product_inquiry' : (name === 'continuation' ? 'continue' : Object.keys(q.criteria)[0]);
           return [name, { type: 'choice', choice, confidence: 0.9,
             probabilities: Object.fromEntries(Object.keys(q.criteria).map(k => [k, k === choice ? 1 : 0])) }];
         }));

@@ -88,7 +88,7 @@ Para garantizar una fiabilidad del 100%, el agente no realiza ninguna lógica de
 
 ### Políticas de Atención y Ubicación
 - **Ubicación**: Ferretería El Serrucho está ubicada en **Mene Mauroa, Estado Falcón**.
-- **Retiro y transporte**: Las compras se pueden retirar de manera presencial en la tienda física en Mene Mauroa. Además se ofrece **transporte de materiales a $10 dentro del casco central de Mene Mauroa**; para direcciones **fuera del casco central** el costo varía según la distancia y lo coordina un empleado (el agente no estima el monto: deriva a un empleado).
+- **Retiro y transporte**: Las compras de ferretería general se pueden retirar de manera presencial en la tienda física en Mene Mauroa. Todo lo que corresponde a **hierros** (tubos, láminas, cerchas, cabillas, perfiles, etc.) y **cemento** se ubica en un **galpón aparte en La Compañía**; allí se retiran y de allí salen los envíos. Además se ofrece **transporte de materiales a $10 dentro del casco central de Mene Mauroa**; para direcciones **fuera del casco central** el costo varía según la distancia y el cliente tiene que preguntar (lo coordina un empleado). En cualquier caso, **antes de pagar el envío el cliente siempre debe hablar con un empleado**.
 - **Horario Comercial**: El horario de atención al público es de **Lunes a Sábado de 08:00 AM a 06:00 PM**, con un descanso para el almuerzo de **01:00 PM a 02:00 PM**. Los mensajes recibidos fuera de este horario deben ser respondidos indicando la hora de apertura del siguiente día hábil.
 
 ## 7. Búsqueda Inteligente, Razonamiento de Ventas y Memoria a Largo Plazo

@@ -10,6 +10,11 @@
   "politicas_despacho": {
     "disponible": true,
     "retiro_en_tienda": true,
+    "galpon_materiales_pesados": {
+      "descripcion": "Todo lo que es hierros (tubos, láminas, cerchas, cabillas, perfiles, etc.) y cemento se encuentra en un galpón aparte en La Compañía. Los retiros de estos materiales se realizan allí y de allí salen los envíos.",
+      "ubicacion": "La Compañía, Mene Mauroa",
+      "materiales": ["hierros", "tubos", "láminas", "cerchas", "cabillas", "perfiles", "cemento"]
+    },
     "transporte_casco_central": {
       "disponible": true,
       "costo_usd": 10,
@@ -17,9 +22,10 @@
     },
     "transporte_fuera_casco_central": {
       "disponible": true,
-      "costo": "Variable según la distancia; lo coordina un empleado (no estimar el monto)."
+      "costo": "Variable según la distancia; tiene que preguntar y lo coordina un empleado (no estimar el monto)."
     },
-    "mensaje": "Retiro en tienda física en Mene Mauroa. También hacemos transporte de materiales a $10 dentro del casco central de Mene Mauroa; fuera del casco central el costo varía según la distancia y lo coordina un empleado."
+    "condicion_pago_envio": "Antes de pagar el envío, el cliente siempre debe hablar primero con un empleado.",
+    "mensaje": "Retiro en tienda física para ferretería general. Todo lo que es hierros (tubos, láminas, cerchas, cabillas, etc.) y cemento está en un galpón aparte en La Compañía; allí se retiran y de allí salen los envíos. Transporte de materiales a $10 dentro del casco central de Mene Mauroa; fuera del Mene el costo varía y debe preguntar. Antes de pagar el envío siempre debe hablar con un empleado."
   },
   "metodos_pago_aceptados": [
     "Pago Móvil (tasa oficial BCV)",

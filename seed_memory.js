@@ -15,7 +15,7 @@ const observations = [
     title: 'Ubicación de la Tienda, Retiro y Transporte',
     type: 'policy',
     topic_key: 'bot:ubicacion',
-    content: 'La tienda física de Ferretería El Serrucho está ubicada en Mene Mauroa, Estado Falcón, Venezuela. El cliente puede retirar sus compras de manera presencial en la tienda. Además se ofrece transporte de materiales a $10 dentro del casco central de Mene Mauroa; para entregas fuera del casco central el costo varía según la distancia y lo coordina un empleado (el bot no estima ese monto, deriva a un empleado).'
+    content: 'La tienda física de Ferretería El Serrucho está ubicada en Mene Mauroa, Estado Falcón, Venezuela. Los retiros de artículos de ferretería general se hacen en la tienda. Todo lo que es hierros (tubos, láminas, cerchas, cabillas, perfiles, etc.) y cemento se encuentra en un galpón aparte en La Compañía; allí se retiran y de allí salen los envíos. Se ofrece transporte de materiales a $10 dentro del casco central de Mene Mauroa; para entregas fuera del casco central el costo varía según la distancia y lo coordina un empleado. De todas formas, antes de pagar el envío el cliente siempre debe hablar con un empleado.'
   },
   {
     title: 'Métodos de Pago Aceptados',
