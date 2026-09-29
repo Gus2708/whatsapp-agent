@@ -285,8 +285,8 @@ function fastRouter({ message, jev, context, options = {} } = {}) {
       }
       if (jev.intent === 'quote') {
         return {
-          fast_path: true,
-          action: 'quote_handoff',
+          fast_path: false,
+          action: 'pass',
           query: raw,
           confidence
         };
@@ -337,7 +337,7 @@ function fastRouter({ message, jev, context, options = {} } = {}) {
 // END JEV FUNCTIONS
 const original = $input.first().json;
 const config = {};
-for (const key of ['JEV_MODE', 'JEV_PROVIDER', 'TYPESAFE_API_KEY', 'AI_GATEWAY_API_KEY', 'JEV_MODEL', 'JEV_TIMEOUT_MS',
+for (const key of ['JEV_MODE', 'JEV_ROUTING_ENABLED', 'JEV_PROVIDER', 'TYPESAFE_API_KEY', 'AI_GATEWAY_API_KEY', 'JEV_MODEL', 'JEV_TIMEOUT_MS',
   'JEV_MIN_CONFIDENCE', 'JEV_INPUT_USD_PER_MILLION']) {
   try { config[key] = $env[key]; } catch (_) {}
 }
@@ -372,7 +372,7 @@ const metadata = await classifyShadow({ message: latest,
   },
 });
 let updatedContext = original.conversation_context;
-if (typeof fastRouter === 'function') {
+if (config.JEV_MODE === 'shadow' && config.JEV_ROUTING_ENABLED === 'true' && typeof fastRouter === 'function') {
   const route = fastRouter({ message: latest, jev: metadata, context: updatedContext });
   if (route && route.fast_path) {
     updatedContext = { ...(updatedContext || {}), ...route };

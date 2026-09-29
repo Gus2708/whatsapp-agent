@@ -81,8 +81,9 @@ services:
       - NODE_ENV=production
       # Experimental cable follow-ups; keep off until staging validation.
       - CONVERSATION_STATE_ENABLED=${CONVERSATION_STATE_ENABLED:-false}
-      # Jev observations only; off is zero-network. Inline shadow adds bounded latency.
+      # Off is zero-network; shadow is inline. Fast replies require separate explicit routing opt-in.
       - JEV_MODE=${JEV_MODE:-off}
+      - JEV_ROUTING_ENABLED=${JEV_ROUTING_ENABLED:-false}
       - JEV_PROVIDER=${JEV_PROVIDER:-typesafe}
       - TYPESAFE_API_KEY=${TYPESAFE_API_KEY:-}
       - AI_GATEWAY_API_KEY=${AI_GATEWAY_API_KEY:-}

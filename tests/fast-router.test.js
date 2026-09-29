@@ -72,7 +72,7 @@ test('Phase 2 - Guarded Fast Router intercepts high confidence non-product inten
     assert.match(result.reply, /Perucho|El Serrucho/i);
   });
 
-  await t.test('intercepts quote intent and dispatches to quote pipeline', () => {
+  await t.test('quote intent passes to Agent so the quote tool remains available', () => {
     const jev = {
       contract: 'jev-shadow-v1',
       status: 'ok',
@@ -80,8 +80,8 @@ test('Phase 2 - Guarded Fast Router intercepts high confidence non-product inten
       intent_confidence: 0.88
     };
     const result = fastRouter({ message: 'presupuesto de 20 metros de cable #12 y 4 bombillos led', jev });
-    assert.equal(result.fast_path, true);
-    assert.equal(result.action, 'quote_handoff');
+    assert.equal(result.fast_path, false);
+    assert.equal(result.action, 'pass');
     assert.equal(result.query, 'presupuesto de 20 metros de cable #12 y 4 bombillos led');
   });
 

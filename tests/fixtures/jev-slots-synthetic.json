@@ -1,0 +1,14 @@
+[
+  {"id":"roof-leak","message":"tengo goteras en el techo, que producto necesito para impermeabilizar","expected":{"intent":"product_inquiry","continuation":"new","department":"techos_laminas","material":"general_o_no_aplica","problem_intent":"goteras_impermeabilizacion"}},
+  {"id":"water-leak","message":"se me fuga agua de una tuberia pvc, que puedo usar","expected":{"intent":"product_inquiry","continuation":"new","department":"plomeria_griferia","material":"general_o_no_aplica","problem_intent":"fuga_agua_plomeria"}},
+  {"id":"rust-gate","message":"quiero quitar el oxido de una reja de hierro","expected":{"intent":"product_inquiry","continuation":"new","material":"metal","problem_intent":"oxido_corrosion"}},
+  {"id":"blocked-drain","message":"que sirve para destapar el desague del bano","expected":{"intent":"product_inquiry","continuation":"new","department":"plomeria_griferia","material":"general_o_no_aplica","problem_intent":"destapar_drenar"}},
+  {"id":"metal-bit","message":"tienen broca para perforar hierro","expected":{"intent":"product_inquiry","continuation":"new","department":"herramientas_discos","material":"metal","problem_intent":"ninguno_o_especifico"}},
+  {"id":"wood-bit","message":"busco broca para madera de 8 mm","expected":{"intent":"product_inquiry","continuation":"new","department":"herramientas_discos","material":"madera","problem_intent":"ninguno_o_especifico"}},
+  {"id":"concrete-bit","message":"tienen mecha para perforar concreto","expected":{"intent":"product_inquiry","continuation":"new","department":"herramientas_discos","material":"concreto","problem_intent":"ninguno_o_especifico"}},
+  {"id":"zinc-sheet","message":"precio de lamina de zinc de 3 metros","expected":{"intent":"product_inquiry","continuation":"new","department":"techos_laminas","material":"metal","problem_intent":"ninguno_o_especifico"}},
+  {"id":"paint-wall","message":"quiero tapar huecos de la pared antes de pintar","expected":{"intent":"product_inquiry","continuation":"new","material":"concreto","problem_intent":"preparacion_pared"}},
+  {"id":"bolt","message":"necesito tornillos para fijar una pieza de hierro","expected":{"intent":"product_inquiry","continuation":"new","department":"fijacion_tornilleria","material":"metal","problem_intent":"ninguno_o_especifico"}},
+  {"id":"cable-product","message":"busco cable thhn calibre 12","expected":{"intent":"product_inquiry","continuation":"new","department":"electricidad_cables","material":"general_o_no_aplica","problem_intent":"ninguno_o_especifico"}},
+  {"id":"store-hours","message":"a que hora abre la tienda","expected":{"intent":"store_info","continuation":"new","department":"unclear","material":"general_o_no_aplica","problem_intent":"ninguno_o_especifico"}}
+]

@@ -3,6 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { validateCorpus, evaluateCorpus, fetchTransport } = require('../lib/jev-evaluation');
 const corpus = require('./fixtures/jev-synthetic.json');
+const slotCorpus = require('./fixtures/jev-slots-synthetic.json');
 test('offline validates all synthetic labels and rules without inventing provider accuracy', async () => {
   const result = await evaluateCorpus(corpus);
   assert.equal(result.mode, 'offline');
@@ -33,4 +34,40 @@ test('fetch adapter forbids redirects and stops oversized response streaming', a
   };
   await assert.rejects(() => fetchTransport({ url: 'https://api.typesafe.ai/v1/systemone', body: {}, headers: {} }, fake));
   assert.equal(canceled, true);
+});
+test('slot corpus is fixed, synthetic and covers distinct departments, materials and problems', async () => {
+  validateCorpus(slotCorpus);
+  assert.ok(slotCorpus.length <= 30);
+  const result = await evaluateCorpus(slotCorpus);
+  assert.equal(result.corpus, 'jev-slots-synthetic-v1');
+  assert.equal(result.provider_calls, 0);
+  assert.equal(result.slot_metrics.department.labeled, slotCorpus.filter(row => row.expected.department).length);
+  assert.equal(result.slot_metrics.department.answered, 0);
+  assert.equal(result.slot_metrics.department.accuracy, null);
+  assert.ok(new Set(slotCorpus.map(row => row.expected.department)).size >= 5);
+  assert.ok(new Set(slotCorpus.map(row => row.expected.material)).size >= 4);
+  assert.ok(new Set(slotCorpus.map(row => row.expected.problem_intent)).size >= 5);
+});
+
+test('new Jev slots report coverage, accuracy and confident errors only for labeled answers', async () => {
+  const rows = [{ id: 'roof-leak', message: 'tengo goteras en el techo', expected: {
+    intent: 'product_inquiry', continuation: 'new', department: 'techos_laminas',
+    material: 'general_o_no_aplica', problem_intent: 'goteras_impermeabilizacion' } },
+  { id: 'metal-bit', message: 'broca para hierro', expected: {
+    intent: 'product_inquiry', continuation: 'new', department: 'herramientas_discos',
+    material: 'metal', problem_intent: 'ninguno_o_especifico' } }];
+  const report = await evaluateCorpus(rows, async row => ({ status: 'ok', request_attempted: true,
+    intent: 'product_inquiry', continuation: 'new', department: row.id === 'roof-leak' ? 'techos_laminas' : 'pinturas',
+    department_confidence: 0.95, material: row.id === 'roof-leak' ? null : 'metal', material_confidence: 0.9,
+    problem_intent: row.expected.problem_intent, problem_intent_confidence: 0.5 }));
+  assert.equal(report.slot_metrics.department.labeled, 2);
+  assert.equal(report.slot_metrics.department.answered, 2);
+  assert.equal(report.slot_metrics.department.accuracy, 0.5);
+  assert.equal(report.slot_metrics.department.confident_errors, 1);
+  assert.equal(report.slot_metrics.material.answered, 1);
+  assert.equal(report.slot_metrics.material.accuracy, 1);
+  assert.equal(report.slot_metrics.problem_intent.confident_answered, 0);
+  assert.equal(report.slot_metrics.problem_intent.accuracy, 1);
+  assert.throws(() => validateCorpus([{ id: 'bad-slot', message: 'techo', expected: {
+    intent: 'product_inquiry', continuation: 'new', department: 'invented' } }]));
 });

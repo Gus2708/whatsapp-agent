@@ -82,16 +82,16 @@ In high-volume commercial and industrial conversational AI, sending raw queries 
 
 To solve this with production-grade engineering, this system implements a **Two-Speed Cognitive Duality Architecture**:
 
-- **⚡ System 1 (Deterministic Edge & Sub-Second Jev Engine)**: Sub-millisecond execution (<0.2ms), $0 token cost, strict enterprise PII redaction, deterministic civil engineering calculators, installation kit bundling, and problem-to-product mapping.
+- **⚡ System 1 (Deterministic Edge with optional Jev observation)**: Local rules and calculators handle material estimates, installation kits and product search. Jev is an optional inline API observation with latency and token cost; message redaction is best effort.
 - **🧠 System 2 (Deep Conversational Reasoning)**: High-capability LLMs (`openai/gpt-5.6-luna`, `anthropic/claude-sonnet-5`) dedicated exclusively to conversational nuance, audio note synthesis from Whisper (<800ms), and human escalation coordination.
 
 ```mermaid
 flowchart TD
-    Msg["📱 Customer WhatsApp Message"] --> PII["🔒 PII Sanitizer & Redactor<br/>(Scrubs phone numbers, IDs, bank details, amounts)"]
+    Msg["📱 Customer WhatsApp Message"] --> PII["🔒 Best-effort Redactor<br/>(May leave personal information in free text)"]
     
-    subgraph S1["⚡ SYSTEM 1: Deterministic Edge & Decision Engine (<1ms · $0 Tokens)"]
-        PII --> JEV["🧠 Jev Shadow Observer / Fast Router<br/>(TypeSafe AI · Intent & Calibration)"]
-        JEV --> CALC{"Trade Query or Kit?"}
+    subgraph S1["⚡ SYSTEM 1: Local rules and optional Jev observation"]
+        PII -.-> JEV["🧠 Jev inline observer<br/>(off by default; routing separately gated)"]
+        PII --> CALC{"Trade Query or Kit?"}
         CALC -->|Trade Calculation| EST["🏗️ Construction Materials Estimator<br/>(lib/construction-estimator.js · Masonry, Slabs, Plaster, Fencing)"]
         CALC -->|Installation / Accessories| KITS["🔧 Installation Kits Engine<br/>(lib/installation-kits.js · Toilets, Sinks, Roofing, PVC)"]
         CALC -->|Physical Problem| PROB["🛠️ Problem-to-Product Resolver<br/>(Leaks→Sealants/Membranes · Plumbing→PVC Cement/Teflon)"]
@@ -141,11 +141,11 @@ flowchart TD
    - Regex boundaries with forward lookahead over Spanish conjunctions (`y`, `e`, `con`, `más`, `además`, `también`) ensuring multi-word product names (*"pintura blanco y negro"*) are not erroneously split.
    - Converts number words (*"un"*, *"dos"*, *"medio"*, *"docena"*) to exact numeric quantities.
 
-5. **Sub-Second Jev Decision Engine & Enterprise PII Redaction ([`lib/jev-shadow.js`](lib/jev-shadow.js))**:
-   - **Zero-Risk Shadow Deployment**: Evaluates `typesafe-ai/jev` in the background within a strict 1,500ms budget without affecting live customer traffic (`JEV_MODE=off` by default).
-   - **Enterprise PII Redaction**: Sanitizes phone numbers, emails, government IDs, bank details, and currency amounts before any external API egress.
+5. **Jev observation pilot and best-effort redaction ([`lib/jev-shadow.js`](lib/jev-shadow.js))**:
+   - **Inline, default-off observation**: `JEV_MODE=shadow` adds an API request before the Agent, bounded by a default 1,500ms deadline. `JEV_ROUTING_ENABLED=false` prevents Jev and rule fast paths from changing replies.
+   - **Best-effort redaction**: Masks common contact, credential and currency patterns, but does not guarantee removal of personal information from arbitrary messages.
    - **Dual-Provider Architecture**: Native support for direct **TypeSafe API** (`/v1/systemone`) and **Vercel AI Gateway** (`ai-gateway.vercel.sh`).
-   - **Synthetic Evaluation Benchmark ([`scripts/evaluate_jev.js`](scripts/evaluate_jev.js))**: 30-case test suite measuring intent agreement, confidence calibration, token consumption, and P95 latency.
+   - **Synthetic Evaluation ([`scripts/evaluate_jev.js`](scripts/evaluate_jev.js))**: The original 30-case corpus measures intent and continuity. A separate 12-case corpus measures department, material and problem labels. Neither measures full-agent improvement or confidence calibration.
 
 6. **Deterministic Context Engine & Technical Attribute Slotting ([`lib/conversation-context.js`](lib/conversation-context.js))**:
    - **Multi-Turn Specification Tracking**: Preserves technical attributes such as wire gauge (8, 10, 12, 14 AWG), insulation type (THW), presentation (per-meter / spool), and color across turns without repetitive prompt reinjection.
