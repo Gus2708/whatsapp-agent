@@ -170,9 +170,16 @@ async function waitForHealth(maxWaitSec = 90, intervalSec = 3) {
 
 async function fetchAliasMap() {
   const aliasMap = {};
+  const containers = ['waha_agent', 'waha_serrucho'];
+  const cmd = "const db=new (require('better-sqlite3'))('/app/.sessions/noweb/default/store.sqlite3');console.log(JSON.stringify(db.prepare('SELECT id, pn FROM lid_map').all()))";
+  let raw = '';
+  for (const c of containers) {
+    try {
+      raw = execSync(`docker exec ${c} node -e "${cmd}"`, { encoding: 'utf8', timeout: 5000 }).trim();
+      if (raw) break;
+    } catch (e) {}
+  }
   try {
-    const cmd = "const db=new (require('better-sqlite3'))('/app/.sessions/noweb/default/store.sqlite3');console.log(JSON.stringify(db.prepare('SELECT id, pn FROM lid_map').all()))";
-    const raw = execSync(`docker exec waha_serrucho node -e "${cmd}"`, { encoding: 'utf8', timeout: 5000 }).trim();
     if (raw) {
       const rows = JSON.parse(raw);
       for (const r of rows) {
