@@ -107,6 +107,7 @@ describe('Catchup Domain Logic', () => {
     assert.equal(isHumanHandover({ no_atender: true }), true);
     assert.equal(isHumanHandover({ manual_desde: '2026-09-04T18:00:00Z' }), true);
     assert.equal(isHumanHandover({ estado: 'automatico' }), false);
+    assert.equal(isHumanHandover({ estado: 'automatico', manual_since: '2026-09-23T15:54:22.918Z' }), false);
     assert.equal(isHumanHandover(null), false);
   });
 

@@ -139,7 +139,10 @@ async function buscarLive(p_busqueda, opts) {
     options.env || {}
   );
   const fn = new AsyncFunction('query', 'axios', '$env', SOURCE);
-  const resultStr = await fn({ p_busqueda }, fake, envMap);
+  const queryObj = typeof p_busqueda === 'object' && p_busqueda !== null
+    ? { marcas_excluidas: options.marcas_excluidas, ...p_busqueda }
+    : { p_busqueda, marcas_excluidas: options.marcas_excluidas };
+  const resultStr = await fn(queryObj, fake, envMap);
   return { result: JSON.parse(resultStr), fake };
 }
 

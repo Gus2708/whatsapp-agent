@@ -177,7 +177,9 @@ const ALIAS = {
   'prepintadas':    ['prepintada','prepintado','rojo','roja','azul','verde','naranja','techolit','arquitectonica'],
   'prepintados':    ['prepintado','prepintada','rojo','roja','azul','verde','naranja','techolit','arquitectonica'],
   'techolit':       ['techolit','techolits'],
-  'acerolit':       ['acerolit','acerolits']
+  'acerolit':       ['acerolit','acerolits'],
+  'zinc':           ['zinc','galv','techo galv','calamina'],
+  'sinz':           ['zinc','galv','techo galv','calamina']
 };
 // DEVERBALES: el cliente pide con el VERBO, el catalogo nombra con el SUSTANTIVO.
 // "resina para empalmAR" vs "KIT DE EMPALME DE RESINA": comparten la raiz "empalm" pero
@@ -280,6 +282,9 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
   s = s.replace(/\b(pintadas?|pintados?)\b/gi, 'prepintada');
   s = s.replace(/\b(prepintadas?|prepintados?)\b/gi, 'lamina prepintada');
   s = s.replace(/\blaminas?\s+lamina\b/gi, 'lamina');
+  if (/\bdisco\s+(de\s+)?corte\s+(de\s+|para\s+|p\/)?madera\b/.test(s)) {
+    s = s.replace(/\bdisco\s+(de\s+)?corte\s+(de\s+|para\s+|p\/)?madera\b/g, 'disco madera');
+  }
   // SIN se aplica con LIMITE DE PALABRA, no como subcadena. Con split/join naive, una clave
   // que aparece DENTRO de otra palabra la destroza: "media"->"1/2" convertia "mediano" en
   // "1/2no", "zinc"->"lamina zinc" convertia "zincada" en "lamina zincada", y "riel" rompia
@@ -296,7 +301,48 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
   return s.replace(/\s+/g,' ').trim(); }
 // productos a granel (se venden por metro/kilo): su existencia es irreal, SIEMPRE disponibles
 function esGranel(desc){ const d=norm(desc); return /(^| )x ?(mtrs|mtr|mts|mt|metros|metro|kilos|kilo|kg|gr|ml)( |$)/.test(d) || / por metro( |$)/.test(d); }
-function scoreMatch(descripcion, qTokens){
+function detectProductDepartment(desc){
+  const d = norm(desc);
+  if (/\b(techo|acerolit|techolit|policarbonato|teja|cumbrera|manto|primer asfaltico)\b/.test(d)) return 'techos_laminas';
+  if (/\blaminas?\b/.test(d) && /\b(zinc|galv|galvanizada|ondulad|cuadrad|canal|arquitectonica|prepintada|aluminio|cal)\b/.test(d) && !/\b(hierro|hp|cr|negra|lisa)\b/.test(d)) return 'techos_laminas';
+  if (/\bgancho\s+(p\/|para\s+)?techo\b/.test(d)) return 'techos_laminas';
+
+  if (/\btubos?\b/.test(d) && /\b(electricidad|conduit|luz)\b/.test(d)) return 'electricidad_cables';
+  if (/\b(cable|thwn|thw|breaker|tomacorriente|interruptor|apagador|suiche|switch|cajetin|bombillo|reflector|lampara|teipe|fotocelda|balastro|socate|enchufe|voltaje)\b/.test(d)) return 'electricidad_cables';
+
+  if (/\b(pintura|esmalte|satinad|caucho|oleo|anticorrosiv|brocha|rodillo|thinner|solvente|tirro|imperflex|sellafill)\b/.test(d)) return 'pinturas';
+
+  if (/\b(griferia|fregadero|lavamano|sanitario|inodoro|sifon|grifo|flanche|tanque|valvula|presostato|flotante)\b/.test(d)) return 'plomeria_griferia';
+  if (/\b(codo|tee|adaptador|union)\b/.test(d) && /\b(pvc|cpvc|aguas?|presion|rosca)\b/.test(d)) return 'plomeria_griferia';
+  if (/\btubos?\b/.test(d) && /\b(pvc|cpvc|aguas?|sanitari|cloaca|desague)\b/.test(d)) return 'plomeria_griferia';
+  if (/\bllave\b/.test(d) && /\b(paso|chorro|bola|esfera|jardin)\b/.test(d)) return 'plomeria_griferia';
+  if (/\b(pega|soldadura)\s+(pvc|cpvc)\b/.test(d)) return 'plomeria_griferia';
+
+  if (/\b(disco|mecha|alicate|destornillador|martillo|tenaza|segueta|sierra|cuchilla|pala|pico|carretilla|taladro|esmeril|amoladora|pulidora|soldadora|careta|cepillo|dado)\b/.test(d)) return 'herramientas_discos';
+
+  if (/\b(cemento|cal|yeso|polvo\s+p\/piso|polvo\s+piso|bloque|arena|grava|arido|pego)\b/.test(d)) return 'construccion_aridos';
+
+  if (/\b(tornillo|ramplug|tuerca|arandela|remache|clavo|tirraje|abrazadera|perno|chazo)\b/.test(d)) return 'fijacion_tornilleria';
+
+  if (/\b(cerradura|candado|cerrojo|manilla|tirador|cilindro|pomos?|pasador)\b/.test(d)) return 'seguridad_cerraduras';
+
+  if (/\b(alambre\s+(de\s+)?pua|aspersor|fumigadora|machete|rastrillo|malla\s+pollito|malla\s+gallinero)\b/.test(d)) return 'agro_jardin';
+
+  if (/\b(cabillas?|viga|alambron|perfil|cercha|pletina|angulo|electrosoldada|truckson)\b/.test(d)) return 'hierro_perfiles';
+  if (/\btubos?\b/.test(d) && /\b(herreria|estructural|hierro|redondo|cuadrado|rectangular)\b/.test(d)) return 'hierro_perfiles';
+  if (/\bmalla\b/.test(d)) return 'hierro_perfiles';
+  if (/\blaminas?\b/.test(d) && /\b(hierro|hp|cr|negra|lisa)\b/.test(d)) return 'hierro_perfiles';
+
+  return 'unclear';
+}
+function detectProductMaterial(desc){
+  const d = norm(desc);
+  if (/\b(madera)\b/.test(d) || /\bp\/madera\b/.test(d)) return 'madera';
+  if (/\b(metal|hierro|acero)\b/.test(d) || /\bp\/metal\b/.test(d)) return 'metal';
+  if (/\b(concreto|mamposteria|piedra)\b/.test(d) || /\bp\/concreto\b/.test(d)) return 'concreto';
+  return null;
+}
+function scoreMatch(descripcion, qTokens, context){
   const d = norm(descripcion);
   const nd = normMedida(descripcion);
   const words = d.split(/[\s\-x]+/);
@@ -327,27 +373,835 @@ function scoreMatch(descripcion, qTokens){
   if (_head && words.length && aliasDe(_head).some(a => singular(words[0]) === singular(a))) s += 30;
   if (all && qTokens.length>0) s += 50;
   s -= words.length * 0.1;
+
+  if (context && typeof context === 'object') {
+    const dept = context.department;
+    const conf = context.department_confidence;
+    const mat = context.material;
+    let matConflict = false;
+    if (mat && mat !== 'general_o_no_aplica') {
+      const prodMat = detectProductMaterial(descripcion);
+      if (prodMat && prodMat !== mat) {
+        s -= 80;
+        matConflict = true;
+      }
+    }
+    if (dept && dept !== 'unclear' && (conf === undefined || Number(conf) >= 0.80)) {
+      const prodDept = detectProductDepartment(descripcion);
+      if (prodDept !== 'unclear') {
+        if (prodDept === dept && !matConflict) s += 40;
+        else if (prodDept !== dept) s -= 80;
+      }
+    }
+    if (context.attributes && typeof context.attributes === 'object') {
+      const attrs = context.attributes;
+      if (attrs.length) {
+        const rawLen = attrs.length.replace(/m$/, '');
+        if (medPresent(rawLen, nd)) s += 50;
+      }
+      if (attrs.dimension && medPresent(attrs.dimension, nd)) s += 50;
+      if (attrs.thickness && medPresent(attrs.thickness, nd)) s += 50;
+      if (attrs.diameter && medPresent(attrs.diameter, nd)) s += 50;
+      if (attrs.presentation && nd.includes(attrs.presentation)) s += 50;
+      if (attrs.grade_class && new RegExp('(?:^|\\s)(?:clase|tipo|)\\s*' + attrs.grade_class + '(?:\\s|$)', 'i').test(nd)) s += 50;
+    }
+  }
+
   return s;
 }
+
+const PROBLEM_SOLUTIONS = {
+  goteras_impermeabilizacion: {
+    department: 'techos_laminas',
+    searchTerms: ['cemento plastico', 'manto asfaltico', 'cinta manto', 'primer asfaltico', 'pintura impermeabilizante']
+  },
+  fuga_agua_plomeria: {
+    department: 'plomeria_griferia',
+    searchTerms: ['pega pvc', 'teflon', 'soldadura liquida']
+  },
+  sellado_grietas_ventanas: {
+    department: 'fijacion_tornilleria',
+    searchTerms: ['silicon transparente', 'adhesivo sellador', 'silicon gris']
+  },
+  oxido_corrosion: {
+    department: 'pinturas',
+    searchTerms: ['fondo anticorrosivo', 'desoxidante', 'cepillo alambre']
+  },
+  fijacion_sin_taladrar: {
+    department: 'fijacion_tornilleria',
+    searchTerms: ['cero clavos', 'pega blanca', 'adhesivo de montaje']
+  },
+  preparacion_pared: {
+    department: 'pinturas',
+    searchTerms: ['pasta profesional', 'yeso', 'cemento blanco', 'lija']
+  }
+};
+
+const ACTION_SOLUTIONS = {
+  pegar_adherir: {
+    construccion_aridos: ['pega piso', 'cemento blanco', 'pego gris'],
+    plomeria_griferia: ['pega pvc', 'teflon', 'soldadura liquida'],
+    fijacion_tornilleria: ['cero clavos', 'pega blanca', 'adhesivo de montaje', 'silicon'],
+    _default: ['pega piso', 'pega pvc', 'cero clavos']
+  },
+  lubricar_destrabar: {
+    herramientas_discos: ['aflojatodo', 'grasa', 'aceite 3 en 1'],
+    seguridad_cerraduras: ['aflojatodo', 'grafito en polvo', 'aceite multiuso'],
+    _default: ['aflojatodo', 'grasa multiuso', 'aceite lubricante']
+  },
+  destapar_drenar: {
+    plomeria_griferia: ['destapador de caneria', 'chupa', 'sifon lavaplatos'],
+    _default: ['destapador', 'chupa poceta', 'sifon']
+  },
+  limpiar_desoxidar: {
+    pinturas: ['fondo anticorrosivo', 'desoxidante', 'cepillo alambre'],
+    hierro_perfiles: ['desoxidante', 'cepillo de alambre', 'fondo'],
+    _default: ['desoxidante', 'fondo anticorrosivo', 'desengrasante']
+  },
+  aislar_proteger: {
+    techos_laminas: ['pintura termica', 'manto aluminio', 'aislante termico'],
+    electricidad_cables: ['teipe negro', 'cinta aislante', 'termoencogible'],
+    _default: ['aislante termico', 'manto aluminio', 'cinta aislante']
+  },
+  impermeabilizar_sellar: {
+    techos_laminas: ['cemento plastico', 'manto asfaltico', 'cinta manto', 'primer asfaltico'],
+    fijacion_tornilleria: ['silicon transparente', 'adhesivo sellador'],
+    plomeria_griferia: ['cuello cera', 'teflon', 'silicon'],
+    _default: ['cemento plastico', 'silicon transparente', 'manto asfaltico']
+  },
+  resanar_emparejar: {
+    pinturas: ['pasta profesional', 'yeso', 'lija'],
+    construccion_aridos: ['cemento blanco', 'yeso', 'pasta profesional'],
+    _default: ['pasta profesional', 'yeso', 'cemento blanco']
+  }
+};
+
+function resolveProblemSolutions(intent) {
+  if (!intent || intent === 'ninguno_o_especifico') return null;
+  const target = PROBLEM_SOLUTIONS[intent];
+  return target ? { intent, department: target.department, searchTerms: [...target.searchTerms] } : null;
+}
+
+function resolveDynamicSolutions(intentOrAction, department, customTerms) {
+  if (Array.isArray(customTerms) && customTerms.length > 0) {
+    const cleanTerms = customTerms.map(t => norm(t)).filter(Boolean);
+    if (cleanTerms.length > 0) {
+      return { department: department || 'unclear', searchTerms: cleanTerms };
+    }
+    return null;
+  }
+  if (!intentOrAction || intentOrAction === 'ninguno_o_especifico') return null;
+
+  if (PROBLEM_SOLUTIONS[intentOrAction]) {
+    const staticTarget = PROBLEM_SOLUTIONS[intentOrAction];
+    return {
+      department: department || staticTarget.department,
+      searchTerms: [...staticTarget.searchTerms]
+    };
+  }
+
+  const actionTarget = ACTION_SOLUTIONS[intentOrAction];
+  if (actionTarget) {
+    const deptKey = department && actionTarget[department] ? department : '_default';
+    const terms = actionTarget[deptKey] || actionTarget._default;
+    return {
+      department: department || (deptKey !== '_default' ? deptKey : 'unclear'),
+      searchTerms: [...terms]
+    };
+  }
+
+  return null;
+}
+
+const CANONICAL_COLORS = {
+  blanc: 'blanco',
+  negr: 'negro',
+  roj: 'rojo',
+  amarill: 'amarillo',
+  azul: 'azul',
+  verde: 'verde',
+  gris: 'gris',
+  marron: 'marron',
+  naranja: 'naranja'
+};
+
+function extractDepartmentAttributes(query, department) {
+  if (!query || typeof query !== 'string') return {};
+  const nq = norm(query);
+  const mq = normMedida(query);
+  const dept = department || detectProductDepartment(query);
+  const checkAll = !dept || dept === 'unclear';
+  const out = {};
+
+  if (checkAll || dept === 'techos_laminas') {
+    const m6 = /\b(6\s*(?:m|mts|mtrs|metros?)|6m)\b/i.test(nq);
+    const m12 = /\b(12\s*(?:pies?|ft|p)|3\.6[06]\s*(?:m|mts|mtrs|metros?)?)\b/i.test(nq);
+    const m10 = /\b(10\s*(?:pies?|ft|p)|3\.0[05]\s*(?:m|mts|mtrs|metros?)?)\b/i.test(nq);
+    const m8 = /\b(8\s*(?:pies?|ft|p)|2\.4[04]\s*(?:m|mts|mtrs|metros?)?)\b/i.test(nq);
+    if (m6) out.length = '6m';
+    else if (m12) out.length = '3.66m';
+    else if (m10) out.length = '3.05m';
+    else if (m8) out.length = '2.44m';
+    else {
+      const genM = /\b(\d+(?:\.\d+)?)\s*(?:m|mts|mtrs|metros?)\b/i.exec(nq);
+      if (genM) out.length = `${genM[1]}m`;
+    }
+
+    const calMatch = /\b(?:cal(?:ibre)?\.?\s*(\d{1,2})|0\.(\d{2}))\b/i.exec(nq);
+    if (calMatch) {
+      out.caliber = calMatch[1] || calMatch[2];
+    }
+  }
+
+  if (checkAll || dept === 'hierro_perfiles') {
+    const dimMatch = /\b(\d+(?:-\d+\/\d+)?)\s*x\s*(\d+(?:-\d+\/\d+)?)\b/i.exec(mq);
+    if (dimMatch) {
+      out.dimension = `${dimMatch[1]}x${dimMatch[2]}`;
+    }
+
+    const thickMatch = /\b(?:(?:cal(?:ibre)?\.?\s*)?(\d+(?:\.\d+)?)\s*(?:mm|milimetros?)|(?:de\s+)?(\d+\.\d+)\s*(?:mm)?)\b/i.exec(nq);
+    if (thickMatch) {
+      const val = thickMatch[1] || thickMatch[2];
+      if (val) {
+        const num = parseFloat(val);
+        out.thickness = Number.isInteger(num) ? `${num}.0mm` : `${num}mm`;
+      }
+    }
+  }
+
+  if (checkAll || dept === 'pinturas') {
+    if (/\b(cunete|cuñete|tobo)\b/i.test(nq)) out.presentation = 'cuñete';
+    else if (/\bgalon\b/i.test(nq)) out.presentation = 'galon';
+    else if (/\bcuarto\b/i.test(nq)) out.presentation = 'cuarto';
+
+    const classMatch = /\b(?:clase|tipo)\s*([abc])\b/i.exec(nq);
+    if (classMatch) {
+      out.grade_class = classMatch[1].toLowerCase();
+    }
+
+    if (/\bcaucho\b/i.test(nq)) out.finish = 'caucho';
+    else if (/\baceite\b/i.test(nq)) out.finish = 'aceite';
+    else if (/\bsatinad[ao]\b/i.test(nq)) out.finish = 'satinada';
+    else if (/\bbrillante\b/i.test(nq)) out.finish = 'brillante';
+    else if (/\bmate\b/i.test(nq)) out.finish = 'mate';
+    else if (/\besmalte\b/i.test(nq)) out.finish = 'esmalte';
+
+    const tokens = nq.split(/\s+/);
+    for (const t of tokens) {
+      const st = stemColor(t);
+      if (CANONICAL_COLORS[st]) {
+        out.color = CANONICAL_COLORS[st];
+        break;
+      }
+    }
+  }
+
+  if (checkAll || dept === 'plomeria_griferia') {
+    let diamMatch = /\b(1\/2|3\/4|5\/8|3\/8|1-1\/2|1-1\/4)\b/i.exec(nq);
+    if (!diamMatch) {
+      diamMatch = /\b([1-6])\s*(?:pulg(?:adas?)?|"|''|\b(?=\s*(?:de\s+)?(?:pulg|aguas?|pvc)))/i.exec(nq);
+    }
+    if (diamMatch) {
+      out.diameter = diamMatch[1];
+    }
+
+    if (/\bagua\s*fria\b/i.test(nq)) out.usage = 'agua fria';
+    else if (/\bagua\s*caliente\b/i.test(nq)) out.usage = 'agua caliente';
+    else if (/\baguas?\s*negras?\b/i.test(nq)) out.usage = 'aguas negras';
+    else if (/\bventilacion\b/i.test(nq)) out.usage = 'ventilacion';
+  }
+
+  return out;
+}
+
+function estimateConstructionMaterials(task, quantity, options = {}) {
+  const q = Number(quantity);
+  if (!Number.isFinite(q) || q <= 0) {
+    return {
+      tarea: task,
+      descripcion_tarea: 'Tarea no especificada',
+      cantidad: 0,
+      unidad_entrada: '',
+      materiales: [],
+      items_presupuesto: '',
+      nota_tecnica: 'Cantidad inválida'
+    };
+  }
+
+  switch (task) {
+    case 'pegar_bloques': {
+      // 1 saco de cemento gris rinde para ~30 a 35 bloques.
+      // Arena lavada: ~0.15 m3 por saco de cemento (1m3 para ~200 bloques).
+      const sacosCemento = Math.max(1, Math.ceil(q / 30));
+      const m3Arena = Math.max(1, Math.round(sacosCemento * 0.15));
+      const materiales = [
+        { nombre: 'cemento gris', cantidad: sacosCemento, unidad: 'sacos' },
+        { nombre: 'arena lavada', cantidad: m3Arena, unidad: 'metros cubicos' }
+      ];
+      const items_presupuesto = `${sacosCemento} sacos de cemento gris, ${m3Arena} metro de arena lavada`;
+      const nota_tecnica = `Estimado para ${q} bloques (rendimiento: ~30 bloques por saco de cemento gris con junta de 1.5cm).`;
+      return {
+        tarea: task,
+        descripcion_tarea: 'Pegar bloques de arcilla o concreto',
+        cantidad: q,
+        unidad_entrada: 'bloques',
+        materiales,
+        items_presupuesto,
+        nota_tecnica
+      };
+    }
+
+    case 'vaciar_piso_losa': {
+      // Losa/piso estándar de 10cm de espesor (0.10m3 por m2).
+      // 1m3 concreto: 8 sacos cemento, 0.5 m3 arena, 0.75 m3 piedra picada.
+      // Por cada m2 de losa: ~0.8 sacos cemento, ~0.05 m3 arena, ~0.075 m3 piedra picada, 1m2 malla.
+      const sacosCemento = Math.max(1, Math.ceil(q * 0.8));
+      const m3Arena = Math.max(0.5, Math.round((q * 0.05) * 10) / 10);
+      const m3Piedra = Math.max(0.5, Math.round((q * 0.075) * 10) / 10);
+      const m2Malla = Math.ceil(q);
+      const materiales = [
+        { nombre: 'cemento gris', cantidad: sacosCemento, unidad: 'sacos' },
+        { nombre: 'arena lavada', cantidad: m3Arena, unidad: 'metros cubicos' },
+        { nombre: 'piedra picada', cantidad: m3Piedra, unidad: 'metros cubicos' },
+        { nombre: 'malla truckson', cantidad: m2Malla, unidad: 'metros cuadrados' }
+      ];
+      const items_presupuesto = `${sacosCemento} sacos de cemento gris, ${m3Arena} metro de arena lavada, ${m3Piedra} metros de piedra picada, ${m2Malla} metros de malla truckson`;
+      const nota_tecnica = `Estimado para vaciado de ${q} m² de piso/losa (espesor estándar 10 cm con refuerzo de malla truckson).`;
+      return {
+        tarea: task,
+        descripcion_tarea: 'Vaciar piso o placa de concreto (10cm)',
+        cantidad: q,
+        unidad_entrada: 'm2',
+        materiales,
+        items_presupuesto,
+        nota_tecnica
+      };
+    }
+
+    case 'frisar_pared': {
+      // Friso / revoque de pared (espesor 1.5cm).
+      // 1 saco de cemento rinde para ~7 m2 de friso.
+      // Arena fina: ~0.025 m3 por m2 de pared.
+      const sacosCemento = Math.max(1, Math.ceil(q / 7));
+      const m3Arena = Math.max(0.5, Math.round((q * 0.025) * 10) / 10);
+      const materiales = [
+        { nombre: 'cemento gris', cantidad: sacosCemento, unidad: 'sacos' },
+        { nombre: 'arena fina', cantidad: m3Arena, unidad: 'metros cubicos' }
+      ];
+      const items_presupuesto = `${sacosCemento} sacos de cemento gris, ${m3Arena} metros de arena fina`;
+      const nota_tecnica = `Estimado para frisar ${q} m² de pared (espesor 1.5 cm).`;
+      return {
+        tarea: task,
+        descripcion_tarea: 'Frisar o revocar paredes',
+        cantidad: q,
+        unidad_entrada: 'm2',
+        materiales,
+        items_presupuesto,
+        nota_tecnica
+      };
+    }
+
+    case 'cerca_alambre_pua': {
+      // Cerca estándar de 4 líneas de alambre de púa.
+      // Grapas: 1 empaque de 500g cada 50 metros.
+      const lineas = options.lineas || 4;
+      const metrosAlambre = q * lineas;
+      const empaquesGrapas = Math.max(1, Math.ceil(q / 50));
+      const materiales = [
+        { nombre: 'alambre de pua', cantidad: metrosAlambre, unidad: 'metros' },
+        { nombre: 'grapas para alambre de pua', cantidad: empaquesGrapas, unidad: 'empaque 500gr' }
+      ];
+      const items_presupuesto = `${metrosAlambre} metros de alambre de pua, ${empaquesGrapas} empaque de grapas para alambre de pua`;
+      const nota_tecnica = `Estimado para cerca perimetral de ${q} metros lineales (${lineas} líneas de alambre de púa con grapas).`;
+      return {
+        tarea: task,
+        descripcion_tarea: 'Cerca perimetral con alambre de púa',
+        cantidad: q,
+        unidad_entrada: 'metros',
+        materiales,
+        items_presupuesto,
+        nota_tecnica
+      };
+    }
+
+    case 'pintar_superficie': {
+      // Rendimiento pintura: ~30 m2 por galón a dos manos, ~120 m2 por cuñete (4 galones).
+      let materiales = [];
+      let items_presupuesto = '';
+      if (q >= 80) {
+        const cunetes = Math.max(1, Math.ceil(q / 120));
+        materiales.push({ nombre: 'cuñete de pintura caucho blanco', cantidad: cunetes, unidad: 'cuñete' });
+        items_presupuesto = `${cunetes} cuñete de pintura caucho blanco`;
+      } else {
+        const galones = Math.max(1, Math.ceil(q / 30));
+        materiales.push({ nombre: 'galon de pintura caucho blanco', cantidad: galones, unidad: 'galon' });
+        items_presupuesto = `${galones} galon de pintura caucho blanco`;
+      }
+      materiales.push(
+        { nombre: 'rodillo para pintar', cantidad: 1, unidad: 'unidad' },
+        { nombre: 'brocha para pintar', cantidad: 1, unidad: 'unidad' },
+        { nombre: 'tirro de papel', cantidad: 1, unidad: 'unidad' }
+      );
+      items_presupuesto += ', 1 rodillo para pintar, 1 brocha para pintar, 1 tirro de papel';
+      const nota_tecnica = `Estimado para pintar ${q} m² de superficie a 2 manos con accesorios básicos.`;
+      return {
+        tarea: task,
+        descripcion_tarea: 'Pintar paredes o techos (2 manos)',
+        cantidad: q,
+        unidad_entrada: 'm2',
+        materiales,
+        items_presupuesto,
+        nota_tecnica
+      };
+    }
+
+    default:
+      return {
+        tarea: task,
+        descripcion_tarea: 'Tarea no reconocida',
+        cantidad: q,
+        unidad_entrada: '',
+        materiales: [],
+        items_presupuesto: '',
+        nota_tecnica: 'No se encontraron fórmulas para la tarea especificada.'
+      };
+  }
+}
+
+function detectConstructionTask(query) {
+  if (!query || typeof query !== 'string') return null;
+  const nq = norm(query);
+
+  // Guardias de rechazo inmediato: consultas directas de producto no son estimaciones
+  if (/^(?:bloques?|cemento|cabillas?|tubos?|laminas?|alambre|pinturas?|tornillos?|malla)\b/.test(nq)) {
+    // Si empieza directamente con el nombre del producto, es búsqueda de producto
+    // a menos que contenga un verbo explícito de estimación ("cuanto material para...")
+    if (!/\b(?:cuanto material|que necesito para|combo para|materiales para)\b/.test(nq)) {
+      return null;
+    }
+  }
+
+  // 1. Tarea: Pegar Bloques
+  const isBloques = /\b(?:pegar|pega|asentar|colocar|levantar)\s+(?:los\s+)?bloques?\b/.test(nq) ||
+    /\b(?:bloques?)\b/.test(nq) && /\b(?:cuanto\s+cemento|cuanto\s+material|que\s+necesito|cuanta\s+arena|materiales?\s+para)\b/.test(nq);
+  if (isBloques) {
+    const m = nq.match(/\b(\d+)\s*(?:bloques?|blq)?\b/);
+    if (m && Number(m[1]) > 0) {
+      const cantidad = Number(m[1]);
+      return {
+        match: true,
+        tarea: 'pegar_bloques',
+        cantidad,
+        unidad: 'bloques',
+        requires_dimension: false
+      };
+    }
+    return {
+      match: true,
+      tarea: 'pegar_bloques',
+      requires_dimension: true,
+      mensaje_aclarar: '¿Cuántos bloques vas a pegar? Indícame la cantidad para calcularte los sacos de cemento y metros de arena necesarios.'
+    };
+  }
+
+  // 2. Tarea: Vaciar Piso / Placa / Losa
+  const isVaciar = /\b(?:vaciar|vaciado|echar|hacer)\s+(?:un\s+|una\s+)?(?:placa|piso|losa|contrapiso|plataforma|camino|acera)\b/.test(nq) ||
+    /\b(?:placa|piso|losa)\b/.test(nq) && /\b(?:que\s+necesito|cuanto\s+material|cuanto\s+cemento|para\s+vaciar|materiales?\s+para)\b/.test(nq);
+  if (isVaciar) {
+    const m = nq.match(/\b(\d+(?:\.\d+)?)\s*(?:m2|mts2|metros?\s+cuadrados?|mts|metros?)\b/);
+    if (m && Number(m[1]) > 0) {
+      const cantidad = Number(m[1]);
+      return {
+        match: true,
+        tarea: 'vaciar_piso_losa',
+        cantidad,
+        unidad: 'm2',
+        requires_dimension: false
+      };
+    }
+    return {
+      match: true,
+      tarea: 'vaciar_piso_losa',
+      requires_dimension: true,
+      mensaje_aclarar: '¿De cuántos metros cuadrados (m²) o qué medidas (largo x ancho) es el piso o placa que vas a vaciar? Con eso te calculo exacto el cemento, arena, piedra y malla truckson.'
+    };
+  }
+
+  // 3. Tarea: Frisar Pared
+  const isFrisar = /\b(?:frisar|friso|revoque|revocar|pañetar)\b/.test(nq) ||
+    /\b(?:pared|paredes)\b/.test(nq) && /\b(?:para\s+frisar|cuanto\s+cemento|materiales?\s+para)\b/.test(nq);
+  if (isFrisar) {
+    const m = nq.match(/\b(\d+(?:\.\d+)?)\s*(?:m2|mts2|metros?\s+cuadrados?|mts|metros?)\b/);
+    if (m && Number(m[1]) > 0) {
+      const cantidad = Number(m[1]);
+      return {
+        match: true,
+        tarea: 'frisar_pared',
+        cantidad,
+        unidad: 'm2',
+        requires_dimension: false
+      };
+    }
+    return {
+      match: true,
+      tarea: 'frisar_pared',
+      requires_dimension: true,
+      mensaje_aclarar: '¿Cuántos metros cuadrados de pared vas a frisar? Indícame la medida para calcularte el cemento y la arena fina.'
+    };
+  }
+
+  // 4. Tarea: Cerca con Alambre de Púa
+  const isCerca = /\b(?:cerca|cercar|alambrado)\b/.test(nq) && /\b(?:alambre\s+de\s+pua|puas?)\b/.test(nq) ||
+    /\b(?:alambre\s+de\s+pua)\b/.test(nq) && /\b(?:para\s+(?:armar|hacer|una)?\s*cerca|combo|cuanto\s+alambre)\b/.test(nq);
+  if (isCerca) {
+    const m = nq.match(/\b(\d+(?:\.\d+)?)\s*(?:m|mts|metros?)\b/);
+    if (m && Number(m[1]) > 0) {
+      const cantidad = Number(m[1]);
+      return {
+        match: true,
+        tarea: 'cerca_alambre_pua',
+        cantidad,
+        unidad: 'metros',
+        requires_dimension: false
+      };
+    }
+    return {
+      match: true,
+      tarea: 'cerca_alambre_pua',
+      requires_dimension: true,
+      mensaje_aclarar: '¿De cuántos metros de largo es la cerca que vas a armar? Te calculo los metros o rollos de alambre de púa y las grapas necesarias.'
+    };
+  }
+
+  // 5. Tarea: Pintar Paredes / Superficies
+  const isPintar = /\b(?:cuanta\s+pintura|cuantos?\s+(?:galones?|cu[nñ]etes?)\s+de\s+pintura|pintura\s+para\s+pintar)\b/.test(nq) ||
+    /\b(?:pintar)\b/.test(nq) && /\b(?:metros?\s+cuadrados?|m2|casa|habitaci\w*|cuarto|paredes?)\b/.test(nq);
+  if (isPintar) {
+    const m = nq.match(/\b(\d+(?:\.\d+)?)\s*(?:m2|mts2|metros?\s+cuadrados?|mts|metros?)\b/);
+    if (m && Number(m[1]) > 0) {
+      const cantidad = Number(m[1]);
+      return {
+        match: true,
+        tarea: 'pintar_superficie',
+        cantidad,
+        unidad: 'm2',
+        requires_dimension: false
+      };
+    }
+    return {
+      match: true,
+      tarea: 'pintar_superficie',
+      requires_dimension: true,
+      mensaje_aclarar: '¿Cuántos metros cuadrados vas a pintar o qué medidas tiene el área? Con eso te calculo la cantidad exacta en galones o cuñetes.'
+    };
+  }
+
+  return null;
+}
+
+const INSTALLATION_KITS = {
+  sanitario_poceta: {
+    categoria: 'sanitario_poceta',
+    nombre: 'Kit de instalación para sanitario o poceta',
+    descripcion: 'Kit completo de accesorios para instalar inodoro o poceta con tanque',
+    items: [
+      { nombre: 'herraje para poceta', cantidad: 1, unidad: 'unidad' },
+      { nombre: 'canilla para poceta 1/2 x 7/8', cantidad: 1, unidad: 'unidad' },
+      { nombre: 'llave de arresto 1/2', cantidad: 1, unidad: 'unidad' },
+      { nombre: 'cuello de cera', cantidad: 1, unidad: 'unidad' },
+      { nombre: 'tornillos de fijacion para poceta', cantidad: 1, unidad: 'juego' },
+      { nombre: 'teflon', cantidad: 1, unidad: 'rollo' }
+    ],
+    items_presupuesto: '1 herraje para poceta, 1 canilla para poceta 1/2 x 7/8, 1 llave de arresto 1/2, 1 cuello de cera, 1 juego de tornillos de fijacion para poceta, 1 teflon',
+    consejo_tecnico: 'Para instalar una poceta se necesita el herraje del tanque, la canilla de alimentación (1/2 x 7/8), la llave de arresto, el cuello de cera para sellar la base contra malos olores, los tornillos de fijación al piso y teflón.'
+  },
+
+  lavamanos: {
+    categoria: 'lavamanos',
+    nombre: 'Kit de instalación para lavamanos',
+    descripcion: 'Accesorios para montaje de lavamanos con grifería y desagüe',
+    items: [
+      { nombre: 'griferia para lavamanos', cantidad: 1, unidad: 'unidad' },
+      { nombre: 'canilla para lavamanos 1/2 x 1/2', cantidad: 2, unidad: 'unidades' },
+      { nombre: 'sifon para lavamanos', cantidad: 1, unidad: 'unidad' },
+      { nombre: 'llave de arresto 1/2', cantidad: 1, unidad: 'unidad' },
+      { nombre: 'teflon', cantidad: 1, unidad: 'rollo' }
+    ],
+    items_presupuesto: '1 griferia para lavamanos, 2 canillas para lavamanos 1/2 x 1/2, 1 sifon para lavamanos, 1 llave de arresto 1/2, 1 teflon',
+    consejo_tecnico: 'Para la instalación de lavamanos se requiere la grifería, dos canillas de 1/2 x 1/2, el sifón / desagüe plástico o cromado, llave de arresto y teflón.'
+  },
+
+  fregadero: {
+    categoria: 'fregadero',
+    nombre: 'Kit de instalación para fregadero',
+    descripcion: 'Accesorios para montaje de fregadero de cocina',
+    items: [
+      { nombre: 'griferia de fregadero', cantidad: 1, unidad: 'unidad' },
+      { nombre: 'canilla para fregadero', cantidad: 2, unidad: 'unidades' },
+      { nombre: 'contracanasta para fregadero', cantidad: 1, unidad: 'unidad' },
+      { nombre: 'sifon para fregadero', cantidad: 1, unidad: 'unidad' },
+      { nombre: 'silicon transparente', cantidad: 1, unidad: 'unidad' },
+      { nombre: 'teflon', cantidad: 1, unidad: 'rollo' }
+    ],
+    items_presupuesto: '1 griferia de fregadero, 2 canillas para fregadero, 1 contracanasta para fregadero, 1 sifon para fregadero, 1 silicon transparente, 1 teflon',
+    consejo_tecnico: 'Para el fregadero se necesita la grifería (cuello de cisne o monomando), canillas, la contracanasta con sifón, silicón para sellar el borde y teflón para las roscas.'
+  },
+
+  techo_laminas: {
+    categoria: 'techo_laminas',
+    nombre: 'Accesorios para fijación e impermeabilización de láminas de techo',
+    descripcion: 'Ganchos, remates y selladores para techado',
+    items: [
+      { nombre: 'gancho para techo', cantidad: 10, unidad: 'unidades' },
+      { nombre: 'caballete para techo', cantidad: 1, unidad: 'unidad' },
+      { nombre: 'cemento plastico', cantidad: 1, unidad: 'unidad' }
+    ],
+    items_presupuesto: '10 ganchos para techo, 1 caballete para techo, 1 cemento plastico',
+    consejo_tecnico: 'Para fijar láminas de techo se usan ganchos para techo o tornillos autoperforantes con arandelas de goma, caballete para la cumbrera y cemento plástico para sellar solapes y evitar goteras.'
+  },
+
+  tuberias_pvc: {
+    categoria: 'tuberias_pvc',
+    nombre: 'Kit de pegado e instalación para tuberías PVC',
+    descripcion: 'Soldadura química, limpiador y accesorios para tubos de PVC',
+    items: [
+      { nombre: 'pega soldadura para pvc', cantidad: 1, unidad: 'unidad' },
+      { nombre: 'limpiador para pvc', cantidad: 1, unidad: 'unidad' },
+      { nombre: 'teflon', cantidad: 1, unidad: 'rollo' }
+    ],
+    items_presupuesto: '1 pega soldadura para pvc, 1 limpiador para pvc, 1 teflon',
+    consejo_tecnico: 'Para instalar tuberías de PVC es indispensable la pega soldadura para PVC, el limpiador para acondicionar la superficie del tubo y teflón para las conexiones roscadas.'
+  }
+};
+
+function getInstallationKit(category) {
+  if (!category || typeof category !== 'string') return null;
+  const key = norm(category).replace(/\s+/g, '_');
+  return INSTALLATION_KITS[key] || null;
+}
+
+function detectInstallationQuery(query) {
+  if (!query || typeof query !== 'string') return null;
+  const nq = norm(query);
+
+  // Guardias de rechazo inmediato: consultas directas de accesorios individuales NO son solicitudes de kit
+  // Ejemplo: "canilla para poceta", "herraje de inodoro", "gancho para techo"
+  const isDirectAccessory = /^(?:canillas?|herrajes?|sifones?|sifon|contracanastas?|ganchos?|tornillos?|pega\s+(?:soldadura|para\s+pvc)|teflon|llaves?\s+de\s+arresto|cuello\s+de\s+cera)\b/.test(nq);
+  if (isDirectAccessory) {
+    // Si empieza por el accesorio pero no pide "kit", "combo", "materiales para instalar", o "que necesito para"
+    if (!/\b(?:kit|combo|paquete|juego\s+completo|que\s+necesito|materiales?\s+para\s+instalar)\b/.test(nq)) {
+      return null;
+    }
+  }
+
+  const hasActionCue = /\b(?:instalar|instalacion|montar|colocar|pegar|poner|que\s+necesito\s+para|materiales?\s+para|kit\s+(?:de|para)?|combo\s+(?:de|para)?)\b/.test(nq);
+  if (!hasActionCue) return null;
+
+  // 1. Sanitario / Poceta / Inodoro
+  if (/\b(?:pocetas?|inodoros?|sanitarios?|wc|taza\s+sanitaria)\b/.test(nq)) {
+    return {
+      match: true,
+      categoria: 'sanitario_poceta',
+      kit: INSTALLATION_KITS.sanitario_poceta
+    };
+  }
+
+  // 2. Lavamanos / Lavatorio
+  if (/\b(?:lavamanos?|lavatorios?|bachas?\s+(?:de\s+ba[nñ]o)?)\b/.test(nq)) {
+    return {
+      match: true,
+      categoria: 'lavamanos',
+      kit: INSTALLATION_KITS.lavamanos
+    };
+  }
+
+  // 3. Fregadero / Lavaplatos
+  if (/\b(?:fregaderos?|lavaplatos?)\b/.test(nq)) {
+    return {
+      match: true,
+      categoria: 'fregadero',
+      kit: INSTALLATION_KITS.fregadero
+    };
+  }
+
+  // 4. Techo / Láminas
+  if (/\b(?:laminas?\s+(?:de\s+)?techo|techo|laminas?\s+de\s+zinc|acerolit)\b/.test(nq) &&
+      /\b(?:instalar|colocar|fijar|montar|kit|combo|accesorios?)\b/.test(nq)) {
+    return {
+      match: true,
+      categoria: 'techo_laminas',
+      kit: INSTALLATION_KITS.techo_laminas
+    };
+  }
+
+  // 5. Tuberías PVC
+  if (/\b(?:tuberias?|tubos?\s+pvc|aguas?\s+negras?|aguas?\s+blancas?)\b/.test(nq) &&
+      /\b(?:instalar|pegar|kit|combo|accesorios?|materiales?)\b/.test(nq)) {
+    return {
+      match: true,
+      categoria: 'tuberias_pvc',
+      kit: INSTALLATION_KITS.tuberias_pvc
+    };
+  }
+
+  return null;
+}
+
+function findComplementaryKit(productName, department) {
+  if (!productName || typeof productName !== 'string') return null;
+  const np = norm(productName);
+
+  // 1. Sanitario / Poceta
+  if (/\b(?:pocetas?|inodoros?|taza\s+sanitaria)\b/.test(np)) {
+    // Excluir si ya es un accesorio (herraje, canilla, tornillo)
+    if (!/\b(?:herraje|canilla|tornillo|cuello|tapa|asiento)\b/.test(np)) {
+      return INSTALLATION_KITS.sanitario_poceta;
+    }
+  }
+
+  // 2. Fregadero
+  if (/\bfregaderos?\b/.test(np)) {
+    if (!/\b(?:griferia|canilla|sifon|contracanasta)\b/.test(np)) {
+      return INSTALLATION_KITS.fregadero;
+    }
+  }
+
+  // 3. Lavamanos
+  if (/\blavamanos?\b/.test(np)) {
+    if (!/\b(?:griferia|canilla|sifon|llave|kit)\b/.test(np)) {
+      return INSTALLATION_KITS.lavamanos;
+    }
+  }
+
+  // 4. Láminas de techo
+  if (/\blamina\s+(?:de\s+)?(?:zinc|techo|galv|ondulada|arquitectonica|acerolit)\b/.test(np) ||
+      /\blamina\s+zinc\b/.test(np)) {
+    return INSTALLATION_KITS.techo_laminas;
+  }
+
+  return null;
+}
+
 function parseItems(str){
-  const partes = str.split(/[,;\n]+/).map(s=>s.trim()).filter(Boolean);
+  if (!str || typeof str !== 'string') return [];
+  const WORD_NUMS = {
+    un: 1, una: 1, uno: 1,
+    dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10,
+    medio: 0.5
+  };
+  const lines = str.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const rawParts = [];
+  const conjLookahead = '(?=' +
+    '\\d+(?:\\.\\d+)?(?:\\s|$)' + '|' +
+    '(?:un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|medio)(?:\\s|$)' + '|' +
+    '(?:sacos?|tubos?|laminas?|láminas?|cabillas?|rollos?|cuñetes?|cunetes?|galones?|bombillos?|codos?|pegas?|teflon|manto)(?:\\s|$)' +
+  ')';
+  const splitRe = new RegExp('[,;]+|\\s+(?:y|e|con|mas|más|ademas|además|tambien|también)\\s+' + conjLookahead, 'gi');
+
+  for (const line of lines) {
+    const cleanLine = line
+      .replace(/^[\s\-*•·–—]+/, '')
+      .replace(/^\s*\d+[\.\)]\s+/, '')
+      .trim();
+    if (!cleanLine) continue;
+
+    const tokens = cleanLine.split(splitRe).map(t => t.trim()).filter(Boolean);
+    for (const t of tokens) {
+      rawParts.push(t);
+    }
+  }
+
   const out = [];
-  for (let p of partes){
-    let nombre=p, cant=1;
+  for (let p of rawParts) {
+    p = p.replace(/^[\s\-*•·–—]+/, '').replace(/^\s*\d+[\.\)]\s+/, '').trim();
+    if (!p) continue;
+
+    let nombre = p, cant = 1;
     let m = p.match(/^(.*?)[:=]\s*(\d+(?:\.\d+)?)\s*$/);
     if (!m) m = p.match(/^(.*?)\s+x\s*(\d+(?:\.\d+)?)\s*$/i);
-    if (!m){ const m2=p.match(/^(\d+(?:\.\d+)?)\s+(.*)$/); if(m2){ cant=Number(m2[1]); nombre=m2[2]; } }
-    if (m){ nombre=m[1].trim(); cant=Number(m[2]); }
-    nombre = nombre.replace(/^((sacos?|unidades?|uds?|piezas?|metros?|mts|de|del|la|el|los|las)\s+)+/i,'').trim();
-    if (nombre) out.push({ nombre, cantidad: cant>0?cant:1 });
+    if (!m) m = p.match(/^(.*?)\s*\(\s*(\d+(?:\.\d+)?)\s*\)\s*$/);
+
+    if (m) {
+      nombre = m[1].trim();
+      cant = Number(m[2]);
+    } else {
+      const m2 = p.match(/^(\d+(?:\.\d+)?)\s*(?:x\s*)?(.*)$/i);
+      if (m2) {
+        cant = Number(m2[1]);
+        nombre = m2[2];
+      } else {
+        const mw = p.match(/^(un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|medio)\s+(.*)$/i);
+        if (mw) {
+          cant = WORD_NUMS[mw[1].toLowerCase()] || 1;
+          nombre = mw[2];
+        }
+      }
+    }
+
+    nombre = nombre.replace(/^((sacos?|unidades?|uds?|piezas?|metros?|mts|de|del|la|el|los|las)\s+)+/i, '').trim();
+    if (nombre) {
+      out.push({ nombre, cantidad: cant > 0 ? cant : 1 });
+    }
   }
+
   return out;
 }
 
 async function getRecargo(){ try { const r = await axios.get(SB+'/rest/v1/presupuesto_config?id=eq.1&select=markup_porcentaje',{headers:H}); const p = r.data && r.data[0] && Number(r.data[0].markup_porcentaje); return (p!=null && !isNaN(p)) ? 1+(p/100) : 1.30; } catch(e){ return 1.30; } }
 async function getTasa(){ try { const r = await axios.get(SB+'/rest/v1/tazas?nombre=eq.actual&select=bcv_usd',{headers:H}); return r.data && r.data[0] && Number(r.data[0].bcv_usd); } catch(e){ return null; } }
 
-const { p_busqueda } = query;
+const { p_busqueda, marcas_excluidas, department, department_confidence, material, problem_intent, problem_intent_confidence, solution_terms, solution_terms_confidence } = (typeof query === 'object' && query !== null) ? query : { p_busqueda: query };
+const _detectedDept = (department && department !== 'unclear') ? department : detectProductDepartment(p_busqueda);
+const _deptAttrs = extractDepartmentAttributes(p_busqueda, _detectedDept);
+const _alignment = (department || material || problem_intent || solution_terms || Object.keys(_deptAttrs).length > 0)
+  ? { department: _detectedDept, department_confidence, material, problem_intent, problem_intent_confidence, solution_terms, solution_terms_confidence, attributes: _deptAttrs }
+  : null;
+
+const _constructionTask = detectConstructionTask(p_busqueda);
+if (_constructionTask && _constructionTask.match) {
+  if (_constructionTask.requires_dimension) {
+    return JSON.stringify({
+      ok: true,
+      aclarar: true,
+      es_estimacion_obra: true,
+      tarea: _constructionTask.tarea,
+      instruccion: _constructionTask.mensaje_aclarar,
+      mensaje: _constructionTask.mensaje_aclarar
+    });
+  }
+  const _est = estimateConstructionMaterials(_constructionTask.tarea, _constructionTask.cantidad);
+  const itemsBullet = _est.materiales.map(m => `• ${m.cantidad} ${m.unidad} de *${tc(m.nombre)}*`).join('\n');
+  const userMsg = `Para ${_est.descripcion_tarea.toLowerCase()} (${_est.cantidad} ${_est.unidad_entrada}) el estimado estándar de materiales es:\n${itemsBullet}\n\n_${_est.nota_tecnica}_\n\n¿Deseas que te prepare la cotización con los precios exactos de una vez?`;
+  return JSON.stringify({
+    ok: true,
+    es_estimacion_obra: true,
+    tarea: _est.tarea,
+    cantidad: _est.cantidad,
+    unidad: _est.unidad_entrada,
+    materiales: _est.materiales,
+    items_presupuesto: _est.items_presupuesto,
+    mensaje: userMsg,
+    instruccion: `El cliente consultó materiales para una obra (${_est.descripcion_tarea}: ${_est.cantidad} ${_est.unidad_entrada}). Preséntale el desglose técnico estimado y pregúntale si desea que se lo cotices con precios de una vez: "${_est.items_presupuesto}".`
+  });
+}
+
+const _installationQuery = detectInstallationQuery(p_busqueda);
+if (_installationQuery && _installationQuery.match) {
+  const _kit = _installationQuery.kit;
+  const itemsBullet = _kit.items.map(m => `• ${m.cantidad} ${m.unidad} de *${tc(m.nombre)}*`).join('\n');
+  const userMsg = `${_kit.nombre}:\n${itemsBullet}\n\n_${_kit.consejo_tecnico}_\n\n¿Deseas que te prepare el presupuesto con los precios de todos estos accesorios de una vez?`;
+  return JSON.stringify({
+    ok: true,
+    es_kit_instalacion: true,
+    categoria: _kit.categoria,
+    nombre: _kit.nombre,
+    items: _kit.items,
+    items_presupuesto: _kit.items_presupuesto,
+    mensaje: userMsg,
+    instruccion: `El cliente preguntó por los accesorios para instalar ${_kit.descripcion.toLowerCase()}. Preséntale los componentes requeridos y ofrécele cotizárselos completos: "${_kit.items_presupuesto}".`
+  });
+}
+
 
 function triggerAutomejora(motivo, extra){
   try {
@@ -755,9 +1609,31 @@ if (res.length===0){
   // Sin resultados lexicos no hay nada que comparar: cualquier propuesta del vector mejora.
   const _vec = (await buscarVectorial(null)).filas;
   if (_vec.length > 0){
-    res = _vec;
-    // Tratado como HIPOTESIS igual que el rescate: es una interpretacion, no un hallazgo.
-    _rescate = { categoria: norm(_vec[0].descripcion).split(' ')[0], termino: '', confianza: 4 };
+    const _vecFiltered = _alignment && _alignment.department && _alignment.department !== 'unclear' && (Number(_alignment.department_confidence) >= 0.80 || _alignment.department_confidence === undefined)
+      ? _vec.filter(p => {
+          const pd = detectProductDepartment(p.descripcion);
+          return pd === 'unclear' || pd === _alignment.department;
+        })
+      : _vec;
+    if (_vecFiltered.length > 0){
+      res = _vecFiltered;
+      // Tratado como HIPOTESIS igual que el rescate: es una interpretacion, no un hallazgo.
+      _rescate = { categoria: norm(_vecFiltered[0].descripcion).split(' ')[0], termino: '', confianza: 4 };
+    }
+  }
+  if (res.length === 0 && _alignment && (_alignment.problem_intent || _alignment.solution_terms) && _alignment.problem_intent !== 'ninguno_o_especifico' &&
+      (_alignment.problem_intent_confidence === undefined || Number(_alignment.problem_intent_confidence) >= 0.80)) {
+    const _solTarget = resolveDynamicSolutions(_alignment.problem_intent, _alignment.department, _alignment.solution_terms);
+    if (_solTarget && Array.isArray(_solTarget.searchTerms)) {
+      for (const term of _solTarget.searchTerms) {
+        const _solRows = await rpc(term);
+        if (_solRows && _solRows.length > 0) {
+          res = _solRows;
+          _rescate = { categoria: _solTarget.department, termino: term, confianza: 5 };
+          break;
+        }
+      }
+    }
   }
   const _rs = res.length===0 ? await rescateSemantico() : null;
   if (_rs){
@@ -816,9 +1692,31 @@ if (!_rescate && res.length > 0){
     const _lexFalla = _vr.simLex !== null && _vr.simLex < UMBRAL_LEXICO_FIABLE;
     const _catDiff = _vcat !== _d0.split(' ')[0];
     const _vecFiable = _vec.length > 0 && Number(_vec[0].similitud) >= UMBRAL_VECTOR_ADOPTAR;
-    if (_vec.length > 0 && (_lexFalla || (_catDiff && _vecFiable))){
+    const _vecDept = _vec.length ? detectProductDepartment(_vec[0].descripcion) : 'unclear';
+    const _deptConflict = _alignment && _alignment.department && _alignment.department !== 'unclear' &&
+      (Number(_alignment.department_confidence) >= 0.80 || _alignment.department_confidence === undefined) &&
+      _vecDept !== 'unclear' && _vecDept !== _alignment.department;
+    if (_vec.length > 0 && !_deptConflict && (_lexFalla || (_catDiff && _vecFiable))){
       res = _vec;
       _rescate = { categoria: _vcat, termino: '', confianza: 4 };
+    }
+  }
+}
+
+if (!_rescate && _alignment && (_alignment.problem_intent || _alignment.solution_terms) && _alignment.problem_intent !== 'ninguno_o_especifico' &&
+    (_alignment.problem_intent_confidence === undefined || Number(_alignment.problem_intent_confidence) >= 0.80)) {
+  const _solTarget = resolveDynamicSolutions(_alignment.problem_intent, _alignment.department, _alignment.solution_terms);
+  if (_solTarget && Array.isArray(_solTarget.searchTerms)) {
+    const _currentDept = res.length ? detectProductDepartment(res[0].descripcion) : 'unclear';
+    if (_currentDept !== _solTarget.department) {
+      for (const term of _solTarget.searchTerms) {
+        const _solRows = await rpc(term);
+        if (_solRows && _solRows.length > 0) {
+          res = _solRows;
+          _rescate = { categoria: _solTarget.department, termino: term, confianza: 5 };
+          break;
+        }
+      }
     }
   }
 }
@@ -1057,6 +1955,17 @@ if (rolloIntent && !granelIntent){
   if (r.length>0){ unicos.length=0; for(const x of r) unicos.push(x); }
 }
 
+// Filtro de MARCAS EXCLUIDAS: si el cliente rechazo una marca previa ("otra marca"), descarta esa marca
+if (Array.isArray(marcas_excluidas) && marcas_excluidas.length > 0) {
+  const normExcl = marcas_excluidas.map(m => norm(m)).filter(Boolean);
+  const sinExcl = unicos.filter(p => {
+    const nd = norm(p.descripcion);
+    return !normExcl.some(m => new RegExp('(^|[^a-z0-9])' + m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-z0-9]|$)').test(nd));
+  });
+  unicos.length = 0;
+  for (const x of sinExcl) unicos.push(x);
+}
+
 // Filtro de MEDIDA: si el cliente dio medidas, deja solo los que las cumplen TODAS.
 // Si NINGUNO cumple todas pero dio VARIAS medidas (ej. "cable 8 12"), prueba cada una por separado.
 let medMismatch = false;
@@ -1091,7 +2000,20 @@ function casaPalabra(a, d){
   const esc = a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp('(^|[^a-z0-9])' + esc + '[a-z]{0,2}([^a-z0-9]|$)').test(d);
 }
-function fullMatch(descripcion, qTokens){
+function fullMatch(descripcion, qTokens, context){
+  if (context && typeof context === 'object') {
+    const dept = context.department;
+    const conf = context.department_confidence;
+    const mat = context.material;
+    if (dept && dept !== 'unclear' && (conf === undefined || Number(conf) >= 0.80)) {
+      const prodDept = detectProductDepartment(descripcion);
+      if (prodDept !== 'unclear' && prodDept !== dept) return false;
+    }
+    if (mat && mat !== 'general_o_no_aplica') {
+      const prodMat = detectProductMaterial(descripcion);
+      if (prodMat && prodMat !== mat) return false;
+    }
+  }
   const d = norm(descripcion);
   const nd = normMedida(descripcion);
   const words = d.split(/[\s\-x]+/);
@@ -1121,7 +2043,7 @@ unicos.sort((a,b)=>{
     return (vMap[b.codigo_interno]||0) - (vMap[a.codigo_interno]||0);
   }
   const qTokensMatch = isPaintQuery ? qTokens.filter(t => !['exterior','exteriores','interior','interiores','fachada','intemperie','clase','tipo','calidad'].includes(t)) : qTokens;
-  const aFull = fullMatch(a.descripcion, qTokensMatch), bFull = fullMatch(b.descripcion, qTokensMatch);
+  const aFull = fullMatch(a.descripcion, qTokensMatch, _alignment), bFull = fullMatch(b.descripcion, qTokensMatch, _alignment);
   if (aFull !== bFull) return aFull ? -1 : 1;
   const aStock = esGranel(a.descripcion) || Number(a.existencia) > 0;
   const bStock = esGranel(b.descripcion) || Number(b.existencia) > 0;
@@ -1129,9 +2051,9 @@ unicos.sort((a,b)=>{
     if (aStock !== bStock) return aStock ? -1 : 1;
     const dv = (vMap[b.codigo_interno]||0)-(vMap[a.codigo_interno]||0);
     if (dv !== 0) return dv;
-    return scoreMatch(b.descripcion,qTokensMatch)-scoreMatch(a.descripcion,qTokensMatch);
+    return scoreMatch(b.descripcion,qTokensMatch,_alignment)-scoreMatch(a.descripcion,qTokensMatch,_alignment);
   }
-  const ds=scoreMatch(b.descripcion,qTokensMatch)-scoreMatch(a.descripcion,qTokensMatch);
+  const ds=scoreMatch(b.descripcion,qTokensMatch,_alignment)-scoreMatch(a.descripcion,qTokensMatch,_alignment);
   if(Math.abs(ds)>2) return ds; // dif. pequeña = solo ruido de conteo de palabras -> desempata disponibilidad
   if (aStock !== bStock) return aStock ? -1 : 1;
   return (vMap[b.codigo_interno]||0)-(vMap[a.codigo_interno]||0);
@@ -1146,6 +2068,15 @@ const productos = unicos.slice(0,4).map(p=>{
     precio_bs_texto: tasa ? (nUSD(bsUsd)+'$ o '+nBs(bsUsd*tasa)+'bs') : (nUSD(bsUsd)+'$ (tasa BCV no disponible)') };
 });
 const _out = { encontrados:productos.length, tasa_bcv:tasa, productos };
+
+const isRoofSheet = (_detectedDept === 'techos_laminas' || detectProductDepartment(_pb) === 'techos_laminas') &&
+  /\blaminas?\b/i.test(norm(_pb)) && !/\b(hierro|hp|cr|negra|lisa)\b/i.test(norm(_pb));
+const hasDimension = !!(_deptAttrs && (_deptAttrs.length || _deptAttrs.dimension)) || medLargas.length > 0;
+
+if (isRoofSheet && !hasDimension && unicos.length > 0) {
+  _out.aclarar = true;
+  _out.instruccion = 'Tenemos láminas de zinc de 6 metros, 12 pies (3.66m), 10 pies (3.05m) y 8 pies (2.44m). Pregúntale al cliente qué largo necesita.';
+}
 
 // ¿el mejor resultado es de OTRA categoria? (no comparte NINGUNA palabra con lo pedido: coincidio de casualidad)
 let _weak = false;
@@ -1186,7 +2117,20 @@ if (_rescate){
   _out.parcial = true;
   _out.instruccion = 'OJO: no encontre nada que combine todo lo que pidio el cliente; estos resultados salen de buscar SOLO la palabra "' + _unicaPalabra + '", ignorando el resto de la consulta. Es la coincidencia mas debil posible. PROHIBIDO presentarlos como si fueran lo que pidio: preguntale con honestidad si alguno le sirve ANTES de cotizar. Si te dice que no, responde SOLO con el token [PEDIR_AYUDA].';
 }
-Object.assign(_out, searchDecision(_rescate ? 'semantic' : _weak ? 'weak' : medMismatch ? 'measure_mismatch' :
+if (unicos && unicos.length > 0 && !_weak && !_out.aclarar && !_rescate) {
+  const _compKit = findComplementaryKit(unicos[0].descripcion, _detectedDept);
+  if (_compKit) {
+    _out.kit_sugerido = {
+      categoria: _compKit.categoria,
+      nombre: _compKit.nombre,
+      items_presupuesto: _compKit.items_presupuesto,
+      items: _compKit.items,
+      consejo: _compKit.consejo_tecnico,
+      sugerencia_upsell: `¿Deseas agregar el kit de instalación (${_compKit.items.map(i => i.nombre).join(', ')}) para llevarte todo lo necesario de una vez?`
+    };
+  }
+}
+Object.assign(_out, searchDecision(_out.aclarar ? 'vague' : _rescate ? 'semantic' : _weak ? 'weak' : medMismatch ? 'measure_mismatch' :
   medParcial ? 'multiple_measures' : _fuzzy ? 'approximate' : _dropped ? 'relaxed' :
   _unicaPalabra ? 'single_word' : productos.length ? 'exact' : 'missing'));
 return JSON.stringify(_out);

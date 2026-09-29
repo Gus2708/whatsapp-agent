@@ -6,7 +6,7 @@
 //   2) @n8n/nodes-langchain executeBatch.js reads `result.reason.message` on a rejection
 //      whose reason can be undefined, masking the real failure with a TypeError.
 //
-// Contract with boot script (exit codes):
+// Contract with boot_serrucho.ps1 (exit codes):
 //   0  -> nothing to do (already patched). n8n does NOT need a restart.
 //   10 -> files were modified. Node already loaded the old modules, so the caller MUST
 //         restart n8n for the patch to take effect.

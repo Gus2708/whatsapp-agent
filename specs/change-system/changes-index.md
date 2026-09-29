@@ -1,13 +1,33 @@
 project: whatsapp-agent
-active_changes:
+active_changes: []
+archived_recent:
+- change: jev-installation-kits
+  archived_at: '2026-09-28T21:40:56.246822+00:00'
+  archive_path: specs/changes/archive/2026-09-28-jev-installation-kits
+- change: jev-construction-estimator
+  archived_at: '2026-09-28T20:36:58.651868+00:00'
+  archive_path: specs/changes/archive/2026-09-28-jev-construction-estimator
+- change: jev-multi-item-quotes
+  archived_at: '2026-09-28T19:24:32.715804+00:00'
+  archive_path: specs/changes/archive/2026-09-28-jev-multi-item-quotes
+- change: jev-department-attributes
+  archived_at: '2026-09-28T19:03:17.075777+00:00'
+  archive_path: specs/changes/archive/2026-09-28-jev-department-attributes
 - change: pwa-dashboard
-  flow: brief
-  pace: semi-supervised
-  mode: standard
-  verbosity: concise
-  status: verify
-  current_phase: plan
-  next_phase: plan
-  decision_state: specs/changes/pwa-dashboard/decision-state.md
-  updated_at: '2026-09-04T08:09:50.157553+00:00'
-archived_recent: []
+  archived_at: '2026-09-28T09:45:50.983095+00:00'
+  archive_path: specs/changes/archive/2026-09-28-pwa-dashboard
+- change: brand-alternatives-routing
+  archived_at: '2026-09-28T09:45:12.328086+00:00'
+  archive_path: specs/changes/archive/2026-09-28-brand-alternatives-routing
+- change: jev-dynamic-solution-extraction
+  archived_at: '2026-09-28T09:40:09.257472+00:00'
+  archive_path: specs/changes/archive/2026-09-28-jev-dynamic-solution-extraction
+- change: jev-problem-solution-search
+  archived_at: '2026-09-28T09:21:31.078928+00:00'
+  archive_path: specs/changes/archive/2026-09-28-jev-problem-solution-search
+- change: jev-category-guided-search
+  archived_at: '2026-09-28T08:57:25.761535+00:00'
+  archive_path: specs/changes/archive/2026-09-28-jev-category-guided-search
+- change: jev-agent-improvements
+  archived_at: '2026-09-28T08:17:12.267476+00:00'
+  archive_path: specs/changes/archive/2026-09-28-jev-agent-improvements

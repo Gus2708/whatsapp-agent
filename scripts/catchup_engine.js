@@ -1,5 +1,5 @@
 /**
- * CATCHUP ENGINE - WhatsApp Sales Agent
+ * CATCHUP ENGINE - Ferretería El Serrucho
  * Automatización para detección de caídas y respuesta a mensajes pendientes.
  * Refactorizado para máxima testabilidad y validación estricta con esquemas.
  *
@@ -15,7 +15,7 @@ const { maskChatId, buildCatchupPayload, evaluateCandidates, parseEnv, normalize
 
 const PROJECT_DIR = path.resolve(__dirname, '..');
 const ENV_FILE = path.join(PROJECT_DIR, '.env');
-const LOG_FILE = path.join(PROJECT_DIR, 'catchup.log');
+const LOG_FILE = path.join(PROJECT_DIR, 'catchup_serrucho.log');
 const LOCK_FILE = path.join(PROJECT_DIR, 'catchup.lock');
 const STATE_FILE = path.join(PROJECT_DIR, 'catchup_state.json');
 
@@ -54,12 +54,32 @@ function acquireLock() {
     try {
       const stats = fs.statSync(LOCK_FILE);
       const ageMs = Date.now() - stats.mtimeMs;
-      if (ageMs < LOCK_TIMEOUT_MS) {
-        log(`Hay otra instancia de catchup corriendo (lock activo hace ${Math.round(ageMs / 1000)}s). Abortando.`);
+      let isRunning = false;
+      let existingPid = null;
+      try {
+        const lockData = JSON.parse(fs.readFileSync(LOCK_FILE, 'utf8'));
+        existingPid = lockData.pid;
+        if (existingPid) {
+          try {
+            process.kill(existingPid, 0);
+            isRunning = true;
+          } catch (err) {
+            if (err.code === 'ESRCH') isRunning = false;
+            else isRunning = true;
+          }
+        }
+      } catch (e) {}
+
+      if (!isRunning) {
+        log(`Lock huérfano detectado (PID ${existingPid || 'desconocido'} inactivo). Liberando lock.`);
+        fs.unlinkSync(LOCK_FILE);
+      } else if (ageMs < LOCK_TIMEOUT_MS) {
+        log(`Hay otra instancia de catchup corriendo (PID ${existingPid}, lock activo hace ${Math.round(ageMs / 1000)}s). Abortando.`);
         return false;
+      } else {
+        log(`Lock obsoleto detectado (>10 min). Liberando lock.`);
+        fs.unlinkSync(LOCK_FILE);
       }
-      log(`Lock obsoleto detectado (>10 min). Liberando lock.`);
-      fs.unlinkSync(LOCK_FILE);
     } catch (e) {
       return false;
     }
@@ -133,6 +153,21 @@ async function checkHealth() {
   return { wahaOk, n8nOk, allHealthy: wahaOk && n8nOk };
 }
 
+async function waitForHealth(maxWaitSec = 90, intervalSec = 3) {
+  const start = Date.now();
+  let attempts = 0;
+  while ((Date.now() - start) < maxWaitSec * 1000) {
+    attempts++;
+    const health = await checkHealth();
+    if (health.allHealthy) return true;
+    if (attempts === 1) {
+      log(`Esperando a que WAHA y n8n estén disponibles (hasta ${maxWaitSec}s)...`);
+    }
+    await new Promise(r => setTimeout(r, intervalSec * 1000));
+  }
+  return false;
+}
+
 async function fetchAliasMap() {
   const aliasMap = {};
   try {
@@ -172,9 +207,9 @@ async function fetchCandidatesData(maxAgeHours) {
 
   let wahaChats = [];
   try {
-    const res = await fetch(`${WAHA_BASE}/api/default/chats/overview?limit=100`, {
+    const res = await fetch(`${WAHA_BASE}/api/default/chats/overview?limit=50`, {
       headers: { 'X-Api-Key': WAHA_API_KEY },
-      signal: AbortSignal.timeout(15000)
+      signal: AbortSignal.timeout(30000)
     });
     if (res.ok) wahaChats = await res.json();
   } catch (e) {
@@ -198,23 +233,28 @@ async function fetchCandidatesData(maxAgeHours) {
 
   const sessionsMap = {};
   const botMsgsMap = {};
+  const chatIdsList = Array.from(chatIds);
+  const BATCH_SIZE = 10;
 
-  for (const chatId of chatIds) {
-    try {
-      const sRes = await fetch(`${SUPABASE_URL}/rest/v1/chat_sessions?telefono=eq.${encodeURIComponent(chatId)}`, { headers: sbHeaders });
-      if (sRes.ok) {
-        const rows = await sRes.json();
-        if (rows[0]) sessionsMap[chatId] = rows[0];
-      }
-    } catch (e) {}
+  for (let i = 0; i < chatIdsList.length; i += BATCH_SIZE) {
+    const batch = chatIdsList.slice(i, i + BATCH_SIZE);
+    await Promise.all(batch.map(async (chatId) => {
+      try {
+        const sRes = await fetch(`${SUPABASE_URL}/rest/v1/chat_sessions?telefono=eq.${encodeURIComponent(chatId)}`, { headers: sbHeaders, signal: AbortSignal.timeout(8000) });
+        if (sRes.ok) {
+          const rows = await sRes.json();
+          if (rows[0]) sessionsMap[chatId] = rows[0];
+        }
+      } catch (e) {}
 
-    try {
-      const bRes = await fetch(`${SUPABASE_URL}/rest/v1/mensajes_bot?chat_id=eq.${encodeURIComponent(chatId)}&order=created_at.desc&limit=1`, { headers: sbHeaders });
-      if (bRes.ok) {
-        const rows = await bRes.json();
-        if (rows[0]) botMsgsMap[chatId] = rows[0];
-      }
-    } catch (e) {}
+      try {
+        const bRes = await fetch(`${SUPABASE_URL}/rest/v1/mensajes_bot?chat_id=eq.${encodeURIComponent(chatId)}&order=created_at.desc&limit=1`, { headers: sbHeaders, signal: AbortSignal.timeout(8000) });
+        if (bRes.ok) {
+          const rows = await bRes.json();
+          if (rows[0]) botMsgsMap[chatId] = rows[0];
+        }
+      } catch (e) {}
+    }));
   }
 
   return { supabaseMsgs, wahaChats, sessionsMap, botMsgsMap, aliasMap };
@@ -235,9 +275,10 @@ async function main() {
   if (!force && !acquireLock()) return;
 
   try {
-    const health = await checkHealth();
-    if (!health.allHealthy) {
-      log(`Servicios no listos para catchup (WAHA=${health.wahaOk}, n8n=${health.n8nOk}). Se aborta ejecución.`);
+    const ready = await waitForHealth(90, 3);
+    if (!ready) {
+      const health = await checkHealth();
+      log(`Servicios no listos para catchup tras 90s de espera (WAHA=${health.wahaOk}, n8n=${health.n8nOk}). Se aborta ejecución.`);
       return;
     }
 
@@ -341,6 +382,7 @@ if (require.main === module) {
 
 module.exports = {
   checkHealth,
+  waitForHealth,
   acquireLock,
   releaseLock,
   getState,

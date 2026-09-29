@@ -1,0 +1,41 @@
+{
+  "comercio": {
+    "nombre": "Ferretería El Serrucho",
+    "ubicacion_central": "Mene Mauroa, Estado Falcón",
+    "horarios_atencion": {
+      "dias": "Lunes a Sábado",
+      "horario": "08:00 a 18:00 (Con descanso para almuerzo de 13:00 a 14:00)"
+    }
+  },
+  "politicas_despacho": {
+    "disponible": true,
+    "retiro_en_tienda": true,
+    "galpon_materiales_pesados": {
+      "descripcion": "Todo lo que es hierros (tubos, láminas, cerchas, cabillas, perfiles, etc.) y cemento se encuentra en un galpón aparte en La Compañía. Los retiros de estos materiales se realizan allí y de allí salen los envíos.",
+      "ubicacion": "La Compañía, Mene Mauroa",
+      "materiales": ["hierros", "tubos", "láminas", "cerchas", "cabillas", "perfiles", "cemento"]
+    },
+    "transporte_casco_central": {
+      "disponible": true,
+      "costo_usd": 10,
+      "zona": "casco central de Mene Mauroa"
+    },
+    "transporte_fuera_casco_central": {
+      "disponible": true,
+      "costo": "Variable según la distancia; tiene que preguntar y lo coordina un empleado (no estimar el monto)."
+    },
+    "condicion_pago_envio": "Antes de pagar el envío, el cliente siempre debe hablar primero con un empleado.",
+    "mensaje": "Retiro en tienda física para ferretería general. Todo lo que es hierros (tubos, láminas, cerchas, cabillas, etc.) y cemento está en un galpón aparte en La Compañía; allí se retiran y de allí salen los envíos. Transporte de materiales a $10 dentro del casco central de Mene Mauroa; fuera del Mene el costo varía y debe preguntar. Antes de pagar el envío siempre debe hablar con un empleado."
+  },
+  "metodos_pago_aceptados": [
+    "Pago Móvil (tasa oficial BCV)",
+    "Efectivo (USD / Moneda Local)",
+    "Transferencia Bancaria",
+    "Zelle (para compras mayores a $20.00 USD)"
+  ],
+  "politicas_devolucion": {
+    "admitida": true,
+    "plazo_maximo_dias": 7,
+    "restricciones": "El artículo debe presentarse cerrado en su empaque de origen, sin marcas físicas de uso y con la factura original de compra."
+  }
+}

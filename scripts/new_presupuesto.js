@@ -168,7 +168,9 @@ const ALIAS = {
   'prepintadas':    ['prepintada','prepintado','rojo','roja','azul','verde','naranja','techolit','arquitectonica'],
   'prepintados':    ['prepintado','prepintada','rojo','roja','azul','verde','naranja','techolit','arquitectonica'],
   'techolit':       ['techolit','techolits'],
-  'acerolit':       ['acerolit','acerolits']
+  'acerolit':       ['acerolit','acerolits'],
+  'zinc':           ['zinc','galv','techo galv','calamina'],
+  'sinz':           ['zinc','galv','techo galv','calamina']
 };
 // DEVERBALES: el cliente pide con el VERBO, el catalogo nombra con el SUSTANTIVO.
 // "resina para empalmAR" vs "KIT DE EMPALME DE RESINA": comparten la raiz "empalm" pero
@@ -271,6 +273,9 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
   s = s.replace(/\b(pintadas?|pintados?)\b/gi, 'prepintada');
   s = s.replace(/\b(prepintadas?|prepintados?)\b/gi, 'lamina prepintada');
   s = s.replace(/\blaminas?\s+lamina\b/gi, 'lamina');
+  if (/\bdisco\s+(de\s+)?corte\s+(de\s+|para\s+|p\/)?madera\b/.test(s)) {
+    s = s.replace(/\bdisco\s+(de\s+)?corte\s+(de\s+|para\s+|p\/)?madera\b/g, 'disco madera');
+  }
   // SIN se aplica con LIMITE DE PALABRA, no como subcadena. Con split/join naive, una clave
   // que aparece DENTRO de otra palabra la destroza: "media"->"1/2" convertia "mediano" en
   // "1/2no", "zinc"->"lamina zinc" convertia "zincada" en "lamina zincada", y "riel" rompia
@@ -287,7 +292,48 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
   return s.replace(/\s+/g,' ').trim(); }
 // productos a granel (se venden por metro/kilo): su existencia es irreal, SIEMPRE disponibles
 function esGranel(desc){ const d=norm(desc); return /(^| )x ?(mtrs|mtr|mts|mt|metros|metro|kilos|kilo|kg|gr|ml)( |$)/.test(d) || / por metro( |$)/.test(d); }
-function scoreMatch(descripcion, qTokens){
+function detectProductDepartment(desc){
+  const d = norm(desc);
+  if (/\b(techo|acerolit|techolit|policarbonato|teja|cumbrera|manto|primer asfaltico)\b/.test(d)) return 'techos_laminas';
+  if (/\blaminas?\b/.test(d) && /\b(zinc|galv|galvanizada|ondulad|cuadrad|canal|arquitectonica|prepintada|aluminio|cal)\b/.test(d) && !/\b(hierro|hp|cr|negra|lisa)\b/.test(d)) return 'techos_laminas';
+  if (/\bgancho\s+(p\/|para\s+)?techo\b/.test(d)) return 'techos_laminas';
+
+  if (/\btubos?\b/.test(d) && /\b(electricidad|conduit|luz)\b/.test(d)) return 'electricidad_cables';
+  if (/\b(cable|thwn|thw|breaker|tomacorriente|interruptor|apagador|suiche|switch|cajetin|bombillo|reflector|lampara|teipe|fotocelda|balastro|socate|enchufe|voltaje)\b/.test(d)) return 'electricidad_cables';
+
+  if (/\b(pintura|esmalte|satinad|caucho|oleo|anticorrosiv|brocha|rodillo|thinner|solvente|tirro|imperflex|sellafill)\b/.test(d)) return 'pinturas';
+
+  if (/\b(griferia|fregadero|lavamano|sanitario|inodoro|sifon|grifo|flanche|tanque|valvula|presostato|flotante)\b/.test(d)) return 'plomeria_griferia';
+  if (/\b(codo|tee|adaptador|union)\b/.test(d) && /\b(pvc|cpvc|aguas?|presion|rosca)\b/.test(d)) return 'plomeria_griferia';
+  if (/\btubos?\b/.test(d) && /\b(pvc|cpvc|aguas?|sanitari|cloaca|desague)\b/.test(d)) return 'plomeria_griferia';
+  if (/\bllave\b/.test(d) && /\b(paso|chorro|bola|esfera|jardin)\b/.test(d)) return 'plomeria_griferia';
+  if (/\b(pega|soldadura)\s+(pvc|cpvc)\b/.test(d)) return 'plomeria_griferia';
+
+  if (/\b(disco|mecha|alicate|destornillador|martillo|tenaza|segueta|sierra|cuchilla|pala|pico|carretilla|taladro|esmeril|amoladora|pulidora|soldadora|careta|cepillo|dado)\b/.test(d)) return 'herramientas_discos';
+
+  if (/\b(cemento|cal|yeso|polvo\s+p\/piso|polvo\s+piso|bloque|arena|grava|arido|pego)\b/.test(d)) return 'construccion_aridos';
+
+  if (/\b(tornillo|ramplug|tuerca|arandela|remache|clavo|tirraje|abrazadera|perno|chazo)\b/.test(d)) return 'fijacion_tornilleria';
+
+  if (/\b(cerradura|candado|cerrojo|manilla|tirador|cilindro|pomos?|pasador)\b/.test(d)) return 'seguridad_cerraduras';
+
+  if (/\b(alambre\s+(de\s+)?pua|aspersor|fumigadora|machete|rastrillo|malla\s+pollito|malla\s+gallinero)\b/.test(d)) return 'agro_jardin';
+
+  if (/\b(cabillas?|viga|alambron|perfil|cercha|pletina|angulo|electrosoldada|truckson)\b/.test(d)) return 'hierro_perfiles';
+  if (/\btubos?\b/.test(d) && /\b(herreria|estructural|hierro|redondo|cuadrado|rectangular)\b/.test(d)) return 'hierro_perfiles';
+  if (/\bmalla\b/.test(d)) return 'hierro_perfiles';
+  if (/\blaminas?\b/.test(d) && /\b(hierro|hp|cr|negra|lisa)\b/.test(d)) return 'hierro_perfiles';
+
+  return 'unclear';
+}
+function detectProductMaterial(desc){
+  const d = norm(desc);
+  if (/\b(madera)\b/.test(d) || /\bp\/madera\b/.test(d)) return 'madera';
+  if (/\b(metal|hierro|acero)\b/.test(d) || /\bp\/metal\b/.test(d)) return 'metal';
+  if (/\b(concreto|mamposteria|piedra)\b/.test(d) || /\bp\/concreto\b/.test(d)) return 'concreto';
+  return null;
+}
+function scoreMatch(descripcion, qTokens, context){
   const d = norm(descripcion);
   const nd = normMedida(descripcion);
   const words = d.split(/[\s\-x]+/);
@@ -318,20 +364,208 @@ function scoreMatch(descripcion, qTokens){
   if (_head && words.length && aliasDe(_head).some(a => singular(words[0]) === singular(a))) s += 30;
   if (all && qTokens.length>0) s += 50;
   s -= words.length * 0.1;
+
+  if (context && typeof context === 'object') {
+    const dept = context.department;
+    const conf = context.department_confidence;
+    const mat = context.material;
+    let matConflict = false;
+    if (mat && mat !== 'general_o_no_aplica') {
+      const prodMat = detectProductMaterial(descripcion);
+      if (prodMat && prodMat !== mat) {
+        s -= 80;
+        matConflict = true;
+      }
+    }
+    if (dept && dept !== 'unclear' && (conf === undefined || Number(conf) >= 0.80)) {
+      const prodDept = detectProductDepartment(descripcion);
+      if (prodDept !== 'unclear') {
+        if (prodDept === dept && !matConflict) s += 40;
+        else if (prodDept !== dept) s -= 80;
+      }
+    }
+    if (context.attributes && typeof context.attributes === 'object') {
+      const attrs = context.attributes;
+      if (attrs.length) {
+        const rawLen = attrs.length.replace(/m$/, '');
+        if (medPresent(rawLen, nd)) s += 50;
+      }
+      if (attrs.dimension && medPresent(attrs.dimension, nd)) s += 50;
+      if (attrs.thickness && medPresent(attrs.thickness, nd)) s += 50;
+      if (attrs.diameter && medPresent(attrs.diameter, nd)) s += 50;
+      if (attrs.presentation && nd.includes(attrs.presentation)) s += 50;
+      if (attrs.grade_class && new RegExp('(?:^|\\s)(?:clase|tipo|)\\s*' + attrs.grade_class + '(?:\\s|$)', 'i').test(nd)) s += 50;
+    }
+  }
+
   return s;
 }
+
+const PROBLEM_SOLUTIONS = {
+  goteras_impermeabilizacion: {
+    department: 'techos_laminas',
+    searchTerms: ['cemento plastico', 'manto asfaltico', 'cinta manto', 'primer asfaltico', 'pintura impermeabilizante']
+  },
+  fuga_agua_plomeria: {
+    department: 'plomeria_griferia',
+    searchTerms: ['pega pvc', 'teflon', 'soldadura liquida']
+  },
+  sellado_grietas_ventanas: {
+    department: 'fijacion_tornilleria',
+    searchTerms: ['silicon transparente', 'adhesivo sellador', 'silicon gris']
+  },
+  oxido_corrosion: {
+    department: 'pinturas',
+    searchTerms: ['fondo anticorrosivo', 'desoxidante', 'cepillo alambre']
+  },
+  fijacion_sin_taladrar: {
+    department: 'fijacion_tornilleria',
+    searchTerms: ['cero clavos', 'pega blanca', 'adhesivo de montaje']
+  },
+  preparacion_pared: {
+    department: 'pinturas',
+    searchTerms: ['pasta profesional', 'yeso', 'cemento blanco', 'lija']
+  }
+};
+
+const ACTION_SOLUTIONS = {
+  pegar_adherir: {
+    construccion_aridos: ['pega piso', 'cemento blanco', 'pego gris'],
+    plomeria_griferia: ['pega pvc', 'teflon', 'soldadura liquida'],
+    fijacion_tornilleria: ['cero clavos', 'pega blanca', 'adhesivo de montaje', 'silicon'],
+    _default: ['pega piso', 'pega pvc', 'cero clavos']
+  },
+  lubricar_destrabar: {
+    herramientas_discos: ['aflojatodo', 'grasa', 'aceite 3 en 1'],
+    seguridad_cerraduras: ['aflojatodo', 'grafito en polvo', 'aceite multiuso'],
+    _default: ['aflojatodo', 'grasa multiuso', 'aceite lubricante']
+  },
+  destapar_drenar: {
+    plomeria_griferia: ['destapador de caneria', 'chupa', 'sifon lavaplatos'],
+    _default: ['destapador', 'chupa poceta', 'sifon']
+  },
+  limpiar_desoxidar: {
+    pinturas: ['fondo anticorrosivo', 'desoxidante', 'cepillo alambre'],
+    hierro_perfiles: ['desoxidante', 'cepillo de alambre', 'fondo'],
+    _default: ['desoxidante', 'fondo anticorrosivo', 'desengrasante']
+  },
+  aislar_proteger: {
+    techos_laminas: ['pintura termica', 'manto aluminio', 'aislante termico'],
+    electricidad_cables: ['teipe negro', 'cinta aislante', 'termoencogible'],
+    _default: ['aislante termico', 'manto aluminio', 'cinta aislante']
+  },
+  impermeabilizar_sellar: {
+    techos_laminas: ['cemento plastico', 'manto asfaltico', 'cinta manto', 'primer asfaltico'],
+    fijacion_tornilleria: ['silicon transparente', 'adhesivo sellador'],
+    plomeria_griferia: ['cuello cera', 'teflon', 'silicon'],
+    _default: ['cemento plastico', 'silicon transparente', 'manto asfaltico']
+  },
+  resanar_emparejar: {
+    pinturas: ['pasta profesional', 'yeso', 'lija'],
+    construccion_aridos: ['cemento blanco', 'yeso', 'pasta profesional'],
+    _default: ['pasta profesional', 'yeso', 'cemento blanco']
+  }
+};
+
+function resolveProblemSolutions(intent) {
+  if (!intent || intent === 'ninguno_o_especifico') return null;
+  const target = PROBLEM_SOLUTIONS[intent];
+  return target ? { intent, department: target.department, searchTerms: [...target.searchTerms] } : null;
+}
+
+function resolveDynamicSolutions(intentOrAction, department, customTerms) {
+  if (Array.isArray(customTerms) && customTerms.length > 0) {
+    const cleanTerms = customTerms.map(t => norm(t)).filter(Boolean);
+    if (cleanTerms.length > 0) {
+      return { department: department || 'unclear', searchTerms: cleanTerms };
+    }
+    return null;
+  }
+  if (!intentOrAction || intentOrAction === 'ninguno_o_especifico') return null;
+
+  if (PROBLEM_SOLUTIONS[intentOrAction]) {
+    const staticTarget = PROBLEM_SOLUTIONS[intentOrAction];
+    return {
+      department: department || staticTarget.department,
+      searchTerms: [...staticTarget.searchTerms]
+    };
+  }
+
+  const actionTarget = ACTION_SOLUTIONS[intentOrAction];
+  if (actionTarget) {
+    const deptKey = department && actionTarget[department] ? department : '_default';
+    const terms = actionTarget[deptKey] || actionTarget._default;
+    return {
+      department: department || (deptKey !== '_default' ? deptKey : 'unclear'),
+      searchTerms: [...terms]
+    };
+  }
+
+  return null;
+}
+
 function parseItems(str){
-  const partes = str.split(/[,;\n]+/).map(s=>s.trim()).filter(Boolean);
+  if (!str || typeof str !== 'string') return [];
+  const WORD_NUMS = {
+    un: 1, una: 1, uno: 1,
+    dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10,
+    medio: 0.5
+  };
+  const lines = str.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const rawParts = [];
+  const conjLookahead = '(?=' +
+    '\\d+(?:\\.\\d+)?(?:\\s|$)' + '|' +
+    '(?:un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|medio)(?:\\s|$)' + '|' +
+    '(?:sacos?|tubos?|laminas?|láminas?|cabillas?|rollos?|cuñetes?|cunetes?|galones?|bombillos?|codos?|pegas?|teflon|manto)(?:\\s|$)' +
+  ')';
+  const splitRe = new RegExp('[,;]+|\\s+(?:y|e|con|mas|más|ademas|además|tambien|también)\\s+' + conjLookahead, 'gi');
+
+  for (const line of lines) {
+    const cleanLine = line
+      .replace(/^[\s\-*•·–—]+/, '')
+      .replace(/^\s*\d+[\.\)]\s+/, '')
+      .trim();
+    if (!cleanLine) continue;
+
+    const tokens = cleanLine.split(splitRe).map(t => t.trim()).filter(Boolean);
+    for (const t of tokens) {
+      rawParts.push(t);
+    }
+  }
+
   const out = [];
-  for (let p of partes){
-    let nombre=p, cant=1;
+  for (let p of rawParts) {
+    p = p.replace(/^[\s\-*•·–—]+/, '').replace(/^\s*\d+[\.\)]\s+/, '').trim();
+    if (!p) continue;
+
+    let nombre = p, cant = 1;
     let m = p.match(/^(.*?)[:=]\s*(\d+(?:\.\d+)?)\s*$/);
     if (!m) m = p.match(/^(.*?)\s+x\s*(\d+(?:\.\d+)?)\s*$/i);
-    if (!m){ const m2=p.match(/^(\d+(?:\.\d+)?)\s+(.*)$/); if(m2){ cant=Number(m2[1]); nombre=m2[2]; } }
-    if (m){ nombre=m[1].trim(); cant=Number(m[2]); }
-    nombre = nombre.replace(/^((sacos?|unidades?|uds?|piezas?|metros?|mts|de|del|la|el|los|las)\s+)+/i,'').trim();
-    if (nombre) out.push({ nombre, cantidad: cant>0?cant:1 });
+    if (!m) m = p.match(/^(.*?)\s*\(\s*(\d+(?:\.\d+)?)\s*\)\s*$/);
+
+    if (m) {
+      nombre = m[1].trim();
+      cant = Number(m[2]);
+    } else {
+      const m2 = p.match(/^(\d+(?:\.\d+)?)\s*(?:x\s*)?(.*)$/i);
+      if (m2) {
+        cant = Number(m2[1]);
+        nombre = m2[2];
+      } else {
+        const mw = p.match(/^(un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|medio)\s+(.*)$/i);
+        if (mw) {
+          cant = WORD_NUMS[mw[1].toLowerCase()] || 1;
+          nombre = mw[2];
+        }
+      }
+    }
+
+    nombre = nombre.replace(/^((sacos?|unidades?|uds?|piezas?|metros?|mts|de|del|la|el|los|las)\s+)+/i, '').trim();
+    if (nombre) {
+      out.push({ nombre, cantidad: cant > 0 ? cant : 1 });
+    }
   }
+
   return out;
 }
 

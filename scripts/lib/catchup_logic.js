@@ -1,5 +1,5 @@
 /**
- * CATCHUP LOGIC - WhatsApp Sales Agent
+ * CATCHUP LOGIC - Ferretería El Serrucho
  * Lógica de dominio pura para el filtrado, deduplicación y evaluación de candidatos
  * de catchup. No realiza peticiones de red directas (totalmente testeable en TDD).
  */
@@ -13,8 +13,9 @@ function maskChatId(chatId) {
 
 function isHumanHandover(session) {
   if (!session || typeof session !== 'object') return false;
-  if (session.estado === 'manual') return true;
   if (session.no_atender === true) return true;
+  if (session.estado === 'automatico') return false;
+  if (session.estado === 'manual') return true;
   if (session.manual_desde || session.manual_since) return true;
   return false;
 }

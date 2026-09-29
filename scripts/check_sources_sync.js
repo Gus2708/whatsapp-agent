@@ -1,16 +1,13 @@
-// Guard: lib/catalog-search.js is the single source of truth for the matcher.
+// Guard: lib/serrucho-search.js is the single source of truth for the matcher.
 // Fails (non-zero exit) if any copy has drifted. Run via `npm test`.
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
+const L = require('../lib/serrucho-search.js');
+
 const root = path.join(__dirname, '..');
 // Normalize CRLF->LF: the Windows checkout is CRLF, but Function.prototype.toString() is always LF.
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8').replace(/\r\n/g, '\n');
-
-const searchLibPath = fs.existsSync(path.join(root, 'lib', 'catalog-search.js'))
-  ? '../lib/catalog-search.js'
-  : '../lib/serrucho-search.js';
-const L = require(searchLibPath);
 
 // (a) dev copies must equal the live dumps (the source of truth)
 assert.strictEqual(
@@ -26,10 +23,19 @@ assert.strictEqual(
 const buscar = read('scratch_live/live_buscar.js');
 const presupuesto = read('scratch_live/live_presupuesto.js');
 // aliasDe esta en la lista a proposito: scoreMatch depende de el, asi que dos copias del
-// mismo scoreMatch pueden comportarse distinto sin que nada chille.
+// mismo scoreMatch pueden comportarse distinto sin que nada chille. Paso de verdad —
+// "empalmar" gano su alias "empalme" en buscar y NO en presupuesto, y ninguna guarda lo vio.
 const sharedFns = ['nUSD', 'nBs', 'nBsInt', 'tc', 'norm', 'normMedida',
-  'medPresent', 'stemColor', 'singular', 'expandir', 'esGranel', 'aliasDe', 'scoreMatch'];
+  'medPresent', 'stemColor', 'singular', 'expandir', 'esGranel', 'aliasDe',
+  'detectProductDepartment', 'detectProductMaterial', 'scoreMatch', 'resolveProblemSolutions', 'resolveDynamicSolutions'];
 for (const name of sharedFns) {
+  assert.ok(
+    buscar.includes(L[name].toString().replace(/\r\n/g, '\n')),
+    `lib.${name} source not found verbatim in scratch_live/live_buscar.js (lib drifted)`
+  );
+}
+const buscarOnlyFns = ['detectConstructionTask', 'estimateConstructionMaterials', 'getInstallationKit', 'detectInstallationQuery', 'findComplementaryKit'];
+for (const name of buscarOnlyFns) {
   assert.ok(
     buscar.includes(L[name].toString().replace(/\r\n/g, '\n')),
     `lib.${name} source not found verbatim in scratch_live/live_buscar.js (lib drifted)`
@@ -38,7 +44,8 @@ for (const name of sharedFns) {
 // presupuesto tambien duplica scoreMatch/expandir (y por tanto ALIAS/aliasDe, del que scoreMatch
 // depende): un drift aqui paso desapercibido una vez (scoreMatch referenciaba aliasDe sin que
 // existiera en este archivo -> ReferenceError en vivo en cuanto un item tenia 2+ candidatos).
-const presupuestoFns = ['norm', 'normMedida', 'medPresent', 'stemColor', 'singular', 'expandir', 'esGranel', 'aliasDe', 'scoreMatch'];
+const presupuestoFns = ['norm', 'normMedida', 'medPresent', 'stemColor', 'singular', 'expandir', 'esGranel', 'aliasDe',
+  'detectProductDepartment', 'detectProductMaterial', 'scoreMatch', 'resolveProblemSolutions', 'resolveDynamicSolutions'];
 for (const name of presupuestoFns) {
   assert.ok(
     presupuesto.includes(L[name].toString().replace(/\r\n/g, '\n')),

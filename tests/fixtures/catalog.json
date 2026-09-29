@@ -110,5 +110,75 @@
     "precio_venta": 25.0,
     "existencia": 6,
     "_origen": "paint_search.test.js: Liliana incident (Floripaint) and 'pintura floripaint clase b'"
+  },
+  {
+    "codigo_interno": "IMP-001",
+    "descripcion": "CEMENTO PLASTICO COVO 1 GAL",
+    "precio_venta": 14.5,
+    "existencia": 8,
+    "_origen": "problem-search.test.js: leak repair"
+  },
+  {
+    "codigo_interno": "IMP-002",
+    "descripcion": "MANTO ASFALTICO 3MM COVO",
+    "precio_venta": 24.0,
+    "existencia": 5,
+    "_origen": "problem-search.test.js: leak repair"
+  },
+  {
+    "codigo_interno": "PLO-001",
+    "descripcion": "PEGA SOLDADURA PVC 118ML TUBRICA",
+    "precio_venta": 4.2,
+    "existencia": 12,
+    "_origen": "problem-search.test.js: plumbing leak"
+  },
+  {
+    "codigo_interno": "PLO-002",
+    "descripcion": "CINTA TEFLON 1/2 PROFESIONAL",
+    "precio_venta": 1.0,
+    "existencia": 20,
+    "_origen": "problem-search.test.js: plumbing leak"
+  },
+  {
+    "codigo_interno": "PIN-008",
+    "descripcion": "FONDO ANTICORROSIVO GRIS SUN DECO 1 GAL",
+    "precio_venta": 18.0,
+    "existencia": 6,
+    "_origen": "problem-search.test.js: rust protection"
+  },
+  {
+    "codigo_interno": "CON-001",
+    "descripcion": "PEGA PISO GRIS 14KG MEGAFLEX",
+    "precio_venta": 6.5,
+    "existencia": 40,
+    "_origen": "dynamic-solution-search.test.js: loose tile repair"
+  },
+  {
+    "codigo_interno": "CON-002",
+    "descripcion": "CEMENTO BLANCO 1KG CATATUMBO",
+    "precio_venta": 2.1,
+    "existencia": 15,
+    "_origen": "dynamic-solution-search.test.js: masonry repair"
+  },
+  {
+    "codigo_interno": "HER-001",
+    "descripcion": "AFLOJATODO SPRAY 400ML SQ",
+    "precio_venta": 4.5,
+    "existencia": 25,
+    "_origen": "dynamic-solution-search.test.js: squeaky door"
+  },
+  {
+    "codigo_interno": "HER-002",
+    "descripcion": "GRASA MULTIUSO 250GR",
+    "precio_venta": 3.2,
+    "existencia": 10,
+    "_origen": "dynamic-solution-search.test.js: lubrication"
+  },
+  {
+    "codigo_interno": "CON-003",
+    "descripcion": "CEMENTO GRIS CSC 42.5KG",
+    "precio_venta": 9.0,
+    "existencia": 50,
+    "_origen": "dynamic-solution-search.test.js: direct cement query"
   }
 ]

@@ -4,14 +4,14 @@ import { sendWahaTextMessage, fetchWahaChats } from '@/lib/waha-client';
 import { Conversation, ChatMessage, LeadStatus } from '@/lib/types';
 import { INITIAL_CONVERSATIONS } from '@/lib/constants';
 
-const AGENT_NAME = process.env.NEXT_PUBLIC_AGENT_NAME || process.env.AGENT_NAME || 'Sales Agent';
-const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || process.env.STORE_NAME || 'Commerce Store';
+const AGENT_NAME = process.env.AGENT_NAME || 'Perucho';
+const STORE_NAME = process.env.STORE_NAME || 'Ferretería El Serrucho';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    // 1. Consultar cola de atenciones y solicitudes reales en Supabase
+    // 1. Consultar cola de atenciones y solicitudes reales de Ferretería El Serrucho
     const [atencionesRes, ayudasRes, sessionsRes] = await Promise.all([
       supabase
         .from('atenciones_pendientes')
@@ -337,7 +337,7 @@ export async function GET() {
         name: wahaChat?.name || `Cliente (+${cleanPhone.slice(-4)})`,
         phone: formatPhone(cleanPhone),
         status: isManual ? 'escalated' : 'in-progress',
-        statusLabel: isManual ? 'Atención Manual' : `IA Activa (${AGENT_NAME})`,
+        statusLabel: isManual ? 'Atención Manual' : 'IA Activa (Perucho)',
         score: isManual ? 92 : 78,
         silentMode: isManual,
         lastTime,

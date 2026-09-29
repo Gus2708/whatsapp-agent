@@ -737,11 +737,15 @@ async function diagnostico(consulta, flags) {
     const lex = JSON.parse(await runMatcher({ p_busqueda: texto }, n => (n === 'axios' ? axiosShim : require(n)), $ENV));
     const topLex = (lex.productos || [])[0];
     casoRes.lexico = topLex || null;
+    casoRes.no_vendido = Boolean(lex.no_vendido);
     if (!soloJson) {
       if (spinD) spinD.fin();
       console.log('\n ' + c.claude('❯') + ' ' + c.bold(c.num(`"${texto}"`)));
       console.log(' ' + c.darkGray('─'.repeat(W + 15)));
       console.log(`  ${c.gray('1. Capa Léxica (Trigramas):')} ${topLex ? c.ok(topLex.nombre) : c.darkGray('(sin resultados)')}`);
+      if (lex.no_vendido) {
+        console.log(`  ${c.gray('1b. Regla viva no_vendido:')} ${c.warn('NO VENDIDO')} ${c.darkGray('(la consulta casa con un negativo guardado: NEGATIVO ⊆ CONSULTA, ≤8 tokens, TTL 90d)')}`);
+      }
     }
 
     // 2. Gatillo
@@ -895,6 +899,16 @@ async function buscar(consulta) {
     for (const linea of String(r.instruccion).trim().split('\n')) {
       console.log('   ' + c.darkGray('│') + ' ' + c.gray(linea));
     }
+    console.log('   ' + c.darkGray('╰' + '─'.repeat(W - 6)));
+  }
+
+  if (r.kit_sugerido) {
+    console.log('\n   ' + c.ok('◆') + ' ' + c.bold(c.ok('Kit complementario sugerido:')) + ' ' + c.num(r.kit_sugerido.nombre));
+    console.log('   ' + c.darkGray('─'.repeat(W - 6)));
+    for (const it of (r.kit_sugerido.items || [])) {
+      console.log('   ' + c.darkGray('│') + ' ' + c.gray(`• ${it.cantidad} ${it.unidad} de ${it.nombre}`));
+    }
+    console.log('   ' + c.darkGray('│') + ' ' + c.cyan(`Cotización: "${r.kit_sugerido.items_presupuesto}"`));
     console.log('   ' + c.darkGray('╰' + '─'.repeat(W - 6)));
   }
   return 0;

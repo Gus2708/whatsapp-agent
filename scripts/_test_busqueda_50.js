@@ -20,10 +20,10 @@ const runBuscar = new AsyncFunction('require', 'query', '$env', body);
 // q = consulta del cliente | exists = ¿esperamos que SÍ exista en catálogo? (true/false/null=desconocido)
 const TESTS = [
   // ---- 21 reales de solicitudes_ayuda (motivo=no_encontrado) ----
-  { q: 'Tiene pipas de agua de 200', exists: null, src: 'real' },
+  { q: 'Tiene pipas de agua de 200', exists: false, src: 'real' },
   { q: 'Saludos me puede dar precio de lámina arquitectónica 0,30 mts en bolívares', exists: true, src: 'real' },
   { q: 'tienes lamina arquitectónicas de las q mide 6 metros x 1 de ancho q presio la tienes', exists: true, src: 'real' },
-  { q: 'que precio tiene la estructura o soporte del cielo razo porfavor', exists: null, src: 'real' },
+  { q: 'que precio tiene la estructura o soporte del cielo razo porfavor', exists: false, src: 'real' },
   { q: 'son paneles de esos que vienen en papel tapiz que uno se los pega a la pared del baño', exists: null, src: 'real' },
   { q: 'Tornillo tres cuartos con tuerca y arandela', exists: null, src: 'real' },
   { q: 'Piston de guadaña de 53cc o 45mm tienes?', exists: null, src: 'real' },
