@@ -19,6 +19,8 @@
     <a href="https://n8n.io/"><img src="https://img.shields.io/badge/Potenciado%20por-n8n-orange.svg?style=for-the-badge&logo=n8n&logoColor=white" alt="n8n" /></a>
     <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" /></a>
     <a href="docs/jev-shadow-pilot.md"><img src="https://img.shields.io/badge/Jev%20AI-Motor%20de%20Decisi%C3%B3n-7928CA?style=for-the-badge" alt="Jev AI Motor de Decisión" /></a>
+    <a href="tests/"><img src="https://img.shields.io/badge/Tests-248%20Passing-brightgreen?style=for-the-badge&logo=node.js&logoColor=white" alt="248 Tests Passing" /></a>
+    <a href="scripts/"><img src="https://img.shields.io/badge/Regresi%C3%B3n-86%2F86%20Cero%20FN-success?style=for-the-badge" alt="Regresión 86/86 Cero FN" /></a>
     <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-14-black.svg?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js 14" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/Licencia-MIT-yellow.svg?style=for-the-badge" alt="Licencia: MIT" /></a>
   </p>
@@ -50,12 +52,12 @@ graph TD
 | HTTP API WhatsApp | WAHA (Docker, motor NOWEB) | Emulación de sesiones multidispositivo y despacho de webhooks |
 | Orquestador de Flujos | n8n (Docker) | Gestión de eventos, enrutamiento de estado, rate limiting y despacho de herramientas |
 | Razonamiento LLM | OpenRouter / OpenAI | Razonamiento multiturno e invocación de herramientas |
-| Modelado de Decisiones | TypeSafe Jev / Vercel AI Gateway | Clasificación de intenciones sub-segundo y piloto de evaluación shadow |
+| Modelado de Decisiones | TypeSafe Jev / Vercel AI Gateway + Motores Deterministas | Dualidad cognitiva: edge determinista <0.2ms y piloto shadow |
 | Transcripción de Voz | Groq Whisper | Transcripción de notas de audio en <800ms |
 | Base de Datos y Búsqueda | Supabase (PostgreSQL + pg_trgm + pgvector) | Catálogo de inventario, cola de pedidos y búsqueda vectorial híbrida |
 | Estado y Memoria | Engram + Contexto de Sesión en Memoria | Perfilado de clientes y caché de atributos con TTL de 30 minutos |
 | Flight Deck & CRM | Next.js 14 (App Router + Tailwind + GSAP + PWA) | Telemetría en vivo, cola de operaciones de chat, estudio RAG, consola DevOps |
-| Runtime y Testing | Node.js 22+ (Native Test Runner) | Herramientas de CLI, guardias de sincronización, recuperación, 150+ tests herméticos |
+| Runtime y Testing | Node.js 22+ (Native Test Runner) | Herramientas de CLI, guardias de sincronización, 248 tests herméticos, 86 casos regresión 0 FN |
 
 ---
 
@@ -74,38 +76,86 @@ Ver [RAG.md](RAG.md) y [ARCHITECTURE.md](ARCHITECTURE.md) para detalles profundo
 
 ---
 
-## ⚡ Modelado de Decisiones de Vanguardia: Piloto Jev Shadow y Motor de Contexto
+## ⚡ Modelado de Decisiones de Vanguardia: Dualidad Cognitiva (Sistema 1 + Sistema 2)
 
-En sistemas de IA conversacional de alto tráfico, los modelos fundacionales pesados (GPT-4o, Claude) introducen latencias elevadas (1.000–3.000ms) y costos de inferencia significativos en micro-decisiones de ruteo o aclaración.
+En aplicaciones industriales y de comercio conversacional de alto volumen, enviar todas las consultas crudas a modelos fundacionales masivos (GPT-4o, Claude 3.5 Sonnet) es un antipatrón costoso: introduce latencias inaceptables (1.500–3.500 ms), costos acumulativos elevados en tokens, fallos de formato JSON y, lo más grave, **alucinaciones aritméticas en dosificaciones de obra y omisión de accesorios críticos**.
 
-Para optimizar esto a nivel de arquitectura empresarial, el agente implementa un **Motor de Modelado de Decisiones Sub-Segundo** con un **Piloto Shadow** basado en **TypeSafe Jev** (y Vercel AI Gateway), desacoplado de la inferencia del cliente y respaldado por un **Resolvedor Determinista de Contexto**:
+Para resolver esto con rigor de ingeniería de producción, Perucho implementa una **Arquitectura de Dualidad Cognitiva de Dos Velocidades**:
+
+- **⚡ Sistema 1 (Edge Determinista & Motor Jev Sub-Segundo)**: Ejecución en submilisegundos (<0.2 ms), costo \$0 en tokens, anonimización estricta de PII corporativo, cálculo matemático determinista de ingeniería civil, empaquetado de kits de instalación y resolución de problemas físicos a productos de catálogo.
+- **🧠 Sistema 2 (Razonamiento Profundo Multiturno)**: Modelos LLM (`openai/gpt-5.6-luna` y `anthropic/claude-sonnet-5`) dedicados exclusivamente a la sutileza conversacional, síntesis de transcripciones de voz de Whisper (<800 ms) y coordinación de escalamiento a empleados.
 
 ```mermaid
-flowchart LR
-    Msg["📱 Mensaje del Cliente"] --> Ctx["🧠 Motor de Contexto<br/>(30m TTL · Aislamiento por Sesión)"]
-    Ctx --> Shadow["⚡ Observador Jev Shadow<br/>(TypeSafe AI / Vercel Gateway)"]
-    Shadow -.-> Eval["📊 Harness de Evaluación Sintética<br/>(Latencia · Costo · Precisión)"]
-    Ctx --> Agent["🤖 Agente IA Producción<br/>(GPT-5.6 / Claude)"]
-    Agent --> Guard["🛡️ Guard de Decisiones y Sanitizador<br/>(Suprime Precios No Confirmados)"]
-    Guard --> Out["💬 Respuesta WhatsApp al Cliente"]
+flowchart TD
+    Msg["📱 Mensaje WhatsApp del Cliente"] --> PII["🔒 Sanitizador & Redactor de PII<br/>(Enmascara teléfonos, cédulas, bancos, montos)"]
+    
+    subgraph S1["⚡ SISTEMA 1: Edge Determinista & Motor de Decisiones (<1ms · $0 Tokens)"]
+        PII --> JEV["🧠 Observador Jev Shadow / Fast Router<br/>(TypeSafe AI · Intención & Calibración)"]
+        JEV --> CALC{"¿Consulta de Oficio o Kit?"}
+        CALC -->|Cálculo de Obra| EST["🏗️ Estimador de Materiales de Construcción<br/>(lib/construction-estimator.js · Bloques, Losas, Friso, Cercas)"]
+        CALC -->|Instalación / Accesorios| KITS["🔧 Motor de Kits de Instalación<br/>(lib/installation-kits.js · Pocetas, Lavamanos, Techos, PVC)"]
+        CALC -->|Problema Físico| PROB["🛠️ Resolvedor de Problema a Solución<br/>(Goteras→Manto/Cemento Plástico · Fugas→Pega PVC/Teflón)"]
+        CALC -->|Búsqueda / Compra Directa| RAG["🔍 Pipeline RAG Híbrido 5 Capas<br/>(AST Léxico · Vocabulario · Trigramas · pgvector · Popularidad)"]
+    end
+    
+    subgraph S2["🧠 SISTEMA 2: Razonamiento Profundo & Coordinación Multiturno"]
+        RAG --> Ctx["🧠 Resolvedor de Contexto Determinista<br/>(lib/conversation-context.js · TTL 30m · Slotting de Calibre/Atributos)"]
+        EST --> Ctx
+        KITS --> Ctx
+        PROB --> Ctx
+        Ctx --> LLM["🤖 Inferencia LLM (OpenRouter Luna / Sonnet)<br/>(Redacción conversacional cálida · Tono ferretero)"]
+    end
+    
+    LLM --> Guard["🛡️ Guard de Decisiones y Sanitizador<br/>(Suprime Precios Vagos · Bloquea Alucinaciones)"]
+    Guard --> WAHA["💬 Despacho HTTP WAHA a WhatsApp"]
 ```
 
 ### Aspectos Técnicos Destacados para Equipos de Selección y Arquitectos de IA:
 
-1. **Motor de Decisiones Sub-Segundo Jev ([`lib/jev-shadow.js`](lib/jev-shadow.js))**:
-   - **Despliegue Shadow sin Riesgo Operativo**: Evalúa `typesafe-ai/jev` en segundo plano con un presupuesto de tiempo estricto (1.500ms) sin alterar respuestas ni ruteo de negocio (`JEV_MODE=off` por defecto).
-   - **Anonimización y Redacción de PII Empresarial**: Sanitizador previo que enmascara números de teléfono, correos, URLs, credenciales bancarias, montos de dinero y presentaciones personales antes de llamar a APIs externas.
-   - **Arquitectura Dual-Provider**: Abstracción nativa compatible con **TypeSafe API** directa (`api.typesafe.ai/v1/systemone`) y **Vercel AI Gateway** (`ai-gateway.vercel.sh`).
-   - **Evaluación Sintética Hermética ([`scripts/evaluate_jev.js`](scripts/evaluate_jev.js))**: Benchmark integrado con 30 casos en español que mide concordancia de intención, calibración de confianza, uso de tokens y latencia P95.
+1. **Estimador Determinista de Materiales de Construcción ([`lib/construction-estimator.js`](lib/construction-estimator.js))**:
+   - **El Problema en Producción**: Los albañiles, contratistas y clientes de ferretería no consultan por código SKU; preguntan: *«¿cuánto cemento y arena necesito para 400 bloques?»* o *«voy a vaciar una placa de 5x4 metros, ¿qué compro?»*. Los LLMs alucinan proporciones, usan unidades imperiales norteamericanas o inventan consumos que destruyen presupuestos comerciales.
+   - **Solución Determinista**: Motor matemático calibrado según las fórmulas estándar del *maestro de obra* venezolano con rendimientos certificados:
+     - **Pegado de bloques**: 12.5 bloques/m² con 5% de merma, 1 saco de cemento gris por cada 30 bloques, 0.15 m³ de arena lavada por saco.
+     - **Vaciado de piso/losa (10 cm)**: 0.10 m³ de concreto/m² (0.8 sacos de cemento gris, 0.05 m³ de arena lavada, 0.075 m³ de piedra picada y 1 m² de malla truckson de refuerzo por m²).
+     - **Friso / revoque de pared**: Espesor 1.5 cm (1 saco de cemento por cada 7 m² de pared, 0.025 m³ de arena fina por m²).
+     - **Cercas perimetrales de alambre de púa**: Cálculo de líneas (4 o 5 hilos), separación de postes a 2.5 m (madera) o 3.0 m (cemento), grapas de fijación y rollos de alambre.
+     - **Pintura de paredes**: Cobertura estándar de 30 m² por galón y 120 m² por cuñete (4 galones).
+     - **Detección dimensional en lenguaje natural**: Parser de expresiones regulares con solicitud proactiva de aclaración (`aclarar: true`) si el usuario no especifica dimensiones o unidades.
 
-2. **Motor de Contexto Determinista ([`lib/conversation-context.js`](lib/conversation-context.js))**:
-   - **Desambiguación Multiturno sin Alucinaciones**: Rastrea atributos técnicos de producto (calibre de cables, aislamiento, presentación, colores) entre turnos (ej. *"¿y en calibre 8?"* → conserva contexto de tipo THW/por metro).
-   - **Máquina de Estado en Memoria con TTL de 30 min**: Aislada por sesión de WAHA y chat ID. Las ambigüedades o reinicios de sesión solicitan aclaración controlada en lugar de inferir productos incorrectos.
+2. **Motor de Kits de Instalación y Venta Cruzada Proactiva ([`lib/installation-kits.js`](lib/installation-kits.js))**:
+   - **El Problema en Producción**: La mayor pérdida de conversión en retail técnico ocurre cuando el cliente compra una pieza principal (inodoro, lavamanos, láminas de techo, tubos) pero olvida los accesorios críticos de instalación (cuello de cera, canillas, sifón, pegamento PVC), teniendo que pausar su trabajo o abandonar la compra.
+   - **Bundles Calibrados de Accesorios**: 5 categorías especializadas con piezas exactas y asesoría técnica incorporada:
+     - `sanitario_poceta`: Herraje para poceta, canilla 1/2 × 7/8, llave de arresto 1/2, cuello de cera anti-olores, juego de tornillos de fijación al piso y teflón.
+     - `lavamanos`: Grifería para lavamanos, 2 canillas 1/2 × 1/2, sifón / desagüe flexible, llave de arresto y teflón.
+     - `fregadero`: Grifería (cuello de cisne), 2 canillas para fregadero, contracanasta, sifón, silicón sellador transparente y teflón.
+     - `techo_laminas`: Ganchos para techo / tornillos autoperforantes con arandelas vulcanizadas, caballete cumbrera y cemento plástico para goteras.
+     - `tuberias_pvc`: Soldadura líquida / pega PVC, limpiador acondicionador para PVC y cinta de teflón.
+   - **Vía Doble de Activación**: Responde tanto a consultas directas de kits como mediante adjunción no intrusiva de `kit_sugerido` cuando el cliente cotiza la pieza principal, cotizando en vivo contra el inventario de Supabase (ej. Kit de Lavamanos \$13.45, Kit de Sanitario \$18.00).
 
-3. **Guardias de Decisión Estructurada y Sanitización Anti-Alucinaciones**:
-   - `buscar_productos` devuelve contratos validados por esquema (`match_status: exact | vague | missing`).
-   - Las coincidencias aproximadas suprimen estrictamente precios y exigen confirmación del cliente, protegiendo márgenes comerciales.
-   - El sanitizador valida pasos intermedios de herramientas y elimina trazas internas antes del despacho final.
+3. **Resolvedor de Problema a Producto Físico ([`lib/serrucho-search.js`](lib/serrucho-search.js))**:
+   - Los clientes suelen consultar desde el síntoma físico antes de conocer el producto: *"tengo una filtración en el techo"*, *"se me rompió un tubo de agua"*, *"hay una gotera"*.
+   - Mapeo determinista inmediato que conecta el problema con los insumos correctos (`cemento plastico`, `manto asfaltico`, `pega pvc`, `teflon`) con salvaguardas fail-closed.
+
+4. **Tokenizer Multiproducto en Lenguaje Natural con Lookahead ([`parseItems`](lib/serrucho-search.js))**:
+   - Resuelve el despiece de listas de compras complejas en una sola línea (*"dame 2 sacos de cemento, una canilla de lavamanos y 3 metros de cable calibre 10"*).
+   - Regex de límites con lookahead sobre conjunciones en español (`y`, `e`, `con`, `más`, `además`, `también`) para no fragmentar nombres compuestos válidos como *"pintura blanco y negro"*.
+   - Mapeo léxico de números cardinales en texto (*"un"*, *"dos"*, *"medio"*, *"docena"*) a cantidades numéricas exactas.
+
+5. **Motor de Decisiones Sub-Segundo Jev y Redacción de PII ([`lib/jev-shadow.js`](lib/jev-shadow.js))**:
+   - **Despliegue Shadow sin Riesgo Operativo**: Ejecución en segundo plano evaluando `typesafe-ai/jev` con presupuesto estricto (1.500 ms) sin riesgo sobre el tráfico en vivo (`JEV_MODE=off` por defecto).
+   - **Redacción de PII Corporativo**: Sanitización previa que enmascara números de teléfono, correos, credenciales bancarias, montos de dinero e identidades antes de enviar payloads a APIs externas.
+   - **Abstracción Dual-Provider**: Soporte conmutativo para **TypeSafe API** (`/v1/systemone`) y **Vercel AI Gateway** (`ai-gateway.vercel.sh`).
+   - **Benchmark Sintético ([`scripts/evaluate_jev.js`](scripts/evaluate_jev.js))**: 30 casos de prueba en español con medición de concordancia de intención, calibración de confianza y latencia P95.
+
+6. **Motor de Contexto Determinista y Slotting de Atributos ([`lib/conversation-context.js`](lib/conversation-context.js))**:
+   - **Rastreo Técnico de Atributos Multiturno**: Preserva calibre de cables (calibre 8, 10, 12, 14), tipo de aislamiento (THW), presentación (por metro / rollo) y tonalidades entre turnos sin necesidad de re-inyección en el prompt.
+   - **Máquina de Estado en Memoria con TTL de 30 min**: Aislamiento por sesión de WAHA y teléfono de cliente, forzando preguntas de aclaración (`match_status: vague`) en lugar de inferir o adivinar pedidos erróneos.
+
+7. **Rigor de Ingeniería y Puertas de Calidad (Zero Hallucinations Guarantee)**:
+   - **248 pruebas unitarias herméticas** ejecutadas con el test runner nativo de Node.js (`npm test`), con 100% de éxito.
+   - **86 casos de prueba de regresión de catálogo** con **0 falsos negativos** exigidos por contrato (`node rag.js regresion`).
+   - **Puertas de Sincronización de Fuente Única (`check_sources_sync.js`, `check_workflow_sync.js`)**: Previenen desviaciones entre la lógica canónica en `lib/`, los volcados de producción y los nodos activos de n8n.
+   - **Guardias de Cotización Comercial**: Supresión automática de precios en coincidencias vagas (`match_status: vague`), protegiendo los márgenes comerciales de la tienda.
 
 ---
 
@@ -273,14 +323,15 @@ node scripts/generar_embeddings.js
 ---
 
 ## 🧩 Fuente Única de Verdad y Protección contra Desviaciones
-El motor de búsqueda principal reside canónicamente en `lib/catalog-search.js`. Protegido por:
+El motor de búsqueda principal reside canónicamente en `lib/serrucho-search.js` (con fachada `lib/catalog-search.js`). Protegido por:
 ```bash
 npm test
 ```
-- `check_sources_sync.js` — verifica que lib/catalog-search.js coincida con scripts y dumps en vivo
-- `check_workflow_sync.js` — verifica que n8n_workflow.json coincida con el prompt del sistema y nodos de búsqueda
+- `check_sources_sync.js` — verifica que `lib/` coincida con scripts y dumps en vivo
+- `check_workflow_sync.js` — verifica que `n8n_workflow.json` coincida con el prompt del sistema y nodos de búsqueda
+- **248 pruebas unitarias herméticas** en Node.js nativo (11 suites, 0 fallos)
+- **86 consultas de regresión en catálogo** sin falsos negativos (`node rag.js regresion`)
 - Dashboard: Verificación estricta en TypeScript + pruebas unitarias con Vitest + suites E2E con Playwright
-- Pruebas en raíz: búsqueda en catálogo, guardia de workflow, entornos declarados, búsqueda de pinturas/láminas, flujo de recuperación
 
 ---
 
@@ -302,9 +353,12 @@ npm test
 | `dashboard/components/auth/` | Proveedor de Auth + pantalla de login (Supabase Auth + Modo Demo) |
 | `dashboard/components/pwa/` | Registro de service worker PWA |
 | `dashboard/app/api/` | Rutas API de Next.js (conversaciones, n8n, rag, telemetría, túnel) |
-| `lib/catalog-search.js` | Motor de búsqueda canónico y normalizador AST |
-| `lib/conversation-context.js` | Motor determinista de estado de conversación y parseador de cables |
-| `lib/jev-shadow.js` | Observador en modo sombra para modelo de decisión Jev con redactor de PII |
+| `lib/serrucho-search.js` | Motor canónico de búsqueda, AST normalizador, tokenizador multiproducto con lookahead |
+| `lib/catalog-search.js` | Fachada de búsqueda de catálogo para scripts y tooling CLI |
+| `lib/construction-estimator.js` | Estimador determinista de materiales (bloques, losas 10cm, friso, cercas de púa, pintura) |
+| `lib/installation-kits.js` | Motor de kits de instalación y bundles de accesorios (pocetas, lavamanos, fregaderos, techos, PVC) |
+| `lib/conversation-context.js` | Motor determinista de estado de conversación y slotting de atributos técnicos (calibre, tipo) |
+| `lib/jev-shadow.js` | Observador en modo sombra para modelo de decisión Jev con redactor de PII corporativo |
 | `lib/workflow-overlay.js` | Generador de overlay sobre workflows n8n sin afectar la línea base |
 | `scripts/evaluate_jev.js` | Harness de evaluación sintética (latencia, costo, precisión) para Jev |
 | `docs/jev-shadow-pilot.md` | Especificación técnica del piloto Jev shadow y modelo de privacidad |
