@@ -912,7 +912,7 @@
             {
               "id": "needs-product",
               "leftValue": "={{ [\"clarify\", \"respond\", \"handoff\"].includes($json.conversation_context?.action) || $json.conversation_context?.fast_path === true }}",
-              "rightValue": "true",
+              "rightValue": true,
               "operator": {
                 "type": "boolean",
                 "operation": "equals"

@@ -79,6 +79,10 @@ test('generated workflow connects context and enables the tool observation contr
   assert.equal(wf.connections['Jev Shadow Decision'].main[0][0].node, 'Needs Product Clarification?');
   assert.equal(wf.connections['Needs Product Clarification?'].main[0][0].node, 'Sanitize Agent Output');
   assert.equal(wf.connections['Needs Product Clarification?'].main[1][0].node, 'AI Agent');
+  const branch = wf.nodes.find(node => node.name === 'Needs Product Clarification?');
+  assert.equal(branch.parameters.conditions.options.typeValidation, 'strict');
+  assert.equal(branch.parameters.conditions.conditions[0].operator.type, 'boolean');
+  assert.equal(branch.parameters.conditions.conditions[0].rightValue, true);
   const visited = new Set();
   function visit(name) {
     if (visited.has(name)) return;
