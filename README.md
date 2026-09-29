@@ -145,7 +145,7 @@ flowchart TD
    - **Inline, default-off observation**: `JEV_MODE=shadow` adds an API request before the Agent, bounded by a default 1,500ms deadline. `JEV_ROUTING_ENABLED=false` prevents Jev and rule fast paths from changing replies.
    - **Best-effort redaction**: Masks common contact, credential and currency patterns, but does not guarantee removal of personal information from arbitrary messages.
    - **Dual-Provider Architecture**: Native support for direct **TypeSafe API** (`/v1/systemone`) and **Vercel AI Gateway** (`ai-gateway.vercel.sh`).
-   - **Synthetic Evaluation ([`scripts/evaluate_jev.js`](scripts/evaluate_jev.js))**: The original 30-case corpus measures intent and continuity. A separate 12-case corpus measures department, material and problem labels. Neither measures full-agent improvement or confidence calibration.
+   - **Synthetic Evaluation ([`scripts/evaluate_jev.js`](scripts/evaluate_jev.js))**: The original 30-case corpus measures intent and continuity. A separate 12-case corpus measures department, material and problem labels. The generated search tool does not yet consume these Jev labels; neither corpus measures full-agent improvement or confidence calibration.
 
 6. **Deterministic Context Engine & Technical Attribute Slotting ([`lib/conversation-context.js`](lib/conversation-context.js))**:
    - **Multi-Turn Specification Tracking**: Preserves technical attributes such as wire gauge (8, 10, 12, 14 AWG), insulation type (THW), presentation (per-meter / spool), and color across turns without repetitive prompt reinjection.
