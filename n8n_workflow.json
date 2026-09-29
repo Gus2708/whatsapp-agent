@@ -195,7 +195,8 @@
         380
       ],
       "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 3.1
+      "typeVersion": 3.1,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
