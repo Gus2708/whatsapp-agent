@@ -302,12 +302,16 @@ function fastRouter({ message, jev, context, options = {} } = {}) {
 // END JEV FUNCTIONS
 const original = $input.first().json;
 const config = {};
-for (const key of ['JEV_MODE', 'JEV_ROUTING_ENABLED', 'JEV_PROVIDER', 'TYPESAFE_API_KEY', 'AI_GATEWAY_API_KEY', 'JEV_MODEL', 'JEV_TIMEOUT_MS',
+for (const key of ['JEV_MODE', 'JEV_ROUTING_ENABLED', 'JEV_ROUTING_SCOPE', 'JEV_CANARY_PHONE', 'JEV_PROVIDER', 'TYPESAFE_API_KEY', 'AI_GATEWAY_API_KEY', 'JEV_MODEL', 'JEV_TIMEOUT_MS',
   'JEV_MIN_CONFIDENCE', 'JEV_INPUT_USD_PER_MILLION']) {
   try { config[key] = $env[key]; } catch (_) {}
 }
 let latest = '';
-try { latest = $('Transcribir Nota de Voz').first().json.body.payload.body || ''; } catch (_) {}
+let inboundPayload;
+try {
+  inboundPayload = $('Transcribir Nota de Voz').first().json.body.payload;
+  latest = inboundPayload.body || '';
+} catch (_) {}
 let axios;
 const client = () => axios || (axios = require('axios'));
 const metadata = await classifyShadow({ message: latest,
@@ -337,7 +341,13 @@ const metadata = await classifyShadow({ message: latest,
   },
 });
 let updatedContext = original.conversation_context;
-if (config.JEV_MODE === 'shadow' && config.JEV_ROUTING_ENABLED === 'true' && typeof fastRouter === 'function') {
+const canaryPhone = config.JEV_CANARY_PHONE;
+const canarySender = typeof canaryPhone === 'string' && /^\+?[1-9]\d{7,14}$/.test(canaryPhone)
+  ? canaryPhone.replace(/^\+/, '') + '@c.us' : null;
+if (config.JEV_MODE === 'shadow' && config.JEV_ROUTING_ENABLED === 'true' &&
+  config.JEV_ROUTING_SCOPE === 'canary' && canarySender &&
+  inboundPayload?.fromMe === false && inboundPayload.from === canarySender &&
+  typeof fastRouter === 'function') {
   const route = fastRouter({ message: latest, jev: metadata, context: updatedContext,
     options: { askName: original.pedir_nombre === 'si' } });
   if (route && route.fast_path) {

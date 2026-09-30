@@ -59,7 +59,9 @@ test('shadow classification cannot change routing without explicit enablement', 
   const condition = wf.nodes.find(n => n.name === 'Needs Product Clarification?').parameters.conditions.conditions[0].leftValue;
   const selected = new Function('$json', 'return ' + condition.slice(3, -2));
   const run = new AsyncFunction('$input', '$', '$env', 'require', node.parameters.jsCode);
-  const lookup = () => ({ first: () => ({ json: { body: { payload: { body: 'hasta que hora abren' } } } }) });
+  const lookup = () => ({ first: () => ({ json: { body: { payload: {
+    body: 'hasta que hora abren', from: '15551234567@c.us', fromMe: false
+  } } } }) });
   const original = { conversation_context: { action: 'pass', query: 'hasta que hora abren' } };
   const answers = Object.fromEntries(Object.entries(jevQuestions()).map(([name, q]) => {
     const choice = name === 'intent' ? 'store_info' : name === 'continuation' ? 'new' : Object.keys(q.criteria)[0];
@@ -75,7 +77,8 @@ test('shadow classification cannot change routing without explicit enablement', 
     assert.equal(selected(item.json), false);
   }
   const [enabled] = await run({ first: () => ({ json: original }) }, lookup,
-    { JEV_MODE: 'shadow', TYPESAFE_API_KEY: 'fake', JEV_ROUTING_ENABLED: 'true' }, () => axios);
+    { JEV_MODE: 'shadow', TYPESAFE_API_KEY: 'fake', JEV_ROUTING_ENABLED: 'true',
+      JEV_ROUTING_SCOPE: 'canary', JEV_CANARY_PHONE: '+15551234567' }, () => axios);
   assert.equal(enabled.json.conversation_context.action, 'respond');
   assert.equal(selected(enabled.json), true);
 });
@@ -86,7 +89,9 @@ test('quote classification stays on the Agent branch even when routing is enable
   const selected = new Function('$json', 'return ' + condition.slice(3, -2));
   const run = new AsyncFunction('$input', '$', '$env', 'require', node.parameters.jsCode);
   const message = 'presupuesto de 2 sacos de cemento y 4 bombillos';
-  const lookup = () => ({ first: () => ({ json: { body: { payload: { body: message } } } }) });
+  const lookup = () => ({ first: () => ({ json: { body: { payload: {
+    body: message, from: '15551234567@c.us', fromMe: false
+  } } } }) });
   const answers = Object.fromEntries(Object.entries(jevQuestions()).map(([name, q]) => {
     const choice = name === 'intent' ? 'quote' : Object.keys(q.criteria)[0];
     return [name, { type: 'choice', choice, confidence: 0.95,
@@ -94,7 +99,8 @@ test('quote classification stays on the Agent branch even when routing is enable
   }));
   const original = { conversation_context: { action: 'pass', query: message } };
   const [item] = await run({ first: () => ({ json: original }) }, lookup,
-    { JEV_MODE: 'shadow', TYPESAFE_API_KEY: 'fake', JEV_ROUTING_ENABLED: 'true' },
+    { JEV_MODE: 'shadow', TYPESAFE_API_KEY: 'fake', JEV_ROUTING_ENABLED: 'true',
+      JEV_ROUTING_SCOPE: 'canary', JEV_CANARY_PHONE: '+15551234567' },
     () => ({ post: async (url, body) => ({ status: 200, data: { model: body.model, answers,
       usage: { input_tokens: 1, output_tokens: 1 } } }) }));
   assert.equal(item.json.jev_shadow.intent, 'quote');
@@ -112,7 +118,8 @@ test('generated Jev node routes only a standalone corroborated greeting', async 
     return [name, { type: 'choice', choice, confidence: 0.97,
       probabilities: Object.fromEntries(Object.keys(q.criteria).map(key => [key, key === choice ? 1 : 0])) }];
   }));
-  const env = { JEV_MODE: 'shadow', JEV_ROUTING_ENABLED: 'true', TYPESAFE_API_KEY: 'fake' };
+  const env = { JEV_MODE: 'shadow', JEV_ROUTING_ENABLED: 'true',
+    JEV_ROUTING_SCOPE: 'canary', JEV_CANARY_PHONE: '+15551234567', TYPESAFE_API_KEY: 'fake' };
   for (const [message, intent, action, expected] of [
     ['Hola', 'general', 'pass', 'respond'],
     ['Hola, tienen cemento', 'general', 'pass', 'pass'],
@@ -120,7 +127,9 @@ test('generated Jev node routes only a standalone corroborated greeting', async 
     ['Hola', 'general', 'clarify', 'clarify']
   ]) {
     const original = { pedir_nombre: 'si', conversation_context: { action, query: message } };
-    const $ = () => ({ first: () => ({ json: { body: { payload: { body: message } } } }) });
+    const $ = () => ({ first: () => ({ json: { body: { payload: {
+      body: message, from: '15551234567@c.us', fromMe: false
+    } } } }) });
     const [item] = await run({ first: () => ({ json: original }) }, $, env,
       () => ({ post: async (_url, body) => ({ status: 200, data: {
         model: body.model, answers: answersFor(intent), usage: { input_tokens: 1, output_tokens: 1 }
@@ -128,6 +137,53 @@ test('generated Jev node routes only a standalone corroborated greeting', async 
     assert.equal(item.json.conversation_context.action, expected, message);
     if (expected === 'respond') assert.match(item.json.conversation_context.reply, /Con qui[eé]n tengo el gusto/i);
   }
+});
+
+test('canary routing is fail-closed for scope, sender and outbound messages', async () => {
+  const code = fs.readFileSync('scratch_live/live_jev_shadow.js', 'utf8');
+  const run = new AsyncFunction('$input', '$', '$env', 'require', 'AbortController', code);
+  const answers = Object.fromEntries(Object.entries(jevQuestions()).map(([name, question]) => {
+    const choice = name === 'intent' ? 'general' : name === 'continuation' ? 'new' : Object.keys(question.criteria)[0];
+    return [name, { type: 'choice', choice, confidence: 0.97,
+      probabilities: Object.fromEntries(Object.keys(question.criteria).map(key => [key, key === choice ? 1 : 0])) }];
+  }));
+  const baseEnv = { JEV_MODE: 'shadow', JEV_ROUTING_ENABLED: 'true',
+    JEV_ROUTING_SCOPE: 'canary', JEV_CANARY_PHONE: '+15551234567', TYPESAFE_API_KEY: 'fake' };
+  const cases = [
+    ['matching inbound JID', {}, '15551234567@c.us', false, 'respond'],
+    ['routing flag off', { JEV_ROUTING_ENABLED: 'false' }, '15551234567@c.us', false, 'pass'],
+    ['mode off', { JEV_MODE: 'off' }, '15551234567@c.us', false, 'pass'],
+    ['missing scope', { JEV_ROUTING_SCOPE: undefined }, '15551234567@c.us', false, 'pass'],
+    ['unknown scope', { JEV_ROUTING_SCOPE: 'all' }, '15551234567@c.us', false, 'pass'],
+    ['missing phone', { JEV_CANARY_PHONE: undefined }, '15551234567@c.us', false, 'pass'],
+    ['malformed phone', { JEV_CANARY_PHONE: '1555-123-4567' }, '15551234567@c.us', false, 'pass'],
+    ['another sender', {}, '15557654321@c.us', false, 'pass'],
+    ['outbound', {}, '15551234567@c.us', true, 'pass'],
+    ['unknown direction', {}, '15551234567@c.us', undefined, 'pass'],
+    ['group sender', {}, '15551234567@g.us', false, 'pass'],
+    ['LID sender', {}, '15551234567@lid', false, 'pass'],
+    ['malformed sender', {}, '15551234567@c.us/other', false, 'pass'],
+    ['missing sender', {}, undefined, false, 'pass'],
+  ];
+  for (const [label, overrides, from, fromMe, expected] of cases) {
+    const env = { ...baseEnv, ...overrides };
+    const original = { conversation_context: { action: 'pass', query: 'Hola' } };
+    const $ = () => ({ first: () => ({ json: { body: { payload: { body: 'Hola', from, fromMe } } } }) });
+    const [item] = await run({ first: () => ({ json: original }) }, $, env,
+      () => ({ post: async (_url, body) => ({ status: 200, data: { model: body.model, answers,
+        usage: { input_tokens: 1, output_tokens: 1 } } }) }), undefined);
+    assert.equal(item.json.conversation_context.action, expected, label);
+    assert.equal(item.json.jev_shadow.status, env.JEV_MODE === 'off' ? 'disabled' : 'ok', label);
+  }
+});
+
+test('Docker passes canary configuration with safe defaults', () => {
+  const compose = fs.readFileSync('docker-compose.yml', 'utf8');
+  const example = fs.readFileSync('.env.example', 'utf8');
+  assert.match(compose, /JEV_ROUTING_SCOPE=\$\{JEV_ROUTING_SCOPE:-off\}/);
+  assert.match(compose, /JEV_CANARY_PHONE=\$\{JEV_CANARY_PHONE:-\}/);
+  assert.match(example, /^JEV_ROUTING_SCOPE=off$/m);
+  assert.match(example, /^JEV_CANARY_PHONE=$/m);
 });
 
 test('shadow deadline aborts axios with frozen Promise prototypes and no AbortController', async () => {

@@ -84,6 +84,8 @@ services:
       # Off is zero-network; shadow is inline. Fast replies require separate explicit routing opt-in.
       - JEV_MODE=${JEV_MODE:-off}
       - JEV_ROUTING_ENABLED=${JEV_ROUTING_ENABLED:-false}
+      - JEV_ROUTING_SCOPE=${JEV_ROUTING_SCOPE:-off}
+      - JEV_CANARY_PHONE=${JEV_CANARY_PHONE:-}
       - JEV_PROVIDER=${JEV_PROVIDER:-typesafe}
       - TYPESAFE_API_KEY=${TYPESAFE_API_KEY:-}
       - AI_GATEWAY_API_KEY=${AI_GATEWAY_API_KEY:-}
