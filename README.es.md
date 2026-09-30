@@ -282,7 +282,7 @@ PostgreSQL en Supabase con RLS. Tablas clave:
 - `atenciones_pendientes` — Cola de escalamiento humano (Habilitado con Realtime)
 - `solicitudes_ayuda` / `solicitudes_ayuda_items` — Cola de ayuda (Habilitado con Realtime)
 - `push_subscriptions` — Suscripciones a notificaciones Web Push
-- `servidores_tuneles` — Registro de URLs dinámicas de túneles Cloudflare
+- `tunnel_config` — Registro de URLs dinámicas de túneles Cloudflare ([guía de consulta](docs/tunnel-discovery.md))
 
 Características clave: Índices GIN pg_trgm, búsqueda coseno con pgvector, políticas RLS (anon para bot, autenticado para empleados), suscripciones Supabase Realtime, funciones SECURITY DEFINER.
 

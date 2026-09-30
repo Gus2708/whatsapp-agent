@@ -282,7 +282,7 @@ Supabase PostgreSQL with RLS. Key tables:
 - `atenciones_pendientes` — Human escalation queue (Realtime-enabled)
 - `solicitudes_ayuda` / `solicitudes_ayuda_items` — Help request queue (Realtime-enabled)
 - `push_subscriptions` — Web Push notification subscriptions
-- `servidores_tuneles` — Dynamic Cloudflare tunnel URL registry
+- `tunnel_config` — Dynamic Cloudflare tunnel URL registry ([lookup guide](docs/tunnel-discovery.md))
 
 Key database features: pg_trgm GIN indexes, pgvector cosine search, RLS policies (anon for bot, authenticated for employees), Supabase Realtime subscriptions, SECURITY DEFINER functions.
 
