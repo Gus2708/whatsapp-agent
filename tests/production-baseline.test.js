@@ -2,12 +2,24 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const baseline = require('../workflows/production-baseline.json');
-const { buildWorkflow } = require('../lib/workflow-overlay');
+const { buildWorkflow, canonicalFunctionSource } = require('../lib/workflow-overlay');
+const { searchDecision, searchGuard } = require('../lib/conversation-context');
 const fs = require('node:fs');
 const sources = {
   context: fs.readFileSync('scratch_live/live_conversation_context.js', 'utf8'),
   jev: fs.readFileSync('scratch_live/live_jev_shadow.js', 'utf8'),
 };
+
+test('embedded function source uses LF even when the host source uses CRLF', () => {
+  const hostFunction = new Function('value', '\r\n  return value;\r\n');
+  assert.match(hostFunction.toString(), /\r\n/, 'fixture must retain host line endings');
+  assert.equal(canonicalFunctionSource(hostFunction), hostFunction.toString().replace(/\r\n/g, '\n'));
+  const output = buildWorkflow(baseline, sources);
+  const node = name => output.nodes.find(n => n.name === name);
+  assert.ok(node('buscar_productos_tool').parameters.jsCode.startsWith(canonicalFunctionSource(searchDecision) + '\n'));
+  assert.ok(node('Sanitize Agent Output').parameters.jsCode.startsWith(
+    canonicalFunctionSource(searchDecision) + '\n' + canonicalFunctionSource(searchGuard) + '\n'));
+});
 test('production overlay preserves published business nodes, settings and unrelated branches', () => {
   const input = structuredClone(baseline);
   input.settings.customSentinel = 'preserve';

@@ -22,6 +22,21 @@ export interface TunnelStatus {
 // In-memory short-lived cache (15 seconds) to minimize Supabase query overhead
 const cache: Record<string, { data: TunnelRecord; fetchedAt: number }> = {};
 const CACHE_TTL_MS = 15 * 1000;
+const HEARTBEAT_MAX_AGE_MS = 90 * 1000;
+const FUTURE_SKEW_MS = 5 * 1000;
+
+export function isUsableTunnelRecord(record: TunnelRecord, now = Date.now()): boolean {
+  if (record.tunnel_state !== 'running' || !record.url) return false;
+  const updated = Date.parse(record.updated_at);
+  if (!Number.isFinite(updated) || now - updated > HEARTBEAT_MAX_AGE_MS || updated - now > FUTURE_SKEW_MS) return false;
+  try {
+    const url = new URL(record.url);
+    return url.protocol === 'https:' && /^[a-z0-9-]+\.trycloudflare\.com$/i.test(url.hostname) &&
+      !url.username && !url.password && !url.port && url.pathname === '/' && !url.search && !url.hash;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Obtiene la configuración y URL vigente del túnel desde la tabla public.tunnel_config.
@@ -66,12 +81,11 @@ export async function getTunnelConfig(servicio: 'n8n' | 'waha'): Promise<TunnelS
 
   const updatedAtTime = new Date(record.updated_at).getTime();
   const ageSeconds = Math.max(0, Math.floor((now - updatedAtTime) / 1000));
-  const isRunning = record.tunnel_state === 'running' && Boolean(record.url);
-  const isOnline = isRunning;
+  const isOnline = isUsableTunnelRecord(record, now);
 
   return {
     service: servicio,
-    url: isOnline ? record.url : record.url, // Return url with status flag
+    url: record.url,
     state: record.tunnel_state,
     isOnline,
     ageSeconds,
