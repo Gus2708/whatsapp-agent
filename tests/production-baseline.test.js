@@ -82,3 +82,31 @@ test('published sanitizer retains reservation behavior but blocks uncertain rese
   assert.equal(guarded.result[0].json.jev_shadow, undefined);
   assert.equal(guarded.result[0].json.intermediateSteps, undefined);
 });
+
+test('published sanitizer replaces blank and errored agent output with customer fallback', async () => {
+  const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+  const code = buildWorkflow(baseline, sources).nodes.find(n=>n.name==='Sanitize Agent Output').parameters.jsCode;
+  const $ = name => ({first:()=>({json:name==='Prepare Conversation Context'
+    ? {conversation_context:{action:'disabled'}} : {body:{payload:{from:'synthetic-chat'}}}})});
+  const axios = {get:async()=>({data:[]}),post:async()=>({data:[]})};
+  for (const json of [{output:''},{output:'unsafe answer',error:'model failed'}]) {
+    const result = await new AsyncFunction('items','$','$env','require','process',code)(
+      [{json}],$,{},()=>axios,{env:{}});
+    assert.match(result[0].json.output, /Disculpa/);
+    assert.equal(result[0].json._sanitized,true);
+  }
+});
+
+test('published sanitizer fixes a mixed-currency bolivar line without changing prices', async () => {
+  const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+  const code = buildWorkflow(baseline, sources).nodes.find(n=>n.name==='Sanitize Agent Output').parameters.jsCode;
+  const $ = name => ({first:()=>({json:name==='Prepare Conversation Context'
+    ? {conversation_context:{action:'disabled'}} : {body:{payload:{from:'synthetic-chat'}}}})});
+  const axios = {get:async()=>({data:[]}),post:async()=>({data:[]})};
+  const run = async output => (await new AsyncFunction('items','$','$env','require','process',code)(
+    [{json:{output,intermediateSteps:[]}}],$,{},()=>axios,{env:{}}))[0].json.output;
+  assert.equal(await run('Precio USD: 12$\nPrecio Bs (BCV): 12$ o 10,308.75bs'),
+    'Precio USD: 12$\nPrecio Bs (BCV): 10,308.75 Bs');
+  assert.equal(await run('Precio USD: 12$\nPrecio Bs (BCV): 12$'),
+    'Precio USD: 12$\nPrecio Bs (BCV): 12$');
+});
