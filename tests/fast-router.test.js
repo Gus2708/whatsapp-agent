@@ -2,6 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { getStoreInfo, formatStoreInfoReply } = require('../lib/store-info');
 const { fastRouter } = require('../lib/conversation-context');
+const trustedJev = intent => ({ contract: 'jev-shadow-v1', status: 'ok', intent,
+  intent_confidence: 0.97, intent_probability: 0.97, continuation: 'new',
+  continuation_confidence: 0.97, continuation_probability: 0.97 });
 
 test('Phase 1 - getStoreInfo returns authoritative store info', async (t) => {
   await t.test('returns hours info correctly', () => {
@@ -45,12 +48,7 @@ test('Phase 1 - getStoreInfo returns authoritative store info', async (t) => {
 
 test('Phase 2 - Guarded Fast Router intercepts high confidence non-product intents', async (t) => {
   await t.test('intercepts high-confidence store_info with authoritative reply', () => {
-    const jev = {
-      contract: 'jev-shadow-v1',
-      status: 'ok',
-      intent: 'store_info',
-      intent_confidence: 0.95
-    };
+    const jev = trustedJev('store_info');
     const result = fastRouter({ message: '¿A qué hora abren hoy?', jev });
     assert.equal(result.fast_path, true);
     assert.equal(result.action, 'respond');
@@ -59,12 +57,7 @@ test('Phase 2 - Guarded Fast Router intercepts high confidence non-product inten
   });
 
   await t.test('intercepts high-confidence general greeting with polite instant response', () => {
-    const jev = {
-      contract: 'jev-shadow-v1',
-      status: 'ok',
-      intent: 'general',
-      intent_confidence: 0.92
-    };
+    const jev = trustedJev('general');
     const result = fastRouter({ message: 'Hola buenas tardes', jev });
     assert.equal(result.fast_path, true);
     assert.equal(result.action, 'respond');
@@ -86,12 +79,7 @@ test('Phase 2 - Guarded Fast Router intercepts high confidence non-product inten
   });
 
   await t.test('intercepts human request intent and dispatches handoff', () => {
-    const jev = {
-      contract: 'jev-shadow-v1',
-      status: 'ok',
-      intent: 'human_request',
-      intent_confidence: 0.90
-    };
+    const jev = trustedJev('human_request');
     const result = fastRouter({ message: 'quiero comunicarme con un asesor humano', jev });
     assert.equal(result.fast_path, true);
     assert.equal(result.action, 'handoff');
@@ -133,11 +121,82 @@ test('Phase 2 - Guarded Fast Router intercepts high confidence non-product inten
     assert.equal(result.action, 'pass');
   });
 
-  await t.test('fallback regex detects store info when Jev is disabled or missing', () => {
+  await t.test('disabled or missing Jev never triggers a direct response', () => {
     const result = fastRouter({ message: '¿cuál es el horario de atención?', jev: null });
+    assert.equal(result.fast_path, false);
+    assert.equal(result.action, 'pass');
+  });
+
+  await t.test('requires both Jev confidence and deterministic standalone evidence', () => {
+    const cases = [
+      ['Hola, ¿tienen cemento?', 'general'],
+      ['gracias por el presupuesto de cemento', 'general'],
+      ['¿A qué hora abren y tienen cable #12?', 'store_info'],
+      ['donde tienen tornillos', 'store_info'],
+      ['quiero hablar con un asesor sobre la cotización de cemento', 'human_request'],
+      ['necesito 20 metros de cable', 'store_info']
+    ];
+    for (const [message, intent] of cases) {
+      const result = fastRouter({ message, jev: trustedJev(intent) });
+      assert.equal(result.fast_path, false, message);
+      assert.equal(result.action, 'pass', message);
+    }
+  });
+
+  await t.test('does not override conversation clarification, handoff, or prior product context', () => {
+    for (const context of [
+      { action: 'clarify', query: 'y el #8' },
+      { action: 'handoff', query: 'asesor' },
+      { action: 'search', query: 'cable #12' },
+      { action: 'pass', state: { gauge: '12' } },
+      { action: 'pass', previous_product: { gauge: '12' } }
+    ]) {
+      const result = fastRouter({ message: 'Hola', jev: trustedJev('general'), context });
+      assert.equal(result.fast_path, false, JSON.stringify(context));
+    }
+  });
+
+  await t.test('can route a standalone greeting when independent conversation state is disabled', () => {
+    const result = fastRouter({ message: 'Hola', jev: trustedJev('general'),
+      context: { action: 'disabled', query: 'Hola', state: null } });
     assert.equal(result.fast_path, true);
     assert.equal(result.action, 'respond');
-    assert.match(result.reply, /8:00\s*AM/i);
+  });
+
+  await t.test('retains the first-message name request only when customer memory permits it', () => {
+    const allow = fastRouter({ message: 'Hola', jev: trustedJev('general'), options: { askName: true } });
+    const deny = fastRouter({ message: 'Hola', jev: trustedJev('general'), options: { askName: false } });
+    assert.match(allow.reply, /Con qui[eé]n tengo el gusto/i);
+    assert.doesNotMatch(deny.reply, /Con qui[eé]n tengo el gusto/i);
+  });
+
+  await t.test('requires a fresh, corroborated Jev classification', () => {
+    const variations = [
+      { status: 'timeout' },
+      { intent: 'quote' },
+      { continuation: 'continue' },
+      { continuation: 'unclear' },
+      { intent_confidence: 0.89 },
+      { intent_probability: 0.89 },
+      { continuation_confidence: 0.89 }
+    ];
+    for (const variation of variations) {
+      const result = fastRouter({ message: 'Hola', jev: { ...trustedJev('general'), ...variation } });
+      assert.equal(result.fast_path, false, JSON.stringify(variation));
+    }
+  });
+
+  await t.test('responds only with audited store topics; no payment or delivery card', () => {
+    for (const message of ['¿A qué hora abren?', '¿Dónde están ubicados?']) {
+      const result = fastRouter({ message, jev: trustedJev('store_info') });
+      assert.equal(result.fast_path, true, message);
+      assert.equal(result.action, 'respond', message);
+      assert.doesNotMatch(result.reply, /Zelle|\$10|devoluci[oó]n/i);
+    }
+    for (const message of ['¿Aceptan Zelle?', '¿Hacen envíos?', 'información de la tienda']) {
+      const result = fastRouter({ message, jev: trustedJev('store_info') });
+      assert.equal(result.fast_path, false, message);
+    }
   });
 });
 
@@ -146,9 +205,9 @@ test('Phase 3 - Multi-turn conversational sequence and fast-path integration', a
   const now = Date.now();
   const session = JSON.stringify(['test-session', '584121234567']);
 
-  await t.test('executes clean multi-turn: greeting -> product search -> follow-up -> store info', () => {
+  await t.test('executes greeting and product search while preserving follow-up context', () => {
     // Turn 1: Greeting (Fast Router intercepts)
-    const turn1Jev = { contract: 'jev-shadow-v1', status: 'ok', intent: 'general', intent_confidence: 0.94 };
+    const turn1Jev = trustedJev('general');
     const turn1 = fastRouter({ message: 'Hola buenas tardes', jev: turn1Jev });
     assert.equal(turn1.fast_path, true);
     assert.equal(turn1.action, 'respond');
@@ -172,12 +231,11 @@ test('Phase 3 - Multi-turn conversational sequence and fast-path integration', a
     assert.equal(turn3Context.query, 'cable thwn #8 azul por metro');
     assert.equal(turn3Context.state.gauge, '8');
 
-    // Turn 4: Institutional inquiry (Fast Router intercepts without clearing product state)
-    const turn4Jev = { contract: 'jev-shadow-v1', status: 'ok', intent: 'store_info', intent_confidence: 0.95 };
+    // Turn 4: An active product state keeps this request on the Agent branch.
+    const turn4Jev = trustedJev('store_info');
     const turn4 = fastRouter({ message: '¿hasta qué hora trabajan hoy?', jev: turn4Jev, context: turn3Context.state });
-    assert.equal(turn4.fast_path, true);
-    assert.equal(turn4.action, 'respond');
-    assert.match(turn4.reply, /6:00\s*PM/i);
+    assert.equal(turn4.fast_path, false);
+    assert.equal(turn4.action, 'pass');
   });
 
   await t.test('fastRouter executes sub-millisecond in-memory dispatch', () => {
@@ -185,7 +243,7 @@ test('Phase 3 - Multi-turn conversational sequence and fast-path integration', a
     for (let i = 0; i < 1000; i++) {
       fastRouter({
         message: '¿dónde están ubicados?',
-        jev: { contract: 'jev-shadow-v1', status: 'ok', intent: 'store_info', intent_confidence: 0.95 }
+        jev: trustedJev('store_info')
       });
     }
     const durationNs = process.hrtime.bigint() - start;

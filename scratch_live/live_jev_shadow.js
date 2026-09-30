@@ -1,4 +1,4 @@
-// Observational only. This node cannot change the original context, query or action.
+// Jev is observational unless shadow mode and explicit routing enablement are both set.
 // BEGIN JEV FUNCTIONS
 function productAttributes(value) {
   const allowed = {
@@ -254,85 +254,50 @@ function detectStoreInfoTopic(text) {
 
 function fastRouter({ message, jev, context, options = {} } = {}) {
   const raw = String(message || '');
-  const text = raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
-  const minConfidence = Number(options.minConfidence || 0.85);
+  const pass = { fast_path: false, action: 'pass', query: raw };
+  const text = raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ').trim().replace(/^[¿¡\s]+|[?!.,;:\s]+$/g, '').trim();
+  const minConfidence = Math.max(0.9, Number(options.minConfidence ?? 0.9));
+  const namePrompt = options.askName === true ? '\n\n¿Con quién tengo el gusto? 😊' : '';
 
-  // 1. Guarded Jev Classification Path
-  if (jev && jev.status === 'ok' && typeof jev.intent === 'string') {
-    const confidence = Number(jev.intent_confidence ?? jev.confidence ?? 0);
-    if (confidence >= minConfidence) {
-      if (jev.intent === 'store_info') {
-        const topic = detectStoreInfoTopic(text) || 'general';
-        return {
-          fast_path: true,
-          action: 'respond',
-          topic,
-          reply: formatStoreInfoReply(topic),
-          confidence
-        };
-      }
-      if (jev.intent === 'general') {
-        const isClosing = /\b(?:gracias|muchas gracias|agradecido|listo gracias|chao|adios|hasta luego)\b/.test(text);
-        const reply = isClosing
-          ? '¡A tu orden siempre! 😊 Recuerda que en *Ferretería El Serrucho* estamos para servirte. ¡Que tengas un excelente día! 👨🏻‍🔧'
-          : '¡Hola! 👋 Te atiende *Perucho* 👨🏻‍🔧 de *Ferretería El Serrucho* 🪚 en Mene Mauroa. ¿En qué producto o material te podemos ayudar hoy? 😊';
-        return {
-          fast_path: true,
-          action: 'respond',
-          reply,
-          confidence
-        };
-      }
-      if (jev.intent === 'quote') {
-        return {
-          fast_path: false,
-          action: 'pass',
-          query: raw,
-          confidence
-        };
-      }
-      if (jev.intent === 'human_request') {
-        return {
-          fast_path: true,
-          action: 'handoff',
-          query: raw,
-          reply: '[PEDIR_AYUDA]',
-          confidence
-        };
-      }
-    }
+  // A previous conversation decision or product state must keep its own route.
+  if (context && (context.action !== undefined && !['pass', 'disabled'].includes(context.action) ||
+    context.state || context.previous_product || context.base_query || context.variant ||
+    context.gauge || context.presentation)) return pass;
+  if (jev?.status !== 'ok' || jev.continuation !== 'new' ||
+    !Number.isFinite(minConfidence) ||
+    ![jev.intent_confidence, jev.intent_probability, jev.continuation_confidence,
+      jev.continuation_probability].every(value => Number.isFinite(value) && value >= minConfidence)) return pass;
+
+  // Jev and an anchored local pattern must agree before a customer-facing reply.
+  if (jev.intent === 'general') {
+    const closing = /^(?:gracias|muchas gracias|mil gracias|listo gracias|chao|adios|hasta luego|hasta pronto)$/.test(text);
+    const greeting = /^(?:hola(?: buenas(?: tardes| noches)?)?|buenos dias|buen dia|buenas tardes|buenas noches|saludos)$/.test(text);
+    if (!closing && !greeting) return pass;
+    return { fast_path: true, action: 'respond',
+      reply: (closing
+        ? '¡A tu orden siempre! 😊 Recuerda que en *Ferretería El Serrucho* estamos para servirte. ¡Que tengas un excelente día! 👨🏻‍🔧'
+        : '¡Hola! 👋 Te atiende *Perucho* 👨🏻‍🔧 de *Ferretería El Serrucho* 🪚 en Mene Mauroa. ¿En qué producto o material te podemos ayudar hoy? 😊') + (closing ? '' : namePrompt),
+      confidence: jev.intent_confidence };
   }
 
-  // 2. Rule-Based Fallback Path (when Jev is absent, disabled, or failed)
-  const humanRequest = /\b(?:hablar con (?:un |una )?(?:humano|persona|asesor|empleado)|comunicame con (?:un |una )?(?:humano|persona|asesor|empleado)|pasame con (?:un |una )?(?:humano|persona|asesor|empleado)|atencion humana|asesor humano)\b/.test(text) ||
-    (/\b(?:humano|asesor|empleado)\b/.test(text) && /\b(?:quiero|puedo|favor|por favor|necesito|hablar|contactar)\b/.test(text));
-  if (humanRequest) {
-    return {
-      fast_path: true,
-      action: 'handoff',
-      query: raw,
-      reply: '[PEDIR_AYUDA]',
-      source: 'fallback'
-    };
+  if (jev.intent === 'store_info') {
+    const hours = /^(?:cual es (?:el|su) horario(?: de atencion)?|horario(?: de atencion)?|a que hora (?:abren|cierran)(?: hoy)?|que hora abren(?: hoy)?|hasta que hora (?:abren|trabajan|atienden)(?: hoy)?)$/.test(text);
+    const location = /^(?:donde estan(?: ubicados)?|donde queda la tienda|cual es (?:su|la) direccion|direccion|ubicacion|como llegar a la tienda)$/.test(text);
+    if (hours) return { fast_path: true, action: 'respond', topic: 'horario',
+      reply: formatStoreInfoReply('horario') + namePrompt, confidence: jev.intent_confidence };
+    if (location) return { fast_path: true, action: 'respond', topic: 'ubicacion',
+      reply: '📍 *Ubicación*\n' + getStoreData().location + '\n\n¿En qué producto te podemos ayudar? 👨🏻‍🔧' + namePrompt,
+      confidence: jev.intent_confidence };
+    return pass;
   }
 
-  const storeTopic = detectStoreInfoTopic(text);
-  if (storeTopic) {
-    return {
-      fast_path: true,
-      action: 'respond',
-      topic: storeTopic,
-      reply: formatStoreInfoReply(storeTopic),
-      source: 'fallback'
-    };
+  if (jev.intent === 'human_request' &&
+    /^(?:(?:quiero|necesito|puedo) (?:hablar|comunicarme|contactar) con|(?:pasame|comunicame) con) (?:un |una )?(?:asesor(?:a)?(?: humano)?|humano|persona|empleado)$/.test(text)) {
+    return { fast_path: true, action: 'handoff', query: raw,
+      reply: '[PEDIR_AYUDA]', confidence: jev.intent_confidence };
   }
-
-  // 3. Fail-Closed Fallthrough to standard AI Agent
-  return {
-    fast_path: false,
-    action: 'pass',
-    query: raw
-  };
+  return pass;
 }
 // END JEV FUNCTIONS
 const original = $input.first().json;
@@ -373,10 +338,10 @@ const metadata = await classifyShadow({ message: latest,
 });
 let updatedContext = original.conversation_context;
 if (config.JEV_MODE === 'shadow' && config.JEV_ROUTING_ENABLED === 'true' && typeof fastRouter === 'function') {
-  const route = fastRouter({ message: latest, jev: metadata, context: updatedContext });
+  const route = fastRouter({ message: latest, jev: metadata, context: updatedContext,
+    options: { askName: original.pedir_nombre === 'si' } });
   if (route && route.fast_path) {
     updatedContext = { ...(updatedContext || {}), ...route };
   }
 }
 return [{ json: { ...original, jev_shadow: metadata, conversation_context: updatedContext } }];
-

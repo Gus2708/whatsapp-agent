@@ -54,7 +54,7 @@ test('sanitizer removes shadow metadata before downstream delivery', async () =>
   assert.equal(item.json.jev_shadow, undefined);
 });
 
-test('shadow classification and rule fallback cannot change routing without explicit enablement', async () => {
+test('shadow classification cannot change routing without explicit enablement', async () => {
   const node = wf.nodes.find(n => n.name === 'Jev Shadow Decision');
   const condition = wf.nodes.find(n => n.name === 'Needs Product Clarification?').parameters.conditions.conditions[0].leftValue;
   const selected = new Function('$json', 'return ' + condition.slice(3, -2));
@@ -62,7 +62,7 @@ test('shadow classification and rule fallback cannot change routing without expl
   const lookup = () => ({ first: () => ({ json: { body: { payload: { body: 'hasta que hora abren' } } } }) });
   const original = { conversation_context: { action: 'pass', query: 'hasta que hora abren' } };
   const answers = Object.fromEntries(Object.entries(jevQuestions()).map(([name, q]) => {
-    const choice = name === 'intent' ? 'store_info' : Object.keys(q.criteria)[0];
+    const choice = name === 'intent' ? 'store_info' : name === 'continuation' ? 'new' : Object.keys(q.criteria)[0];
     return [name, { type: 'choice', choice, confidence: 0.95,
       probabilities: Object.fromEntries(Object.keys(q.criteria).map(key => [key, key === choice ? 1 : 0])) }];
   }));
@@ -102,6 +102,32 @@ test('quote classification stays on the Agent branch even when routing is enable
   assert.equal(selected(item.json), false);
   assert.equal(wf.connections['Needs Product Clarification?'].main[1][0].node, 'AI Agent');
   assert.ok(wf.nodes.find(n => n.name === 'hacer_presupuesto_tool'));
+});
+
+test('generated Jev node routes only a standalone corroborated greeting', async () => {
+  const code = fs.readFileSync('scratch_live/live_jev_shadow.js', 'utf8');
+  const run = new AsyncFunction('$input', '$', '$env', 'require', 'AbortController', code);
+  const answersFor = intent => Object.fromEntries(Object.entries(jevQuestions()).map(([name, q]) => {
+    const choice = name === 'intent' ? intent : name === 'continuation' ? 'new' : Object.keys(q.criteria)[0];
+    return [name, { type: 'choice', choice, confidence: 0.97,
+      probabilities: Object.fromEntries(Object.keys(q.criteria).map(key => [key, key === choice ? 1 : 0])) }];
+  }));
+  const env = { JEV_MODE: 'shadow', JEV_ROUTING_ENABLED: 'true', TYPESAFE_API_KEY: 'fake' };
+  for (const [message, intent, action, expected] of [
+    ['Hola', 'general', 'pass', 'respond'],
+    ['Hola, tienen cemento', 'general', 'pass', 'pass'],
+    ['¿A qué hora abren y tienen cable?', 'store_info', 'pass', 'pass'],
+    ['Hola', 'general', 'clarify', 'clarify']
+  ]) {
+    const original = { pedir_nombre: 'si', conversation_context: { action, query: message } };
+    const $ = () => ({ first: () => ({ json: { body: { payload: { body: message } } } }) });
+    const [item] = await run({ first: () => ({ json: original }) }, $, env,
+      () => ({ post: async (_url, body) => ({ status: 200, data: {
+        model: body.model, answers: answersFor(intent), usage: { input_tokens: 1, output_tokens: 1 }
+      } }) }), undefined);
+    assert.equal(item.json.conversation_context.action, expected, message);
+    if (expected === 'respond') assert.match(item.json.conversation_context.reply, /Con qui[eé]n tengo el gusto/i);
+  }
 });
 
 test('shadow deadline aborts axios with frozen Promise prototypes and no AbortController', async () => {
