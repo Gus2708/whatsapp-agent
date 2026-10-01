@@ -10,7 +10,7 @@ volumes:
 services:
   waha:
     image: devlikeapro/waha:latest
-    container_name: ${CONTAINER_PREFIX:-waha_agent}
+    container_name: ${WAHA_CONTAINER_NAME:-waha_agent}
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -60,7 +60,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: ${CONTAINER_PREFIX:-n8n_agent}
+    container_name: ${N8N_CONTAINER_NAME:-n8n_agent}
     restart: unless-stopped
     ports:
       - "5678:5678"
@@ -74,10 +74,21 @@ services:
       - waha
     environment:
       - AGENT_NAME=${AGENT_NAME:-Sales Agent}
+      - BOT_NAME=${BOT_NAME:-${AGENT_NAME:-Sales Agent}}
+      - BOT_ROLE=${BOT_ROLE:-asesor comercial}
+      - BOT_EMOJIS=${BOT_EMOJIS:-👨🏻‍🔧 🪚}
       - STORE_NAME=${STORE_NAME:-Commerce Store}
+      - STORE_SHORT_NAME=${STORE_SHORT_NAME:-Tienda}
       - STORE_LOCATION=${STORE_LOCATION:-Main Branch}
-      - STORE_SCHEDULE=${STORE_SCHEDULE:-Mon-Sat 8:00 AM - 6:00 PM}
+      - STORE_CITY=${STORE_CITY:-Mene Mauroa}
+      - STORE_STATE=${STORE_STATE:-Estado Falcón}
+      - STORE_COUNTRY=${STORE_COUNTRY:-Venezuela}
+      - STORE_HOURS=${STORE_HOURS:-${STORE_SCHEDULE:-Mon-Sat 8:00 AM - 6:00 PM}}
+      - STORE_DELIVERY_POLICY=${STORE_DELIVERY_POLICY:-}
+      - STORE_PAYMENTS=${STORE_PAYMENTS:-}
+      - STORE_RETURNS=${STORE_RETURNS:-}
       - STORE_CURRENCY=${STORE_CURRENCY:-USD}
+      - WAHA_INTERNAL_URL=${WAHA_INTERNAL_URL:-http://waha:3000}
       - NODE_ENV=production
       # Experimental cable follow-ups; keep off until staging validation.
       - CONVERSATION_STATE_ENABLED=${CONVERSATION_STATE_ENABLED:-false}

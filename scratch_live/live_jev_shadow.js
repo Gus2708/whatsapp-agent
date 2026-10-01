@@ -180,13 +180,14 @@ async function classifyShadow({ message, previous, env = {}, transport, now = Da
 }
 
 function getStoreData() {
+  const env = (typeof process !== 'undefined' && process.env) || (typeof $env !== 'undefined' && $env) || {};
   return {
-    name: 'Ferretería El Serrucho 🪚',
-    location: 'Estamos ubicados en Mene Mauroa, Estado Falcón, Venezuela.',
-    pickup_and_delivery: 'Puedes retirar compras generales en la tienda física. Todo lo que es hierros (tubos, láminas, cerchas, cabillas, etc.) y cemento está en nuestro galpón aparte en La Compañía; allí se retiran y de allí salen los envíos. Contamos con transporte de materiales a $10 en el centro de Mene Mauroa (fuera del Mene debe preguntar). En cualquier caso, antes de pagar el envío el cliente siempre debe hablar con un empleado.',
-    hours: 'Atendemos de lunes a sábado de 8:00 AM a 6:00 PM (con descanso para almuerzo de 1:00 PM a 2:00 PM). Domingos y feriados permanecemos cerrados.',
-    payments: 'Aceptamos pagos en dólares en efectivo (USD), bolívares en efectivo, Pago Móvil y transferencia bancaria a la tasa oficial del Banco Central de Venezuela (BCV). También aceptamos Zelle para compras a partir de $20.00 USD. Para concretar el pago, un empleado te atiende enseguida o puedes pasar por la tienda física.',
-    returns: 'Aceptamos cambios y devoluciones hasta 7 días continuos desde la fecha de compra, presentando el producto sellado en su empaque original y la factura de compra.'
+    name: env.STORE_NAME || 'Ferretería El Serrucho 🪚',
+    location: env.STORE_LOCATION || 'Estamos ubicados en Mene Mauroa, Estado Falcón, Venezuela.',
+    pickup_and_delivery: env.STORE_DELIVERY_POLICY || 'Puedes retirar compras generales en la tienda física. Todo lo que es hierros (tubos, láminas, cerchas, cabillas, etc.) y cemento está en nuestro galpón aparte en La Compañía; allí se retiran y de allí salen los envíos. Contamos con transporte de materiales a $10 en el centro de Mene Mauroa (fuera del Mene debe preguntar). En cualquier caso, antes de pagar el envío el cliente siempre debe hablar con un empleado.',
+    hours: env.STORE_HOURS || 'Atendemos de lunes a sábado de 8:00 AM a 6:00 PM (con descanso para almuerzo de 1:00 PM a 2:00 PM). Domingos y feriados permanecemos cerrados.',
+    payments: env.STORE_PAYMENTS || 'Aceptamos pagos en dólares en efectivo (USD), bolívares en efectivo, Pago Móvil y transferencia bancaria a la tasa oficial del Banco Central de Venezuela (BCV). También aceptamos Zelle para compras a partir de $20.00 USD. Para concretar el pago, un empleado te atiende enseguida o puedes pasar por la tienda física.',
+    returns: env.STORE_RETURNS || 'Aceptamos cambios y devoluciones hasta 7 días continuos desde la fecha de compra, presentando el producto sellado en su empaque original y la factura de compra.'
   };
 }
 
@@ -274,10 +275,15 @@ function fastRouter({ message, jev, context, options = {} } = {}) {
     const closing = /^(?:gracias|muchas gracias|mil gracias|listo gracias|chao|adios|hasta luego|hasta pronto)$/.test(text);
     const greeting = /^(?:hola(?: buenas(?: tardes| noches)?)?|buenos dias|buen dia|buenas tardes|buenas noches|saludos)$/.test(text);
     if (!closing && !greeting) return pass;
+    const env = (typeof process !== 'undefined' && process.env) || (typeof $env !== 'undefined' && $env) || {};
+    const storeName = env.STORE_NAME || 'Ferretería El Serrucho';
+    const botName = env.BOT_NAME || 'Perucho';
+    const storeCity = env.STORE_CITY || 'Mene Mauroa';
+    const citySuffix = storeCity ? ` en ${storeCity}` : '';
     return { fast_path: true, action: 'respond',
       reply: (closing
-        ? '¡A tu orden siempre! 😊 Recuerda que en *Ferretería El Serrucho* estamos para servirte. ¡Que tengas un excelente día! 👨🏻‍🔧'
-        : '¡Hola! 👋 Te atiende *Perucho* 👨🏻‍🔧 de *Ferretería El Serrucho* 🪚 en Mene Mauroa. ¿En qué producto o material te podemos ayudar hoy? 😊') + (closing ? '' : namePrompt),
+        ? `¡A tu orden siempre! 😊 Recuerda que en *${storeName}* estamos para servirte. ¡Que tengas un excelente día! 👨🏻‍🔧`
+        : `¡Hola! 👋 Te atiende *${botName}* 👨🏻‍🔧 de *${storeName}* 🪚${citySuffix}. ¿En qué producto o material te podemos ayudar hoy? 😊`) + (closing ? '' : namePrompt),
       confidence: jev.intent_confidence };
   }
 
