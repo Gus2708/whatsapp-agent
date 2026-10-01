@@ -158,14 +158,14 @@ test('reranking clears metadata tied to a rejected top candidate', async () => {
   assert.equal(output.match_status, 'semantic');
 });
 
-test('generated workflow embeds the same qualifier and keeps it default off', () => {
+test('generated workflow embeds the same qualifier and Compose defaults to production enforcement', () => {
   const workflow = require('../n8n_workflow.json');
   const code = workflow.nodes.find(n => n.name === 'buscar_productos_tool').parameters.jsCode;
   assert.match(code, /async function qualifyProductCandidates/);
   assert.match(code, /await qualifyProductCandidates\(/);
   assert.match(code, /https:\/\/ai-gateway\.vercel\.sh\/v1\/evaluate/);
   assert.match(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'docker-compose.yml'), 'utf8'),
-    /JEV_PRODUCT_QUALIFIER_MODE=\$\{JEV_PRODUCT_QUALIFIER_MODE:-off\}/);
+    /JEV_PRODUCT_QUALIFIER_MODE=\$\{JEV_PRODUCT_QUALIFIER_MODE:-enforce\}/);
 });
 
 test('generated workflow executes qualification against the catalog double', async () => {
