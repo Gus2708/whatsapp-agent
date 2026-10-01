@@ -344,9 +344,12 @@ let updatedContext = original.conversation_context;
 const canaryPhone = config.JEV_CANARY_PHONE;
 const canarySender = typeof canaryPhone === 'string' && /^\+?[1-9]\d{7,14}$/.test(canaryPhone)
   ? canaryPhone.replace(/^\+/, '') + '@c.us' : null;
+const inboundPrivateSender = inboundPayload?.fromMe === false &&
+  typeof inboundPayload.from === 'string' && /^([1-9]\d{7,14})@c\.us$/.test(inboundPayload.from);
+const scopeAllowsSender = config.JEV_ROUTING_SCOPE === 'all' ||
+  (config.JEV_ROUTING_SCOPE === 'canary' && canarySender && inboundPayload?.from === canarySender);
 if (config.JEV_MODE === 'shadow' && config.JEV_ROUTING_ENABLED === 'true' &&
-  config.JEV_ROUTING_SCOPE === 'canary' && canarySender &&
-  inboundPayload?.fromMe === false && inboundPayload.from === canarySender &&
+  inboundPrivateSender && scopeAllowsSender &&
   typeof fastRouter === 'function') {
   const route = fastRouter({ message: latest, jev: metadata, context: updatedContext,
     options: { askName: original.pedir_nombre === 'si' } });

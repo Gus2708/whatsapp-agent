@@ -83,29 +83,35 @@ test('shadow classification cannot change routing without explicit enablement', 
   assert.equal(selected(enabled.json), true);
 });
 
-test('quote classification stays on the Agent branch even when routing is enabled', async () => {
+test('product and quote classifications stay on the Agent branch in both enabled scopes', async () => {
   const node = wf.nodes.find(n => n.name === 'Jev Shadow Decision');
   const condition = wf.nodes.find(n => n.name === 'Needs Product Clarification?').parameters.conditions.conditions[0].leftValue;
   const selected = new Function('$json', 'return ' + condition.slice(3, -2));
   const run = new AsyncFunction('$input', '$', '$env', 'require', node.parameters.jsCode);
-  const message = 'presupuesto de 2 sacos de cemento y 4 bombillos';
-  const lookup = () => ({ first: () => ({ json: { body: { payload: {
-    body: message, from: '15551234567@c.us', fromMe: false
-  } } } }) });
-  const answers = Object.fromEntries(Object.entries(jevQuestions()).map(([name, q]) => {
-    const choice = name === 'intent' ? 'quote' : Object.keys(q.criteria)[0];
-    return [name, { type: 'choice', choice, confidence: 0.95,
-      probabilities: Object.fromEntries(Object.keys(q.criteria).map(key => [key, key === choice ? 1 : 0])) }];
-  }));
-  const original = { conversation_context: { action: 'pass', query: message } };
-  const [item] = await run({ first: () => ({ json: original }) }, lookup,
-    { JEV_MODE: 'shadow', TYPESAFE_API_KEY: 'fake', JEV_ROUTING_ENABLED: 'true',
-      JEV_ROUTING_SCOPE: 'canary', JEV_CANARY_PHONE: '+15551234567' },
-    () => ({ post: async (url, body) => ({ status: 200, data: { model: body.model, answers,
-      usage: { input_tokens: 1, output_tokens: 1 } } }) }));
-  assert.equal(item.json.jev_shadow.intent, 'quote');
-  assert.equal(item.json.conversation_context.action, 'pass');
-  assert.equal(selected(item.json), false);
+  for (const scope of ['canary', 'all']) {
+    for (const [message, intent] of [
+      ['presupuesto de 2 sacos de cemento y 4 bombillos', 'quote'],
+      ['tienen cemento', 'product_inquiry'],
+    ]) {
+      const lookup = () => ({ first: () => ({ json: { body: { payload: {
+        body: message, from: '15551234567@c.us', fromMe: false
+      } } } }) });
+      const answers = Object.fromEntries(Object.entries(jevQuestions()).map(([name, q]) => {
+        const choice = name === 'intent' ? intent : Object.keys(q.criteria)[0];
+        return [name, { type: 'choice', choice, confidence: 0.95,
+          probabilities: Object.fromEntries(Object.keys(q.criteria).map(key => [key, key === choice ? 1 : 0])) }];
+      }));
+      const original = { conversation_context: { action: 'pass', query: message } };
+      const [item] = await run({ first: () => ({ json: original }) }, lookup,
+        { JEV_MODE: 'shadow', TYPESAFE_API_KEY: 'fake', JEV_ROUTING_ENABLED: 'true',
+          JEV_ROUTING_SCOPE: scope, JEV_CANARY_PHONE: '+15551234567' },
+        () => ({ post: async (url, body) => ({ status: 200, data: { model: body.model, answers,
+          usage: { input_tokens: 1, output_tokens: 1 } } }) }));
+      assert.equal(item.json.jev_shadow.intent, intent);
+      assert.equal(item.json.conversation_context.action, 'pass', `${scope}: ${intent}`);
+      assert.equal(selected(item.json), false, `${scope}: ${intent}`);
+    }
+  }
   assert.equal(wf.connections['Needs Product Clarification?'].main[1][0].node, 'AI Agent');
   assert.ok(wf.nodes.find(n => n.name === 'hacer_presupuesto_tool'));
 });
@@ -154,7 +160,7 @@ test('canary routing is fail-closed for scope, sender and outbound messages', as
     ['routing flag off', { JEV_ROUTING_ENABLED: 'false' }, '15551234567@c.us', false, 'pass'],
     ['mode off', { JEV_MODE: 'off' }, '15551234567@c.us', false, 'pass'],
     ['missing scope', { JEV_ROUTING_SCOPE: undefined }, '15551234567@c.us', false, 'pass'],
-    ['unknown scope', { JEV_ROUTING_SCOPE: 'all' }, '15551234567@c.us', false, 'pass'],
+    ['unknown scope', { JEV_ROUTING_SCOPE: 'global' }, '15551234567@c.us', false, 'pass'],
     ['missing phone', { JEV_CANARY_PHONE: undefined }, '15551234567@c.us', false, 'pass'],
     ['malformed phone', { JEV_CANARY_PHONE: '1555-123-4567' }, '15551234567@c.us', false, 'pass'],
     ['another sender', {}, '15557654321@c.us', false, 'pass'],
@@ -164,6 +170,46 @@ test('canary routing is fail-closed for scope, sender and outbound messages', as
     ['LID sender', {}, '15551234567@lid', false, 'pass'],
     ['malformed sender', {}, '15551234567@c.us/other', false, 'pass'],
     ['missing sender', {}, undefined, false, 'pass'],
+  ];
+  for (const [label, overrides, from, fromMe, expected] of cases) {
+    const env = { ...baseEnv, ...overrides };
+    const original = { conversation_context: { action: 'pass', query: 'Hola' } };
+    const $ = () => ({ first: () => ({ json: { body: { payload: { body: 'Hola', from, fromMe } } } }) });
+    const [item] = await run({ first: () => ({ json: original }) }, $, env,
+      () => ({ post: async (_url, body) => ({ status: 200, data: { model: body.model, answers,
+        usage: { input_tokens: 1, output_tokens: 1 } } }) }), undefined);
+    assert.equal(item.json.conversation_context.action, expected, label);
+    assert.equal(item.json.jev_shadow.status, env.JEV_MODE === 'off' ? 'disabled' : 'ok', label);
+  }
+});
+
+test('all scope routes only valid inbound private senders while preserving canary isolation', async () => {
+  const code = wf.nodes.find(n => n.name === 'Jev Shadow Decision').parameters.jsCode;
+  const run = new AsyncFunction('$input', '$', '$env', 'require', 'AbortController', code);
+  const answers = Object.fromEntries(Object.entries(jevQuestions()).map(([name, question]) => {
+    const choice = name === 'intent' ? 'general' : name === 'continuation' ? 'new' : Object.keys(question.criteria)[0];
+    return [name, { type: 'choice', choice, confidence: 0.97,
+      probabilities: Object.fromEntries(Object.keys(question.criteria).map(key => [key, key === choice ? 1 : 0])) }];
+  }));
+  const baseEnv = { JEV_MODE: 'shadow', JEV_ROUTING_ENABLED: 'true',
+    JEV_ROUTING_SCOPE: 'all', JEV_CANARY_PHONE: undefined, TYPESAFE_API_KEY: 'fake' };
+  const cases = [
+    ['valid private sender without canary phone', {}, '15557654321@c.us', false, 'respond'],
+    ['routing switch off', { JEV_ROUTING_ENABLED: 'false' }, '15557654321@c.us', false, 'pass'],
+    ['mode off', { JEV_MODE: 'off' }, '15557654321@c.us', false, 'pass'],
+    ['canary scope with another sender', { JEV_ROUTING_SCOPE: 'canary', JEV_CANARY_PHONE: '+15551234567' }, '15557654321@c.us', false, 'pass'],
+    ['off scope', { JEV_ROUTING_SCOPE: 'off' }, '15557654321@c.us', false, 'pass'],
+    ['unknown scope', { JEV_ROUTING_SCOPE: 'everyone' }, '15557654321@c.us', false, 'pass'],
+    ['outbound', {}, '15557654321@c.us', true, 'pass'],
+    ['unknown direction', {}, '15557654321@c.us', undefined, 'pass'],
+    ['group sender', {}, '15557654321@g.us', false, 'pass'],
+    ['LID sender', {}, '15557654321@lid', false, 'pass'],
+    ['missing sender', {}, undefined, false, 'pass'],
+    ['zero-leading sender', {}, '05557654321@c.us', false, 'pass'],
+    ['too short sender', {}, '1234567@c.us', false, 'pass'],
+    ['too long sender', {}, '1234567890123456@c.us', false, 'pass'],
+    ['non-digit sender', {}, '1555765432x@c.us', false, 'pass'],
+    ['malformed sender', {}, '15557654321@c.us/other', false, 'pass'],
   ];
   for (const [label, overrides, from, fromMe, expected] of cases) {
     const env = { ...baseEnv, ...overrides };
