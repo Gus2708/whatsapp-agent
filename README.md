@@ -6,7 +6,7 @@
 
   <p align="center">
     <strong>Production-grade autonomous sales and customer support engine for WhatsApp.</strong><br>
-    5-layer hybrid search, sub-second decision engine, deterministic trade calculators, persistent memory, and human escalation.
+    5-layer hybrid search, guarded Jev decisions, deterministic trade calculators, persistent memory, and human escalation.
   </p>
 
   <p align="center">
@@ -19,7 +19,7 @@
     <a href="https://n8n.io/"><img src="https://img.shields.io/badge/Powered%20by-n8n-orange.svg?style=for-the-badge&logo=n8n&logoColor=white" alt="n8n" /></a>
     <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" /></a>
     <a href="docs/jev-shadow-pilot.md"><img src="https://img.shields.io/badge/Jev%20AI-Decision%20Engine-7928CA?style=for-the-badge" alt="Jev AI Decision Engine" /></a>
-    <a href="tests/"><img src="https://img.shields.io/badge/Tests-248%20Passing-brightgreen?style=for-the-badge&logo=node.js&logoColor=white" alt="248 Tests Passing" /></a>
+    <a href="tests/"><img src="https://img.shields.io/badge/Tests-Automated-brightgreen?style=for-the-badge&logo=node.js&logoColor=white" alt="Automated tests" /></a>
     <a href="scripts/"><img src="https://img.shields.io/badge/Regression-86%2F86%20Zero%20FN-success?style=for-the-badge" alt="Regression 86/86 Zero FN" /></a>
     <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-14-black.svg?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js 14" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge" alt="License: MIT" /></a>
@@ -36,7 +36,7 @@ Event-driven. WhatsApp messages arrive via WAHA, n8n orchestrates with LLMs via 
 ```mermaid
 graph TD
     Client["📱 WhatsApp User"] <-->|"Messages & Voice"| WAHA["🐋 WAHA · Port 3000<br/>Engine NOWEB"]
-    WAHA -->|"Webhook 'message'"| N8N["🐋 n8n Engine · Port 5678<br/>33 Nodes · 4 Zones"]
+    WAHA -->|"Webhook 'message'"| N8N["🐋 n8n Engine · Port 5678<br/>4 Zones"]
     N8N -->|"Reasoning"| Model["🧠 OpenRouter / OpenAI<br/>LLM Multi-Tool Reasoning"]
     N8N -->|"Voice Notes → Text"| Groq["🎙️ Groq Whisper <800ms"]
     N8N -->|"Catalog / Prices / Orders"| Supabase[("☁️ Supabase PostgreSQL<br/>pg_trgm + pgvector + RLS")]
@@ -52,12 +52,12 @@ graph TD
 | WhatsApp HTTP API | WAHA (Docker, engine NOWEB) | Multi-device session emulation and webhook delivery |
 | Workflow Orchestrator | n8n (Docker) | Event management, state routing, rate limiting, and tool dispatch |
 | LLM Reasoning | OpenRouter / OpenAI | Multi-turn conversational reasoning and tool invocation |
-| Decision Modeling | TypeSafe Jev / Vercel AI Gateway + Deterministic Engines | Dual-speed cognition: <0.2ms edge determinism + shadow pilot |
+| Decision Modeling | TypeSafe Jev via Vercel AI Gateway + deterministic engines | Guarded message routing and qualification of ambiguous product candidates; local rules handle calculations |
 | Voice Transcription | Groq Whisper | Audio note transcription in <800ms |
 | Database & Search | Supabase (PostgreSQL + pg_trgm + pgvector) | Inventory catalog, order queue, and hybrid vector search |
 | State & Long-Term Memory | Engram + In-Memory Session Context | Customer profiling & 30-min TTL conversational attribute cache |
 | Flight Deck & CRM | Next.js 14 (App Router + Tailwind + GSAP + PWA) | Live telemetry, chat operations queue, RAG studio, DevOps console |
-| Runtime & Testing | Node.js 22+ (Native Test Runner) | CLI tools, sync guards, 248 hermetic tests, 86 regression queries with 0 FN |
+| Runtime & Testing | Node.js 22+ (Native Test Runner) | CLI tools, source/workflow sync guards, and automated regression tests |
 
 ---
 
@@ -82,20 +82,21 @@ In high-volume commercial and industrial conversational AI, sending raw queries 
 
 To solve this with production-grade engineering, this system implements a **Two-Speed Cognitive Duality Architecture**:
 
-- **⚡ System 1 (Deterministic Edge with optional Jev observation)**: Local rules and calculators handle material estimates, installation kits and product search. Jev is an optional inline API observation with latency and token cost; message redaction is best effort.
+- **⚡ System 1 (local rules with guarded Jev calls)**: Local rules and calculators handle material estimates, installation kits and product search. Jev can route eligible standalone messages and qualify ambiguous search candidates through an inline Gateway call. Each call adds latency and token cost; message redaction is best effort.
 - **🧠 System 2 (Deep Conversational Reasoning)**: High-capability LLMs (`openai/gpt-5.6-luna`, `anthropic/claude-sonnet-5`) dedicated exclusively to conversational nuance, audio note synthesis from Whisper (<800ms), and human escalation coordination.
 
 ```mermaid
 flowchart TD
     Msg["📱 Customer WhatsApp Message"] --> PII["🔒 Best-effort Redactor<br/>(May leave personal information in free text)"]
     
-    subgraph S1["⚡ SYSTEM 1: Local rules and optional Jev observation"]
-        PII -.-> JEV["🧠 Jev inline observer<br/>(off by default; routing separately gated)"]
+    subgraph S1["⚡ SYSTEM 1: Local rules and guarded Jev calls"]
+        PII -.-> JEV["🧠 Jev message classification<br/>(shadow observation; guarded fast routing)"]
         PII --> CALC{"Trade Query or Kit?"}
         CALC -->|Trade Calculation| EST["🏗️ Construction Materials Estimator<br/>(lib/construction-estimator.js · Masonry, Slabs, Plaster, Fencing)"]
         CALC -->|Installation / Accessories| KITS["🔧 Installation Kits Engine<br/>(lib/installation-kits.js · Toilets, Sinks, Roofing, PVC)"]
         CALC -->|Physical Problem| PROB["🛠️ Problem-to-Product Resolver<br/>(Leaks→Sealants/Membranes · Plumbing→PVC Cement/Teflon)"]
         CALC -->|Direct Product Search| RAG["🔍 5-Layer Hybrid RAG Pipeline<br/>(Lexical AST · Dictionary · Trigrams · pgvector · Popularity)"]
+        RAG -.-> QUAL["🧠 Jev candidate qualifier<br/>(ambiguous results only; enforce by default)"]
     end
     
     subgraph S2["🧠 SYSTEM 2: Deep Reasoning & Multi-Turn Coordination"]
@@ -141,20 +142,21 @@ flowchart TD
    - Regex boundaries with forward lookahead over Spanish conjunctions (`y`, `e`, `con`, `más`, `además`, `también`) ensuring multi-word product names (*"pintura blanco y negro"*) are not erroneously split.
    - Converts number words (*"un"*, *"dos"*, *"medio"*, *"docena"*) to exact numeric quantities.
 
-5. **Jev observation pilot and best-effort redaction ([`lib/jev-shadow.js`](lib/jev-shadow.js))**:
-   - **Inline, default-off observation**: `JEV_MODE=shadow` adds an API request before the Agent, bounded by a default 1,500ms deadline. `JEV_ROUTING_ENABLED=false` prevents Jev and rule fast paths from changing replies.
+5. **Jev decisions and best-effort redaction ([`lib/jev-shadow.js`](lib/jev-shadow.js))**:
+   - **Observation and guarded routing**: `JEV_MODE=shadow` adds an inline API request before the Agent, bounded by a default 1,500ms deadline. `JEV_ROUTING_ENABLED` and `JEV_ROUTING_SCOPE` gate direct responses; the documented production rollout uses `all` for eligible private inbound chats.
    - **Best-effort redaction**: Masks common contact, credential and currency patterns, but does not guarantee removal of personal information from arbitrary messages.
    - **Dual-Provider Architecture**: Native support for direct **TypeSafe API** (`/v1/systemone`) and **Vercel AI Gateway** (`ai-gateway.vercel.sh`).
    - **Synthetic Evaluation ([`scripts/evaluate_jev.js`](scripts/evaluate_jev.js))**: The original 30-case corpus measures intent and continuity. A separate 12-case corpus measures department, material and problem labels. The generated search tool does not yet consume these Jev labels; neither corpus measures full-agent improvement or confidence calibration.
+   - **Product qualification ([`lib/jev-product-qualifier.js`](lib/jev-product-qualifier.js))**: A separate `off`/`shadow`/`enforce` switch evaluates up to four ambiguous candidates. Production Compose defaults to `enforce`; exact matches and hard measure mismatches bypass it. Failures preserve the original result. See the [qualifier guide](docs/jev-product-qualifier.md) and [Jev implementation record](docs/jev-session-2026-10-01.md).
 
 6. **Deterministic Context Engine & Technical Attribute Slotting ([`lib/conversation-context.js`](lib/conversation-context.js))**:
    - **Multi-Turn Specification Tracking**: Preserves technical attributes such as wire gauge (8, 10, 12, 14 AWG), insulation type (THW), presentation (per-meter / spool), and color across turns without repetitive prompt reinjection.
    - **In-Memory State Machine (30-min TTL)**: Session-isolated state that triggers controlled clarification requests (`match_status: vague`) rather than guessing inaccurate products.
 
-7. **Production Quality & Verification Gates (Zero-Hallucination Guarantee)**:
-   - **248 hermetic unit tests** passing with Node.js native test runner (`npm test`), with 100% pass rate.
+7. **Production Quality & Verification Gates**:
+   - The latest Jev rollout passed 290 Node tests and 23 Vitest tests, plus type and synchronization checks. These checks do not establish customer-facing accuracy; see the [dated implementation record](docs/jev-session-2026-10-01.md).
    - **86 regression benchmark catalog queries** requiring **0 false negatives** (`node rag.js regresion`).
-   - **Single Source of Truth CI Gates (`check_sources_sync.js`, `check_workflow_sync.js`)**: Prevents drift between canonical logic in `lib/`, production dumps, and active n8n workflow nodes.
+   - **Source synchronization checks (`check_sources_sync.js`, `check_workflow_sync.js`)**: Detect drift among checked-in sources and generated exports. The deployed n8n workflow must be checked separately.
    - **Commercial Margin Safeguards**: Unguaranteed prices are suppressed automatically on approximate matches (`match_status: vague`), protecting retail margins.
 
 ---
@@ -323,12 +325,12 @@ node scripts/generar_embeddings.js
 ---
 
 ## 🧩 Single Source of Truth & Drift Protection
-Search matcher lives canonically in `lib/catalog-search.js`. Guarded by:
+Search logic lives in `lib/serrucho-search.js`, with `lib/catalog-search.js` as a facade. Check it with:
 ```bash
 npm test
 ```
-- `check_sources_sync.js` — verifies lib/catalog-search.js matches scripts and live dumps
-- `check_workflow_sync.js` — verifies n8n_workflow.json matches live system message and search nodes
+- `check_sources_sync.js` — verifies canonical sources match generated scripts and checked-in node copies
+- `check_workflow_sync.js` — verifies the generated workflow matches the checked-in node sources; it does not compare against deployed n8n
 - Dashboard: TypeScript strict checking + Vitest unit tests + Playwright E2E
 - Root tests: catalog search, workflow guard, declared environments, paint/lamina search, recovery flow
 
@@ -359,9 +361,12 @@ npm test
 | `lib/installation-kits.js` | Installation kits and accessory bundling engine (toilets, sinks, roofing, PVC) |
 | `lib/conversation-context.js` | Deterministic short-term conversation state engine & cable query parser |
 | `lib/jev-shadow.js` | Jev decision model shadow observer with PII redactor |
+| `lib/jev-product-qualifier.js` | Guarded Jev scoring of ambiguous product candidates |
 | `lib/workflow-overlay.js` | n8n workflow overlay generator for baseline-safe extensions |
 | `scripts/evaluate_jev.js` | Synthetic evaluation harness (latency, cost, accuracy) for Jev |
 | `docs/jev-shadow-pilot.md` | Engineering specification for Jev shadow pilot & privacy model |
+| `docs/jev-product-qualifier.md` | Product qualification modes, boundaries, and rollback |
+| `docs/jev-session-2026-10-01.md` | Dated Jev implementation, validation, and production handoff record |
 | `docs/conversation-context-pilot.md` | Specification for short-term state resolver & typed search guards |
 | `docs/production-workflow-baseline.md` | Sanitized baseline documentation & reproducibility criteria |
 | `workflows/production-baseline.json` | Published production n8n baseline (40 nodes, env-parameterized) |

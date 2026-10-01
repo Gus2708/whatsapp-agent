@@ -19,7 +19,7 @@
     <a href="https://n8n.io/"><img src="https://img.shields.io/badge/Potenciado%20por-n8n-orange.svg?style=for-the-badge&logo=n8n&logoColor=white" alt="n8n" /></a>
     <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" /></a>
     <a href="docs/jev-shadow-pilot.md"><img src="https://img.shields.io/badge/Jev%20AI-Motor%20de%20Decisi%C3%B3n-7928CA?style=for-the-badge" alt="Jev AI Motor de Decisión" /></a>
-    <a href="tests/"><img src="https://img.shields.io/badge/Tests-248%20Passing-brightgreen?style=for-the-badge&logo=node.js&logoColor=white" alt="248 Tests Passing" /></a>
+    <a href="tests/"><img src="https://img.shields.io/badge/Tests-Automatizados-brightgreen?style=for-the-badge&logo=node.js&logoColor=white" alt="Pruebas automatizadas" /></a>
     <a href="scripts/"><img src="https://img.shields.io/badge/Regresi%C3%B3n-86%2F86%20Cero%20FN-success?style=for-the-badge" alt="Regresión 86/86 Cero FN" /></a>
     <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-14-black.svg?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js 14" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/Licencia-MIT-yellow.svg?style=for-the-badge" alt="Licencia: MIT" /></a>
@@ -36,7 +36,7 @@ Basada en eventos. Los mensajes de WhatsApp llegan a través de WAHA, n8n orques
 ```mermaid
 graph TD
     Client["📱 Usuario WhatsApp"] <-->|"Mensajes y Notas de Voz"| WAHA["🐋 WAHA · Puerto 3000<br/>Engine NOWEB"]
-    WAHA -->|"Webhook 'message'"| N8N["🐋 Motor n8n · Puerto 5678<br/>33 Nodos · 4 Zonas"]
+    WAHA -->|"Webhook 'message'"| N8N["🐋 Motor n8n · Puerto 5678<br/>4 Zonas"]
     N8N -->|"Razonamiento"| Model["🧠 OpenRouter / OpenAI<br/>Razonamiento Multi-Herramienta"]
     N8N -->|"Notas de Voz → Texto"| Groq["🎙️ Groq Whisper <800ms"]
     N8N -->|"Catálogo / Precios / Pedidos"| Supabase[("☁️ Supabase PostgreSQL<br/>pg_trgm + pgvector + RLS")]
@@ -52,12 +52,12 @@ graph TD
 | HTTP API WhatsApp | WAHA (Docker, motor NOWEB) | Emulación de sesiones multidispositivo y despacho de webhooks |
 | Orquestador de Flujos | n8n (Docker) | Gestión de eventos, enrutamiento de estado, rate limiting y despacho de herramientas |
 | Razonamiento LLM | OpenRouter / OpenAI | Razonamiento multiturno e invocación de herramientas |
-| Modelado de Decisiones | TypeSafe Jev / Vercel AI Gateway + Motores Deterministas | Dualidad cognitiva: edge determinista <0.2ms y piloto shadow |
+| Modelado de Decisiones | TypeSafe Jev vía Vercel AI Gateway + motores deterministas | Enrutamiento protegido y calificación de candidatos ambiguos; reglas locales para cálculos |
 | Transcripción de Voz | Groq Whisper | Transcripción de notas de audio en <800ms |
 | Base de Datos y Búsqueda | Supabase (PostgreSQL + pg_trgm + pgvector) | Catálogo de inventario, cola de pedidos y búsqueda vectorial híbrida |
 | Estado y Memoria | Engram + Contexto de Sesión en Memoria | Perfilado de clientes y caché de atributos con TTL de 30 minutos |
 | Flight Deck & CRM | Next.js 14 (App Router + Tailwind + GSAP + PWA) | Telemetría en vivo, cola de operaciones de chat, estudio RAG, consola DevOps |
-| Runtime y Testing | Node.js 22+ (Native Test Runner) | Herramientas de CLI, guardias de sincronización, 248 tests herméticos, 86 casos regresión 0 FN |
+| Runtime y Testing | Node.js 22+ (Native Test Runner) | Herramientas CLI, guardias de sincronización y pruebas automatizadas de regresión |
 
 ---
 
@@ -82,20 +82,21 @@ En aplicaciones industriales y de comercio conversacional de alto volumen, envia
 
 Para resolver esto con rigor de ingeniería de producción, Perucho implementa una **Arquitectura de Dualidad Cognitiva de Dos Velocidades**:
 
-- **⚡ Sistema 1 (Edge Determinista & Motor Jev Sub-Segundo)**: Ejecución en submilisegundos (<0.2 ms), costo \$0 en tokens, anonimización estricta de PII corporativo, cálculo matemático determinista de ingeniería civil, empaquetado de kits de instalación y resolución de problemas físicos a productos de catálogo.
+- **⚡ Sistema 1 (reglas locales y llamadas protegidas a Jev)**: Las reglas y calculadoras locales resuelven estimaciones, kits y búsqueda. Jev puede enrutar mensajes aislados elegibles y calificar candidatos ambiguos mediante llamadas en línea a Gateway. Estas llamadas añaden latencia y consumo de tokens; la redacción de datos personales es de mejor esfuerzo.
 - **🧠 Sistema 2 (Razonamiento Profundo Multiturno)**: Modelos LLM (`openai/gpt-5.6-luna` y `anthropic/claude-sonnet-5`) dedicados exclusivamente a la sutileza conversacional, síntesis de transcripciones de voz de Whisper (<800 ms) y coordinación de escalamiento a empleados.
 
 ```mermaid
 flowchart TD
-    Msg["📱 Mensaje WhatsApp del Cliente"] --> PII["🔒 Sanitizador & Redactor de PII<br/>(Enmascara teléfonos, cédulas, bancos, montos)"]
+    Msg["📱 Mensaje WhatsApp del Cliente"] --> PII["🔒 Redacción de datos personales<br/>(Mejor esfuerzo; puede quedar información en texto libre)"]
     
-    subgraph S1["⚡ SISTEMA 1: Edge Determinista & Motor de Decisiones (<1ms · $0 Tokens)"]
-        PII --> JEV["🧠 Observador Jev Shadow / Fast Router<br/>(TypeSafe AI · Intención & Calibración)"]
-        JEV --> CALC{"¿Consulta de Oficio o Kit?"}
+    subgraph S1["⚡ SISTEMA 1: Reglas locales y llamadas protegidas a Jev"]
+        PII -.-> JEV["🧠 Clasificación de mensajes Jev<br/>(Observación shadow; enrutamiento protegido)"]
+        PII --> CALC{"¿Consulta de Oficio o Kit?"}
         CALC -->|Cálculo de Obra| EST["🏗️ Estimador de Materiales de Construcción<br/>(lib/construction-estimator.js · Bloques, Losas, Friso, Cercas)"]
         CALC -->|Instalación / Accesorios| KITS["🔧 Motor de Kits de Instalación<br/>(lib/installation-kits.js · Pocetas, Lavamanos, Techos, PVC)"]
         CALC -->|Problema Físico| PROB["🛠️ Resolvedor de Problema a Solución<br/>(Goteras→Manto/Cemento Plástico · Fugas→Pega PVC/Teflón)"]
         CALC -->|Búsqueda / Compra Directa| RAG["🔍 Pipeline RAG Híbrido 5 Capas<br/>(AST Léxico · Vocabulario · Trigramas · pgvector · Popularidad)"]
+        RAG -.-> QUAL["🧠 Calificador Jev<br/>(Solo candidatos ambiguos; enforce por defecto)"]
     end
     
     subgraph S2["🧠 SISTEMA 2: Razonamiento Profundo & Coordinación Multiturno"]
@@ -141,20 +142,21 @@ flowchart TD
    - Regex de límites con lookahead sobre conjunciones en español (`y`, `e`, `con`, `más`, `además`, `también`) para no fragmentar nombres compuestos válidos como *"pintura blanco y negro"*.
    - Mapeo léxico de números cardinales en texto (*"un"*, *"dos"*, *"medio"*, *"docena"*) a cantidades numéricas exactas.
 
-5. **Motor de Decisiones Sub-Segundo Jev y Redacción de PII ([`lib/jev-shadow.js`](lib/jev-shadow.js))**:
-   - **Despliegue Shadow sin Riesgo Operativo**: Ejecución en segundo plano evaluando `typesafe-ai/jev` con presupuesto estricto (1.500 ms) sin riesgo sobre el tráfico en vivo (`JEV_MODE=off` por defecto).
-   - **Redacción de PII Corporativo**: Sanitización previa que enmascara números de teléfono, correos, credenciales bancarias, montos de dinero e identidades antes de enviar payloads a APIs externas.
+5. **Observación Jev y redacción de datos ([`lib/jev-shadow.js`](lib/jev-shadow.js))**:
+   - **Observación y rutas protegidas**: `JEV_MODE=shadow` añade una solicitud en línea antes del Agent, con plazo predeterminado de 1.500 ms. `JEV_ROUTING_ENABLED` y `JEV_ROUTING_SCOPE` controlan las respuestas directas; el despliegue documentado utiliza `all` para chats privados entrantes elegibles.
+   - **Redacción de mejor esfuerzo**: Enmascara patrones comunes de contacto, credenciales y montos; puede quedar información personal en texto libre.
    - **Abstracción Dual-Provider**: Soporte conmutativo para **TypeSafe API** (`/v1/systemone`) y **Vercel AI Gateway** (`ai-gateway.vercel.sh`).
-   - **Benchmark Sintético ([`scripts/evaluate_jev.js`](scripts/evaluate_jev.js))**: 30 casos de prueba en español con medición de concordancia de intención, calibración de confianza y latencia P95.
+   - **Evaluación sintética ([`scripts/evaluate_jev.js`](scripts/evaluate_jev.js))**: El corpus de 30 casos mide intención y continuidad; otro de 12 mide etiquetas de departamento, material y problema. La búsqueda generada todavía no consume esas etiquetas. Ninguno mide una mejora del agente completo ni demuestra calibración de confianza.
+   - **Calificación de productos ([`lib/jev-product-qualifier.js`](lib/jev-product-qualifier.js))**: Un control independiente `off`/`shadow`/`enforce` evalúa hasta cuatro candidatos ambiguos. Compose de producción usa `enforce` por defecto; coincidencias exactas y discrepancias duras de medidas no lo invocan. Los fallos conservan el resultado anterior. Consulta la [guía del calificador](docs/jev-product-qualifier.md) y el [registro de implementación de Jev](docs/jev-session-2026-10-01.md).
 
 6. **Motor de Contexto Determinista y Slotting de Atributos ([`lib/conversation-context.js`](lib/conversation-context.js))**:
    - **Rastreo Técnico de Atributos Multiturno**: Preserva calibre de cables (calibre 8, 10, 12, 14), tipo de aislamiento (THW), presentación (por metro / rollo) y tonalidades entre turnos sin necesidad de re-inyección en el prompt.
    - **Máquina de Estado en Memoria con TTL de 30 min**: Aislamiento por sesión de WAHA y teléfono de cliente, forzando preguntas de aclaración (`match_status: vague`) en lugar de inferir o adivinar pedidos erróneos.
 
-7. **Rigor de Ingeniería y Puertas de Calidad (Zero Hallucinations Guarantee)**:
-   - **248 pruebas unitarias herméticas** ejecutadas con el test runner nativo de Node.js (`npm test`), con 100% de éxito.
+7. **Rigor de Ingeniería y Puertas de Calidad**:
+   - En el último despliegue de Jev pasaron 290 pruebas de Node y 23 de Vitest, además de chequeos de tipos y sincronización. Estas pruebas no demuestran la precisión comercial en clientes; consulta el [registro fechado](docs/jev-session-2026-10-01.md).
    - **86 casos de prueba de regresión de catálogo** con **0 falsos negativos** exigidos por contrato (`node rag.js regresion`).
-   - **Puertas de Sincronización de Fuente Única (`check_sources_sync.js`, `check_workflow_sync.js`)**: Previenen desviaciones entre la lógica canónica en `lib/`, los volcados de producción y los nodos activos de n8n.
+   - **Chequeos de sincronización (`check_sources_sync.js`, `check_workflow_sync.js`)**: Detectan diferencias entre fuentes versionadas y exportaciones generadas. El workflow desplegado en n8n requiere verificación aparte.
    - **Guardias de Cotización Comercial**: Supresión automática de precios en coincidencias vagas (`match_status: vague`), protegiendo los márgenes comerciales de la tienda.
 
 ---
@@ -327,9 +329,9 @@ El motor de búsqueda principal reside canónicamente en `lib/serrucho-search.js
 ```bash
 npm test
 ```
-- `check_sources_sync.js` — verifica que `lib/` coincida con scripts y dumps en vivo
-- `check_workflow_sync.js` — verifica que `n8n_workflow.json` coincida con el prompt del sistema y nodos de búsqueda
-- **248 pruebas unitarias herméticas** en Node.js nativo (11 suites, 0 fallos)
+- `check_sources_sync.js` — verifica que las fuentes canónicas coincidan con los scripts generados y las copias de nodos versionadas
+- `check_workflow_sync.js` — verifica la exportación generada contra las fuentes versionadas; no compara con el n8n desplegado
+- Pruebas automatizadas en Node.js y Vitest; el resultado fechado del despliegue de Jev está en el [registro de implementación](docs/jev-session-2026-10-01.md)
 - **86 consultas de regresión en catálogo** sin falsos negativos (`node rag.js regresion`)
 - Dashboard: Verificación estricta en TypeScript + pruebas unitarias con Vitest + suites E2E con Playwright
 
@@ -359,9 +361,12 @@ npm test
 | `lib/installation-kits.js` | Motor de kits de instalación y bundles de accesorios (pocetas, lavamanos, fregaderos, techos, PVC) |
 | `lib/conversation-context.js` | Motor determinista de estado de conversación y slotting de atributos técnicos (calibre, tipo) |
 | `lib/jev-shadow.js` | Observador en modo sombra para modelo de decisión Jev con redactor de PII corporativo |
+| `lib/jev-product-qualifier.js` | Calificación protegida de candidatos ambiguos con Jev |
 | `lib/workflow-overlay.js` | Generador de overlay sobre workflows n8n sin afectar la línea base |
 | `scripts/evaluate_jev.js` | Harness de evaluación sintética (latencia, costo, precisión) para Jev |
 | `docs/jev-shadow-pilot.md` | Especificación técnica del piloto Jev shadow y modelo de privacidad |
+| `docs/jev-product-qualifier.md` | Modos, límites y reversión del calificador de productos |
+| `docs/jev-session-2026-10-01.md` | Registro fechado de implementación, pruebas y entrega de Jev |
 | `docs/conversation-context-pilot.md` | Especificación del resolvedor de contexto y guardias de búsqueda |
 | `docs/production-workflow-baseline.md` | Documentación de línea base de producción y reproducibilidad |
 | `workflows/production-baseline.json` | Línea base publicada de n8n (40 nodos, parametrizada por variables) |
