@@ -10,7 +10,7 @@ volumes:
 services:
   waha:
     image: devlikeapro/waha:latest
-    container_name: ${CONTAINER_PREFIX:-waha_agent}
+    container_name: ${WAHA_CONTAINER_NAME:-waha_agent}
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -60,7 +60,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: ${CONTAINER_PREFIX:-n8n_agent}
+    container_name: ${N8N_CONTAINER_NAME:-n8n_agent}
     restart: unless-stopped
     ports:
       - "5678:5678"
