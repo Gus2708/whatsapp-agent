@@ -85,7 +85,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://waha_serrucho:3000/api/sendText",
+        "url": "http://waha:3000/api/sendText",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -274,7 +274,7 @@
       {
         "parameters": {
           "method": "POST",
-          "url": "http://waha_serrucho:3000/api/sendText",
+          "url": "http://waha:3000/api/sendText",
           "sendHeaders": true,
           "headerParameters": {
             "parameters": [

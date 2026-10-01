@@ -99,7 +99,8 @@ try {
     # justo en el caso que protege (contenedor recien recreado por un rebuild).
     $patchScript = Join-Path $ProjectDir "scripts\patch_container_runtime.js"
     if (Test-Path $patchScript) {
-        $patchOut = Get-Content $patchScript -Raw | docker exec -u 0 -i n8n_serrucho node
+        $n8nTarget = if (docker ps --format "{{.Names}}" 2>$null | Select-String -Pattern "^n8n_agent$") { "n8n_agent" } else { "n8n_serrucho" }
+        $patchOut = Get-Content $patchScript -Raw | docker exec -u 0 -i $n8nTarget node
         $patchCode = $LASTEXITCODE
         foreach ($line in @($patchOut)) { if ($line) { Log "  blindaje: $line" } }
         switch ($patchCode) {
