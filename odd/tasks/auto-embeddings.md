@@ -41,8 +41,16 @@ Pieces:
 - [x] T2 Edge Function `embed-productos` (inline) — deployed v2 (v1 was a mistaken
       placeholder deploy, replaced within a minute). Manual call: auth, queue, product,
       vocabulary reads OK; stops at embeddings with "no embeddings provider" (expected).
-- [ ] T3 Cron job + end-to-end check with a real product (inline)
-      BLOCKED: set OPENROUTER_API_KEY as Edge Function secret.
+- [x] T3 Cron job + end-to-end check with a real product (inline)
+      2026-10-22 verified: MH10454 -> 200 {procesados:1, descripciones_nuevas:1}, Luna
+      description saved, vector 1536 dims, queue empty; hash_desc equals the manual
+      script's recomputation. Cron `embed-productos-1m` active. Trigger checks inside
+      rolled-back transactions: no-op update -> not queued, description change -> queued,
+      insert -> queued.
+      Pre-existing drift found (not caused by this feature): 7198/7935 stored hashes no
+      longer match the manual script's text, almost all because catalogo_vocabulario
+      changed after the last full embed. Fix = run the manual script with --rehash.
+      Earlier blocker (resolved): OPENROUTER_API_KEY Edge Function secret.
       2026-10-22: embeddings switched to OpenRouter only (single bill with Luna),
       model id `openai/text-embedding-3-small`; deployed v3, verified it answers
       "missing OPENROUTER_API_KEY secret".
