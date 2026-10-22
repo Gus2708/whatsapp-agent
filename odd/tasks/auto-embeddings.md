@@ -42,7 +42,10 @@ Pieces:
       placeholder deploy, replaced within a minute). Manual call: auth, queue, product,
       vocabulary reads OK; stops at embeddings with "no embeddings provider" (expected).
 - [ ] T3 Cron job + end-to-end check with a real product (inline)
-      BLOCKED: set OPENAI_API_KEY and OPENROUTER_API_KEY as Edge Function secrets.
+      BLOCKED: set OPENROUTER_API_KEY as Edge Function secret.
+      2026-10-22: embeddings switched to OpenRouter only (single bill with Luna),
+      model id `openai/text-embedding-3-small`; deployed v3, verified it answers
+      "missing OPENROUTER_API_KEY secret".
       Cron SQL ready in supabase/migrations/20261022_embedding_cron.sql, not applied.
 - [ ] T4 Docs: README/ARCHITECTURE note, monitor node message
 

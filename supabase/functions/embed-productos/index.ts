@@ -10,11 +10,11 @@ import { createHash } from "node:crypto";
 
 const SB = Deno.env.get("SUPABASE_URL")!;
 const KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const OAI = (Deno.env.get("OPENAI_API_KEY") || "").trim();
 const OR = (Deno.env.get("OPENROUTER_API_KEY") || "").trim();
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" };
 
-const MODELO_EMB = "text-embedding-3-small";
+const MODELO_EMB = "text-embedding-3-small";            // stored in productos_embedding.modelo
+const MODELO_EMB_OR = "openai/text-embedding-3-small";  // OpenRouter id for the same model
 const DIMS = 1536;
 const MODELO_DESC = "openai/gpt-5.6-luna";
 const LOTE = 40;           // products per invocation; keeps writes under the HNSW timeout
@@ -118,25 +118,18 @@ async function describir(lote: { codigo_interno: string; descripcion: string }[]
   return out;
 }
 
+// Embeddings go through OpenRouter, same account as Luna, so there is a single bill.
+// Same OpenAI model underneath, so the vectors are interchangeable with the existing ones.
 async function embeber(textos: string[]): Promise<number[][]> {
-  const pedir = (url: string, key: string) => fetch(url, {
+  if (!OR) throw new Error("missing OPENROUTER_API_KEY secret");
+  const r = await fetch("https://openrouter.ai/api/v1/embeddings", {
     method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: MODELO_EMB, input: textos, dimensions: DIMS }),
+    headers: { Authorization: `Bearer ${OR}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: MODELO_EMB_OR, input: textos, dimensions: DIMS }),
   });
-  let error = "no embeddings provider (set OPENAI_API_KEY or OPENROUTER_API_KEY)";
-  for (const [url, key] of [["https://api.openai.com/v1/embeddings", OAI], ["https://openrouter.ai/api/v1/embeddings", OR]]) {
-    if (!key) continue;
-    try {
-      const r = await pedir(url, key);
-      const j = await r.json();
-      if (r.ok && !j.error) return j.data.map((d: { embedding: number[] }) => d.embedding);
-      error = `${url} ${r.status}: ${JSON.stringify(j.error || j).slice(0, 200)}`;
-    } catch (e) {
-      error = `${url}: ${(e as Error).message}`;
-    }
-  }
-  throw new Error(error);
+  const j = await r.json();
+  if (!r.ok || j.error) throw new Error(`OpenRouter embeddings ${r.status}: ${JSON.stringify(j.error || j).slice(0, 200)}`);
+  return j.data.map((d: { embedding: number[] }) => d.embedding);
 }
 
 // The caller must be service_role (pg_cron). The gateway already verified the JWT.
