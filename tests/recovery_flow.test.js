@@ -183,6 +183,18 @@ describe('Candidate Evaluation Pipeline (TDD Scenarios)', () => {
     assert.equal(candidates[0].source, 'supabase');
   });
 
+  test('Scenario 2b: Employee manual reply (fromMe in WAHA) after customer message is excluded', () => {
+    const clientTs = NOW - 5400000;
+    const supabaseMsgs = [
+      { chat_id: '584140655276@c.us', texto: '[audio]', procesado_at: new Date(clientTs).toISOString() }
+    ];
+    const wahaChats = [
+      { id: '584140655276@c.us', lastMessage: { fromMe: true, timestamp: Math.floor((clientTs + 60000) / 1000), body: 'A su orden amigo' } }
+    ];
+    const candidates = evaluateCandidates({ supabaseMsgs, wahaChats, nowMs: NOW });
+    assert.equal(candidates.length, 0);
+  });
+
   test('Scenario 3: Customer with human handover (estado=manual) is excluded', () => {
     const supabaseMsgs = [
       { chat_id: '198766942527662@lid', texto: 'Okey', procesado_at: new Date(NOW - 600000).toISOString() }

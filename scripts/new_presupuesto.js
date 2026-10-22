@@ -82,6 +82,7 @@ function medPresent(med, nd){
 }
 const SIN = {
   'calibre':'cal','cal.':'cal',
+  'breque':'breaker','breques':'breaker','breker':'breaker','brekers':'breaker',
   'rieles':'tubo herreria','riel':'tubo herreria',
   'lavaplatos':'fregadero','lavaplato':'fregadero','lava platos':'fregadero','lava plato':'fregadero','elegante':'lujo','corrugada':'estriada','corrugado':'estriado','varilla':'cabilla','varillas':'cabilla','cabillas':'cabilla',
   'simento':'cemento','simanto':'cemento','saco de cemento':'cemento','bolsa de cemento':'cemento','saco cemento':'cemento','bolsa cemento':'cemento',
@@ -124,6 +125,10 @@ const SIN = {
   'amariyo':'amarillo',
   'cunete':'cuñete','cunetes':'cuñete','cuñetes':'cuñete','tobo de pintura':'cuñete','balde de pintura':'cuñete',
   'cuartico':'1/4','cuartico de pintura':'1/4',
+  'pintura de agua':'pintura caucho','pinturas de agua':'pintura caucho',
+  'pintura al agua':'pintura caucho','pinturas al agua':'pintura caucho',
+  'pintura base agua':'pintura caucho','pintura base de agua':'pintura caucho',
+  'a base de agua':'caucho','al agua':'caucho',
   'esmalte sintetico':'pintura aceite','pintura sintetica':'pintura aceite',
   'brillo de seda':'pintura satinada','brillo seda':'pintura satinada','seda styl':'pintura satinada',
   'pintura de exterior':'pintura exterior','pintura para exterior':'pintura exterior','pintura de afuera':'pintura exterior','pintura para afuera':'pintura exterior','pintura fachada':'pintura exterior','pintura para fachada':'pintura exterior','pintura intemperie':'pintura exterior',
@@ -138,6 +143,11 @@ const SIN = {
 // Ojo: los breakers se llaman "BREAKER" en el catalogo (no "interruptor termomagnetico"),
 // asi que este alias no arrastra tableros electricos.
 const ALIAS = {
+  'breaker':        ['breaker','breque','breques','breker','brekers'],
+  'breque':         ['breaker','breque','breques','breker','brekers'],
+  'breques':        ['breaker','breque','breques','breker','brekers'],
+  'breker':         ['breaker','breque','breques','breker','brekers'],
+  'brekers':        ['breaker','breque','breques','breker','brekers'],
   'apagador':    ['apagador','interruptor','suiche','switch'],
   'interruptor': ['interruptor','apagador','suiche','switch'],
   'suiche':      ['suiche','switch','interruptor','apagador'],
@@ -214,11 +224,14 @@ const COLOR_STEM = {
   'dorado':'dorad','dorada':'dorad','dorados':'dorad','doradas':'dorad',
   'plateado':'platead','plateada':'platead','plateados':'platead','plateadas':'platead',
   'rosado':'rosad','rosada':'rosad','rosados':'rosad','rosadas':'rosad',
+  'pink':'rosad','pinc':'rosad',
+  'lila':'lila','lilas':'lila',
+  'marfil':'marfil','durazno':'durazno',
   'gris':'gris','grises':'gris','cris':'gris','griss':'gris',
   'verde':'verde','verdes':'verde',
   'azul':'azul','azules':'azul','asul':'azul','asules':'azul',
   'marron':'marron','marrones':'marron',
-  'naranja':'naranja','naranjas':'naranja','beige':'beige','cafe':'cafe',
+  'naranja':'naranja','naranjas':'naranja','beige':'beige','beig':'beige','beis':'beige','veige':'beige','cafe':'cafe',
   'celeste':'celeste','celestes':'celeste'
 };
 function stemColor(w){ return COLOR_STEM[w] || w; }
@@ -269,6 +282,7 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
   s = s.replace(/\b(pinturas?|caucho)\s+b\b/gi, '$1 claseb');
   s = s.replace(/\b(pinturas?|caucho)\s+a\b/gi, '$1 clasea');
   s = s.replace(/\b(pinturas?|caucho)\s+c\b/gi, '$1 clasec');
+  s = s.replace(/\b(pinturas?|esmaltes?)\s+(de\s+|al\s+|a\s+base\s+de\s+|base\s+)?agua\b/gi, '$1 caucho');
   s = s.replace(/\b(de\s+colores?|de\s+color)\b/gi, 'prepintada');
   s = s.replace(/\b(pintadas?|pintados?)\b/gi, 'prepintada');
   s = s.replace(/\b(prepintadas?|prepintados?)\b/gi, 'lamina prepintada');
@@ -816,6 +830,9 @@ let bloque='', totUSD=0, n=0;
 const noEnc=[];
 const altLines=[];
 let hasAgotado = false;
+const agotadosNames = [];
+const sinCantNames = [];
+let disponibles = 0;
 // Fetch all items in parallel instead of sequentially.
 const resultados = await Promise.all(items.map(it => buscarUno(it.nombre)));
 
@@ -826,11 +843,18 @@ for (const [idx, it] of items.entries()) {
   n++;
   const usd=Number(prod.precio_venta);
   const sub=usd*it.cantidad;
-  totUSD+=sub;
-  const isAgotado = !esGranel(prod.descripcion) && Number(prod.existencia) <= 0;
-  if (isAgotado) hasAgotado = true;
-  bloque += n+'. *'+tc(prod.descripcion)+'*' + (isAgotado ? ' _(Agotado)_' : '') + '\n';
-  bloque += '   '+it.cantidad+' x '+nUSD(usd)+'$ = *'+nUSD(sub)+'$*\n\n';
+  // Un renglon NO VENDIBLE (agotado, o cantidad pedida mayor a la existencia) no se factura:
+  // no se suma al total. NUNCA se expone la existencia real al cliente.
+  const _noGranel = !esGranel(prod.descripcion);
+  const isAgotado = _noGranel && Number(prod.existencia) <= 0;
+  const isSinCant = _noGranel && !isAgotado && Number(prod.existencia) < it.cantidad;
+  if (!isAgotado && !isSinCant) totUSD+=sub;
+  if (isAgotado){ hasAgotado = true; agotadosNames.push(tc(prod.descripcion)); }
+  else if (isSinCant){ hasAgotado = true; sinCantNames.push(tc(prod.descripcion)); }
+  else disponibles++;
+  bloque += n+'. *'+tc(prod.descripcion)+'*' + (isAgotado ? ' _(Agotado)_' : (isSinCant ? ' _(Cantidad no disponible)_' : '')) + '\n';
+  if (isAgotado || isSinCant) bloque += '   '+it.cantidad+' x '+nUSD(usd)+'$ = _no disponible, NO incluido en el total_\n\n';
+  else bloque += '   '+it.cantidad+' x '+nUSD(usd)+'$ = *'+nUSD(sub)+'$*\n\n';
   // otras opciones disponibles para este renglón
   for (const a of (r.alts||[])){
     const ausd=Number(a.precio_venta);
@@ -838,6 +862,18 @@ for (const [idx, it] of items.entries()) {
   }
 }
 if (n===0) return JSON.stringify({ ok:false, instruccion:'NO encontre estos productos. Tu UNICA respuesta valida ahora es el token [PEDIR_AYUDA] (escribelo solo, exactamente asi). PROHIBIDO sugerir alternativas o decir que no los tenemos: un empleado los elegira.', mensaje:'No encontré esos productos: '+noEnc.join(', ') });
+
+// TODO el pedido es no vendible (agotado o sin la cantidad pedida): no hay nada que facturar ni que pasar a un empleado.
+if (disponibles === 0 && (agotadosNames.length + sinCantNames.length) > 0){
+  const _todos = agotadosNames.concat(sinCantNames).join(', ');
+  return JSON.stringify({
+    ok:true, todo_agotado:true,
+    presupuesto_texto: bloque.trim(),
+    alternativas_texto: altLines.length ? altLines.join('\n') : '',
+    nota: 'Ningun producto pedido esta disponible en la cantidad solicitada.',
+    instruccion: 'NADA de lo que pidio el cliente esta disponible en la cantidad solicitada (' + _todos + '). NO muestres total, NO ofrezcas facturar y NO uses [PEDIR_AYUDA] ni menciones a un empleado: no hay nada que facturar. Dile solo que por ahora no dispones de esa cantidad (o que esta agotado, si es el caso). PROHIBIDO decir CUANTAS unidades hay, aunque el cliente pregunte: nunca reveles la existencia. Ofrece las alternativas disponibles si las hay, y dile que puede escribir luego para confirmar cuando llegue mercancia.'
+  });
+}
 
 const totBs = tasa ? totUSD*RECARGO*tasa : null;
 bloque += '━━━━━━━━━━━━━━━\n';
@@ -873,5 +909,10 @@ if (noEnc.length){
     'PROHIBIDO presentar el total como si fuera el presupuesto completo: el cliente se llevaria una ' +
     'cifra equivocada y eso es un error de facturacion. Ofrecele que un empleado le consiga esos ' +
     'renglones (puedes usar [PEDIR_AYUDA] si insiste en ellos).';
+}
+if (hasAgotado){
+  // Renglones sin existencia (0) o sin la cantidad pedida: se dice directo que no hay, SIN escalar a empleado y SIN revelar cuantas unidades hay.
+  _out.instruccion = (_out.instruccion ? _out.instruccion + ' ' : '') +
+    'AVISO: algunos renglones no estan disponibles (' + agotadosNames.concat(sinCantNames).join(', ') + '). Dile DIRECTO que ese producto no esta disponible (agotado) o que no dispones de esa cantidad. PROHIBIDO escalar a un empleado ni usar [PEDIR_AYUDA] por esos renglones, y PROHIBIDO decir cuantas unidades hay: nunca reveles la existencia. El cierre de facturar con un empleado aplica SOLO a los renglones disponibles.';
 }
 return JSON.stringify(_out);

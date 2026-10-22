@@ -112,6 +112,34 @@
     "_origen": "paint_search.test.js: Liliana incident (Floripaint) and 'pintura floripaint clase b'"
   },
   {
+    "codigo_interno": "PIN-008",
+    "descripcion": "PINTURA CAUCHO BEIGE C GAL FLORIPAINT",
+    "precio_venta": 7.0,
+    "existencia": 5,
+    "_origen": "paint_search.test.js: incident 'Pintura de agua color pink Beige' (beige gal in stock)"
+  },
+  {
+    "codigo_interno": "PIN-009",
+    "descripcion": "PINTURA CAUCHO BEIGE C CUNETE FLORIPAINT",
+    "precio_venta": 22.0,
+    "existencia": 2,
+    "_origen": "paint_search.test.js: incident 'Pintura de agua color pink Beige' (beige cunete in stock)"
+  },
+  {
+    "codigo_interno": "PIN-010",
+    "descripcion": "PINTURA CAUCHO AGUAMARINA C GAL FLORIPAINT",
+    "precio_venta": 7.0,
+    "existencia": 4,
+    "_origen": "paint_search.test.js: incident 'Pintura de agua color pink Beige' (aguamarina gal in stock)"
+  },
+  {
+    "codigo_interno": "PIN-011",
+    "descripcion": "PINTURA DE CAUCHO TIPO A EVERMAX C-653 AGUA MARINA",
+    "precio_venta": 17.5,
+    "existencia": 0,
+    "_origen": "paint_search.test.js: incident 'Pintura de agua color pink Beige' (agua marina agotado)"
+  },
+  {
     "codigo_interno": "IMP-001",
     "descripcion": "CEMENTO PLASTICO COVO 1 GAL",
     "precio_venta": 14.5,

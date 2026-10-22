@@ -15,6 +15,7 @@ function tc(s){ return String(s).toLowerCase().split(/\s+/).map(w=>{ if(/\d/.tes
 function norm(t){ return String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 .\/-]/g,' ').replace(/\s+/g,' ').trim(); }
 
 const SIN = {
+  'breque':'breaker','breques':'breaker','breker':'breaker','brekers':'breaker',
   'corrugada':'estriada','corrugado':'estriado','varilla':'cabilla','varillas':'cabilla','hierro':'cabilla','cabillas':'cabilla',
   'simento':'cemento','simanto':'cemento','saco cemento':'cemento','bolsa cemento':'cemento',
   'clavo':'clavos','clavillo':'clavos','tornillo':'tornillos',
@@ -136,6 +137,7 @@ async function run(p_busqueda) {
     'venden', 'vendes', 'tienen', 'tiene', 'hay', 'quiero', 'busco', 'comprar', 'necesito', 'dame', 'trae',
     'cuanto', 'cuesta', 'cuestan', 'vale', 'valen', 'sale', 'salen', 'precio', 'precios', 'costo', 'como',
     'saco', 'sacos', 'bolsa', 'bolsas', 'unidad', 'unidades', 'pieza', 'piezas', 'kilo', 'kilos', 'kg',
+    'instalar', 'instalacion', 'instalarlo', 'instalarla', 'montar', 'colocar',
     'metro', 'metros', 'mts', 'caja', 'cajas', 'galon', 'galones', 'para', 'con', 'del', 'algo', 'vender',
     'tener', 'buscar', 'amigo', 'buenas', 'hola', 'tardes', 'dias', 'noches', 'porfa', 'favor', 'gracias',
     'una', 'uno', 'unas', 'unos', 'donde', 'tiene', 'tienen'

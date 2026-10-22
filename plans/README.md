@@ -20,6 +20,7 @@ conditions, and update your row when done.
 | 008 | Parallelize `hacer_presupuesto` item lookups with `Promise.all` | P2 | M | — | DONE |
 | 009 | Fix CRLF bug in `check_sources_sync.js` guard | P1 | S | — | DONE |
 | 010 | Medir el recall por antigüedad de venta (¿el ranking esconde el stock frío?) | P1 | M | — | TODO |
+| 011 | Resilient guardrails and self-healing recovery system | P1 | M | — | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale)
 

@@ -40,11 +40,18 @@ test('stemColor: neutralizes gender/number and common typos', () => {
   assert.strictEqual(L.stemColor('griss'), 'gris');
   assert.strictEqual(L.stemColor('asul'), 'azul');
   assert.strictEqual(L.stemColor('amariyo'), 'amarill');
+  assert.strictEqual(L.stemColor('pink'), 'rosad');
+  assert.strictEqual(L.stemColor('lila'), 'lila');
+  assert.strictEqual(L.stemColor('beige'), 'beige');
+  assert.strictEqual(L.stemColor('marfil'), 'marfil');
 });
 
 test('expandir: applies synonyms (varilla -> cabilla, paint typos & intents, serchas)', () => {
   assert.strictEqual(L.expandir('varilla 1/2'), 'cabilla 1/2');
   assert.strictEqual(L.expandir('Me da Precio de las serchas?.'), 'me da precio de las cercha .');
+  assert.strictEqual(L.expandir('pintura de agua'), 'pintura caucho');
+  assert.strictEqual(L.expandir('pintura al agua'), 'pintura caucho');
+  assert.strictEqual(L.expandir('pintura base agua'), 'pintura caucho');
   assert.strictEqual(L.expandir('pintura cris para exterior'), 'pintura gris para exterior');
   assert.strictEqual(L.expandir('pintura para exterior'), 'pintura exterior');
   assert.strictEqual(L.expandir('brillo de seda'), 'pintura satinada');
@@ -60,6 +67,13 @@ test('expandir: applies synonyms (varilla -> cabilla, paint typos & intents, ser
   assert.strictEqual(L.expandir('lamina de zinc de canal cuadrado'), 'lamina zinc cuadrada');
   assert.strictEqual(L.expandir('lamina de zinc pintada'), 'lamina zinc prepintada');
   assert.strictEqual(L.expandir('laminas de colores para techo'), 'lamina prepintada para techo');
+  assert.strictEqual(L.expandir('breque de 20'), 'breaker de 20');
+  assert.strictEqual(L.expandir('breques de 20 para instalar un aire'), 'breaker de 20 para instalar un aire');
+});
+
+test('aliasDe: resolves breaker synonyms bidirectionally', () => {
+  assert.deepStrictEqual(L.aliasDe('breque'), ['breaker', 'breque', 'breques', 'breker', 'brekers']);
+  assert.deepStrictEqual(L.aliasDe('breaker'), ['breaker', 'breque', 'breques', 'breker', 'brekers']);
 });
 
 test('nUSD: money formatting', () => {

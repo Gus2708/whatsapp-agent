@@ -59,6 +59,13 @@ async function qualifyProductCandidates({ axios, env, query, candidates, output,
     }
     const kept = probabilities.map((p, i) => ({ p, i })).filter(x => x.p >= 0.5)
       .sort((a, b) => b.p - a.p || a.i - b.i);
+    if (!kept.length && output.atributo_ignorado === true) {
+      // The search matched the right product and flagged (atributo_ignorado) that only a
+      // variant attribute, such as a color, was ignored, with an honest-variants instruction.
+      // Rejecting every candidate for that missing attribute must not erase the answer
+      // and escalate: keep the labeled approximation so the customer sees real options.
+      return output;
+    }
     if (!kept.length) {
       output.productos = [];
       output.encontrados = 0;
@@ -166,6 +173,7 @@ function medPresent(med, nd){
 }
 const SIN = {
   'calibre':'cal','cal.':'cal',
+  'breque':'breaker','breques':'breaker','breker':'breaker','brekers':'breaker',
   'rieles':'tubo herreria','riel':'tubo herreria',
   'lavaplatos':'fregadero','lavaplato':'fregadero','lava platos':'fregadero','lava plato':'fregadero','elegante':'lujo','corrugada':'estriada','corrugado':'estriado','varilla':'cabilla','varillas':'cabilla','cabillas':'cabilla',
   'simento':'cemento','simanto':'cemento','saco de cemento':'cemento','bolsa de cemento':'cemento','saco cemento':'cemento','bolsa cemento':'cemento',
@@ -208,6 +216,10 @@ const SIN = {
   'amariyo':'amarillo',
   'cunete':'cuñete','cunetes':'cuñete','cuñetes':'cuñete','tobo de pintura':'cuñete','balde de pintura':'cuñete',
   'cuartico':'1/4','cuartico de pintura':'1/4',
+  'pintura de agua':'pintura caucho','pinturas de agua':'pintura caucho',
+  'pintura al agua':'pintura caucho','pinturas al agua':'pintura caucho',
+  'pintura base agua':'pintura caucho','pintura base de agua':'pintura caucho',
+  'a base de agua':'caucho','al agua':'caucho',
   'esmalte sintetico':'pintura aceite','pintura sintetica':'pintura aceite',
   'brillo de seda':'pintura satinada','brillo seda':'pintura satinada','seda styl':'pintura satinada',
   'pintura de exterior':'pintura exterior','pintura para exterior':'pintura exterior','pintura de afuera':'pintura exterior','pintura para afuera':'pintura exterior','pintura fachada':'pintura exterior','pintura para fachada':'pintura exterior','pintura intemperie':'pintura exterior',
@@ -222,6 +234,11 @@ const SIN = {
 // Ojo: los breakers se llaman "BREAKER" en el catalogo (no "interruptor termomagnetico"),
 // asi que este alias no arrastra tableros electricos.
 const ALIAS = {
+  'breaker':        ['breaker','breque','breques','breker','brekers'],
+  'breque':         ['breaker','breque','breques','breker','brekers'],
+  'breques':        ['breaker','breque','breques','breker','brekers'],
+  'breker':         ['breaker','breque','breques','breker','brekers'],
+  'brekers':        ['breaker','breque','breques','breker','brekers'],
   'apagador':    ['apagador','interruptor','suiche','switch'],
   'interruptor': ['interruptor','apagador','suiche','switch'],
   'suiche':      ['suiche','switch','interruptor','apagador'],
@@ -300,11 +317,14 @@ const COLOR_STEM = {
   'dorado':'dorad','dorada':'dorad','dorados':'dorad','doradas':'dorad',
   'plateado':'platead','plateada':'platead','plateados':'platead','plateadas':'platead',
   'rosado':'rosad','rosada':'rosad','rosados':'rosad','rosadas':'rosad',
+  'pink':'rosad','pinc':'rosad',
+  'lila':'lila','lilas':'lila',
+  'marfil':'marfil','durazno':'durazno',
   'gris':'gris','grises':'gris','cris':'gris','griss':'gris',
   'verde':'verde','verdes':'verde',
   'azul':'azul','azules':'azul','asul':'azul','asules':'azul',
   'marron':'marron','marrones':'marron',
-  'naranja':'naranja','naranjas':'naranja','beige':'beige','cafe':'cafe',
+  'naranja':'naranja','naranjas':'naranja','beige':'beige','beig':'beige','beis':'beige','veige':'beige','cafe':'cafe',
   'celeste':'celeste','celestes':'celeste'
 };
 function stemColor(w){ return COLOR_STEM[w] || w; }
@@ -355,6 +375,7 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
   s = s.replace(/\b(pinturas?|caucho)\s+b\b/gi, '$1 claseb');
   s = s.replace(/\b(pinturas?|caucho)\s+a\b/gi, '$1 clasea');
   s = s.replace(/\b(pinturas?|caucho)\s+c\b/gi, '$1 clasec');
+  s = s.replace(/\b(pinturas?|esmaltes?)\s+(de\s+|al\s+|a\s+base\s+de\s+|base\s+)?agua\b/gi, '$1 caucho');
   s = s.replace(/\b(de\s+colores?|de\s+color)\b/gi, 'prepintada');
   s = s.replace(/\b(pintadas?|pintados?)\b/gi, 'prepintada');
   s = s.replace(/\b(prepintadas?|prepintados?)\b/gi, 'lamina prepintada');
@@ -599,7 +620,16 @@ const CANONICAL_COLORS = {
   verde: 'verde',
   gris: 'gris',
   marron: 'marron',
-  naranja: 'naranja'
+  naranja: 'naranja',
+  rosad: 'rosado',
+  beige: 'beige',
+  lila: 'lila',
+  morad: 'morado',
+  marfil: 'marfil',
+  durazno: 'durazno',
+  celeste: 'celeste',
+  dorad: 'dorado',
+  platead: 'plateado'
 };
 
 function extractDepartmentAttributes(query, department) {
@@ -1310,6 +1340,7 @@ const IGNORED = new Set([
   'aguante', 'aguanta', 'aguantan', 'aguantar', 'resista', 'resiste', 'resistan', 'soporte', 'soporta', 'soporten', 'dure', 'dura', 'duren',
   'disponible', 'disponibles', 'disponibilidad', 'existencia', 'stock', 'quedan', 'queda',
   'quiero', 'quisiera', 'queria', 'quiere', 'quieres', 'deseo', 'busco', 'comprar', 'necesito', 'dame', 'trae', 'ver', 'saber', 'hacer', 'meter', 'poner', 'echar', 'hechar',
+  'instalar', 'instalacion', 'instalarlo', 'instalarla', 'instalarle', 'montar', 'colocar',
   'puede', 'puedes', 'puedo', 'pueden', 'podria', 'podrias',
   'dijeron', 'dijo', 'dice', 'dicen', 'dime', 'digame', 'decir', 'habia', 'habian', 'llego', 'llegaron', 'llegado', 'pregunta', 'pregunte', 'preguntar', 'preguntarle', 'preguntarles',
   'regala', 'regalas', 'regalame', 'pasame', 'pasa', 'pasas', 'pasan', 'pasar', 'pasarme', 'mandame', 'manda', 'mandas', 'mandar', 'envia', 'enviame', 'enviar', 'mostrar', 'muestrame', 'ensename', 'ensenar', 'dar', 'darme',
@@ -1339,6 +1370,7 @@ const IGNORED = new Set([
 const MODIFIERS = new Set([
   'multifuncional', 'pulgada', 'pulgadas', 'media', 'cuarto', 'octavo', 'metro', 'metros', 'pies', 'pulg', 'mm', 'cm', 'mts',
   'negro', 'negra', 'blanco', 'blanca', 'gris', 'cris', 'griss', 'azul', 'asul', 'rojo', 'roja', 'verde', 'amarillo', 'amarilla',
+  'beige', 'beig', 'beis', 'rosado', 'rosada', 'pink', 'lila', 'morado', 'morada', 'marron', 'naranja', 'marfil', 'durazno',
   'exterior', 'exteriores', 'interior', 'interiores', 'fachada', 'intemperie', 'clase', 'tipo', 'calidad'
 ]);
 
@@ -1511,7 +1543,7 @@ async function relajarDropOne(toks){
     const _sub = toks.filter((_w,_j)=>_j!==_i);
     if (_sub.every(_esMod)) continue; // no busques dejando solo modificadores
     const _r = casanDeVerdad(await ilike(_sub, 60), _sub);
-    if (_r.length>0) return { rows: _r, dropped: toks[_i] };
+    if (_r.length>0) return { rows: _r, dropped: toks[_i], droppedEsModificador: !!_esMod(toks[_i]) };
   }
   return { rows: [], dropped: null };
 }
@@ -1524,10 +1556,11 @@ if (res.length===0 && textLargasSql.length>0) res = casanDeVerdad(await ilike(te
 // La rama del cliente agota su cascada ANTES de mirar el diccionario: primero el AND
 // completo, y si falla, la relajacion drop-one.
 let _dropped = null; // palabra que la relajacion tuvo que ignorar (hay que confesarlo)
+let _droppedEsMod = false; // la palabra ignorada era un modificador/color (variante), no el producto
 let _unicaPalabra = null; // si hubo que reducir la consulta a UNA sola palabra, cual fue
 if (res.length===0){
   const _rel = await relajarDropOne(textLargas);
-  if (_rel.rows.length>0){ res = _rel.rows; _dropped = _rel.dropped; }
+  if (_rel.rows.length>0){ res = _rel.rows; _dropped = _rel.dropped; _droppedEsMod = _rel.droppedEsModificador === true; }
 }
 // UNION CON LA RAMA DEL DICCIONARIO. Cuesta una consulta extra y solo corre cuando el
 // diccionario cambio algo de verdad (medido: 19% de las consultas). No se elige entre una
@@ -1553,7 +1586,16 @@ if (_vocDifiere && textLargasVoc.length>0){
   }
 }
 if (res.length===0 && largas.length>0) res = await ilike(largas, 30);
-if (res.length===0 && largas.length>1) res = await ilike(largas.slice(0,2), 30);
+if (res.length===0 && largas.length>1){
+  const _sub = largas.slice(0, 2);
+  const _r = casanDeVerdad(await ilike(_sub, 30), _sub);
+  if (_r.length > 0){
+    res = _r;
+    if (largas.length > 2){
+      _dropped = textLargas.filter(w => !_sub.includes(w)).join(' ') || largas.slice(2).join(' ');
+    }
+  }
+}
 if (res.length===0){
   // Ultimo recurso lexico: quedarse con UNA sola palabra, probando de la mas LARGA a la mas
   // corta. El orden por longitud parece arbitrario y NO lo es: se midieron dos alternativas
@@ -2194,6 +2236,25 @@ if (_rescate){
   _out.parcial = true;
   _out.instruccion = 'OJO: no encontre nada que combine todo lo que pidio el cliente; estos resultados salen de buscar SOLO la palabra "' + _unicaPalabra + '", ignorando el resto de la consulta. Es la coincidencia mas debil posible. PROHIBIDO presentarlos como si fueran lo que pidio: preguntale con honestidad si alguno le sirve ANTES de cotizar. Si te dice que no, responde SOLO con el token [PEDIR_AYUDA].';
 }
+let _colorMismatch = false;
+let _colorBuscado = null;
+const _queryDept = (typeof _detectedDept !== 'undefined' && _detectedDept) || detectProductDepartment(p_busqueda);
+const _qAttrs = extractDepartmentAttributes(p_busqueda, _queryDept);
+if (_qAttrs.color && unicos && unicos.length > 0) {
+  const _cStem = stemColor(_qAttrs.color);
+  const _hasColor = unicos.some(p => {
+    const nd = norm(p.descripcion);
+    return nd.includes(_qAttrs.color) || nd.includes(_cStem) || aliasDe(_cStem).some(a => nd.includes(a));
+  });
+  if (!_hasColor) {
+    _colorMismatch = true;
+    _colorBuscado = _qAttrs.color;
+  }
+}
+if (_colorMismatch && !_out.instruccion) {
+  _out.parcial = true;
+  _out.instruccion = 'OJO: el cliente pidió color "' + _colorBuscado + '", pero NO tenemos existencia en ese color. Los resultados son de la MISMA categoría pero en OTROS colores. PROHIBIDO presentarlos como si fueran ' + _colorBuscado + ': dile con honestidad que no lo tenemos en ' + _colorBuscado + ' y ofrécele estas variantes preguntándole si alguna le sirve. Si no, responde SOLO con el token [PEDIR_AYUDA].';
+}
 if (unicos && unicos.length > 0 && !_weak && !_out.aclarar && !_rescate) {
   const _compKit = findComplementaryKit(unicos[0].descripcion, _detectedDept);
   if (_compKit) {
@@ -2208,10 +2269,13 @@ if (unicos && unicos.length > 0 && !_weak && !_out.aclarar && !_rescate) {
   }
 }
 Object.assign(_out, searchDecision(_out.aclarar ? 'vague' : _rescate ? 'semantic' : _weak ? 'weak' : medMismatch ? 'measure_mismatch' :
-  medParcial ? 'multiple_measures' : _fuzzy ? 'approximate' : _dropped ? 'relaxed' :
+  medParcial ? 'multiple_measures' : _fuzzy ? 'approximate' : _colorMismatch ? 'relaxed' : _dropped ? 'relaxed' :
   _unicaPalabra ? 'single_word' : productos.length ? 'exact' : 'missing'));
+// Si lo unico que no calza es un color/modificador, el calificador no debe vaciar el resultado.
+_out.atributo_ignorado = !!(_colorMismatch || (_dropped && _droppedEsMod));
 await qualifyProductCandidates({ axios, env: typeof $env !== 'undefined' ? $env : process.env,
   query: p_busqueda, candidates: unicos, output: _out,
   eligible: !_out.aclarar && !_weak && !medMismatch && !medParcial &&
-    !!(_rescate || _fuzzy || _dropped || _unicaPalabra) });
+    !!(_rescate || _fuzzy || _colorMismatch || _dropped || _unicaPalabra) });
+delete _out.atributo_ignorado;
 return JSON.stringify(_out);

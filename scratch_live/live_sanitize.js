@@ -11,6 +11,7 @@ function searchDecision(status) {
 
 function searchGuard(steps) {
   const clarify = '¿Qué producto necesitas exactamente? Indícame el nombre y la medida, por favor.';
+  if (steps === undefined || steps === null) return null;
   if (!Array.isArray(steps) || steps.length > 100) return clarify;
   const latest = new Map();
   for (const [index, step] of steps.entries()) {
@@ -70,8 +71,8 @@ for (const item of items) {
   if (!context) {
     try { context = $('Prepare Conversation Context').first().json.conversation_context; } catch (_) {}
   }
-  // With returnIntermediateSteps enabled, tool-free turns return an empty array.
-  // A missing trace is an unsupported runtime contract, not proof of no tool calls.
+  // In n8n, returnIntermediateSteps omits intermediateSteps on tool-free turns (undefined).
+  // searchGuard treats undefined as tool-free, returning null so the output is preserved.
   const guarded = context?.action === 'respond'
     ? context.reply
     : context?.action === 'handoff'

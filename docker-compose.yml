@@ -53,6 +53,12 @@ services:
       # cuando un empleado le escribe al cliente desde el mismo WhatsApp (handoff humano).
       # El bot ignora sus propios salientes vía la tabla mensajes_bot (nodo Detectar Handoff Empleado).
       - WHATSAPP_DOWNLOAD_MEDIA=true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    mem_limit: 1200m
     volumes:
       - waha_session_storage:/app/.sessions
 
@@ -127,10 +133,10 @@ services:
       - OPENAI_API_BASE=${OPENAI_API_BASE:-}
       - N8N_DEFAULT_PRODUCTION_WORKFLOW_ACTIVE=true
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
-      - NODE_OPTIONS=--max-old-space-size=4096
+      - NODE_OPTIONS=--max-old-space-size=1536
       - EXECUTIONS_DATA_PRUNE=true
-      - EXECUTIONS_DATA_MAX_AGE=72
-      - EXECUTIONS_DATA_PRUNE_MAX_COUNT=2000
+      - EXECUTIONS_DATA_MAX_AGE=48
+      - EXECUTIONS_DATA_PRUNE_MAX_COUNT=500
       # DB_SQLITE_VACUUM_ON_STARTUP se desactivó el 2026-08-18: con la base ya en 1.5 GB
       # (más un WAL huérfano de 1.6 GB tras un crash) el VACUUM de arranque nunca terminaba.
       # n8n se quedaba 13+ min bloqueado sin montar el editor ni los webhooks, así que WAHA
@@ -138,6 +144,12 @@ services:
       # El prune incremental de arriba mantiene la base a raya sin bloquear el arranque.
       # Si hace falta compactar, correr el VACUUM a mano con n8n detenido, no al arrancar.
       # - DB_SQLITE_VACUUM_ON_STARTUP=true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    mem_limit: 2048m
     volumes:
       - n8n_data:/home/node/.n8n
       - /var/run/docker.sock:/var/run/docker.sock

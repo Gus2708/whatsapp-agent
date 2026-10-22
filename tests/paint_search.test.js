@@ -80,3 +80,27 @@ test('Floripaint Class B: pintura floripaint clase b', async () => {
   assert.strictEqual(res.encontrados > 0, true);
   assert.strictEqual(res.productos.some(p => /Floripaint/i.test(p.nombre) && /\bB\b/i.test(p.nombre)), true);
 });
+
+test('Water-based paint: Pintura de agua color Beige maps to pintura caucho', async () => {
+  const res = await buscar('Pintura de agua color Beige');
+  assert.strictEqual(res.encontrados > 0, true);
+  assert.strictEqual(res.action, 'show_results');
+  assert.strictEqual(res.match_status, 'exact');
+  assert.strictEqual(res.requires_confirmation, false);
+  assert.strictEqual(res.productos.every(p => /Beige/i.test(p.nombre)), true);
+});
+
+test('Pink Beige incident: Pintura de agua color pink Beige never hallucinates Agua Marina', async () => {
+  const res = await buscar('Pintura de agua color pink Beige');
+  assert.strictEqual(res.encontrados > 0, true);
+  // Never return Agua Marina (which was the bug)
+  assert.strictEqual(res.productos.some(p => /Agua Marina/i.test(p.nombre)), false, 'Must not return Agua Marina');
+  // Must return Beige alternatives
+  assert.strictEqual(res.productos.every(p => /Beige/i.test(p.nombre)), true, 'Should find Beige paint');
+  // Must enforce confirmation because an attribute (pink/rosad) was dropped
+  assert.strictEqual(res.action, 'confirm', 'Must require confirmation when dropping color attribute');
+  assert.strictEqual(res.match_status, 'relaxed');
+  assert.strictEqual(res.requires_confirmation, true);
+  assert.strictEqual(res.parcial, true);
+});
+

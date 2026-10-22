@@ -59,7 +59,9 @@ test('guard uses the last result per query but retains unresolved other searches
   assert.equal(searchGuard(steps), '[PEDIR_AYUDA]');
 });
 test('malformed, oversized and unknown search contracts fail closed', () => {
-  assert.match(searchGuard(undefined), /producto/, 'missing runtime observations cannot silently disable the guard');
+  assert.equal(searchGuard(undefined), null, 'tool-free turns omit intermediate steps in n8n runtime');
+  assert.equal(searchGuard(null), null, 'null steps are treated as tool-free turns');
+  assert.match(searchGuard('invalid-steps'), /producto/, 'non-array non-empty step shapes fail closed');
   assert.match(searchGuard([{ tool: 'buscar_productos', observation: '{}' }]), /producto/, 'unknown runtime step shapes fail closed');
   for (const observation of ['oops', 'x'.repeat(20001), JSON.stringify({ decision_version: 99 }),
     JSON.stringify({ ...searchDecision('exact'), action: 'invented' })]) {

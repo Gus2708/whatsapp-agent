@@ -181,3 +181,22 @@ test('generated workflow executes qualification against the catalog double', asy
   assert.equal(result.encontrados, 1);
   assert.notEqual(result.match_status, 'exact');
 });
+
+test('rejecting every relaxed candidate keeps the honest approximation instead of handing off', async () => {
+  const mk = (status, ignored) => ({ encontrados: 2, atributo_ignorado: ignored, productos: [{ nombre: 'Zinc roja' }, { nombre: 'Zinc sin color' }],
+    match_status: status, action: 'confirm', parcial: true,
+    instruccion: 'Show the variants and say the requested color does not exist' });
+  const axios = { post: async () => ({ data: { answers: {
+    candidate_0: { probability: 0.04 }, candidate_1: { probability: 0.27 } } } }) };
+  const candidates = [{ codigo_interno: 'A', descripcion: 'ZINC ROJA' }, { codigo_interno: 'B', descripcion: 'ZINC' }];
+  const relaxed = mk('relaxed', true);
+  await qualifyProductCandidates({ axios, env, query: 'zinc azul', candidates, output: relaxed, eligible: true });
+  assert.equal(relaxed.encontrados, 2);
+  assert.equal(relaxed.action, 'confirm');
+  assert.equal(relaxed.match_status, 'relaxed');
+  assert.match(relaxed.instruccion, /requested color does not exist/);
+  const semantic = mk('relaxed', false);
+  await qualifyProductCandidates({ axios, env, query: 'zinc azul', candidates, output: semantic, eligible: true });
+  assert.equal(semantic.encontrados, 0);
+  assert.equal(semantic.action, 'handoff');
+});

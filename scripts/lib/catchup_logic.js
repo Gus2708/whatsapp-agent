@@ -146,6 +146,21 @@ function evaluateCandidates({
   const minAllowedTimeMs = nowMs - (maxAgeHours * 3600 * 1000);
   const candidatesMap = new Map();
 
+  // Último mensaje SALIENTE (fromMe) por chat según WAHA. Si un empleado respondió
+  // manualmente desde el teléfono de la tienda, el bot no lo registra en mensajes_bot,
+  // y sin esto el mensaje del cliente parecería pendiente (falso positivo).
+  const humanReplyMap = new Map();
+  for (const c of wahaChats) {
+    const lm = c && c.lastMessage;
+    if (!c || !c.id || !lm || !lm.fromMe) continue;
+    let ts = Number(lm.timestamp) || 0;
+    if (ts > 1e12) ts = Math.floor(ts / 1000);
+    if (ts <= 0) continue;
+    for (const a of resolveAliases(c.id, aliasMap)) {
+      humanReplyMap.set(a, Math.max(humanReplyMap.get(a) || 0, ts * 1000));
+    }
+  }
+
   // Función interna para registrar/actualizar candidato unificado por grupo de alias
   function considerCandidate({ rawChatId, text, clientTimeMs, source }) {
     if (!validateJid(rawChatId).valid) return;
@@ -160,7 +175,11 @@ function evaluateCandidates({
     if (isNaN(clientTimeMs) || clientTimeMs < minAllowedTimeMs) return;
 
     const botMsg = getLatestBotMsgForAliases(aliases, botMsgsMap);
-    const botTimeMs = botMsg ? new Date(botMsg.created_at).getTime() : 0;
+    let botTimeMs = botMsg ? new Date(botMsg.created_at).getTime() : 0;
+    // Una respuesta humana (fromMe) posterior al mensaje del cliente cuenta como atendido.
+    for (const a of aliases) {
+      botTimeMs = Math.max(botTimeMs, humanReplyMap.get(a) || 0);
+    }
 
     if (isUnanswered({ clientTimeMs, botTimeMs })) {
       // Clave canónica unificada: preferir teléfono @c.us si existe en alias, o rawChatId

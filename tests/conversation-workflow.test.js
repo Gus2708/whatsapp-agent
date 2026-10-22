@@ -62,10 +62,11 @@ test('sanitizer consumes actual tool observations and pre-agent clarification wi
     return result;
   };
   assert.match((await run('clarify', [])).output, /producto/);
-  assert.match((await run('search', undefined)).output, /producto/);
-  assert.match((await run('disabled', undefined)).output, /producto/, 'missing trace is an unsupported runtime contract');
+  assert.equal((await run('disabled', undefined, '¡Hola! ¿En qué te ayudo?')).output, '¡Hola! ¿En qué te ayudo?');
   assert.equal((await run('disabled', [], '¡Hola! ¿En qué te ayudo?')).output, '¡Hola! ¿En qué te ayudo?');
+  assert.equal((await run('pass', undefined, 'Abrimos de lunes a sábado.')).output, 'Abrimos de lunes a sábado.');
   assert.equal((await run('pass', [], 'Abrimos de lunes a sábado.')).output, 'Abrimos de lunes a sábado.');
+  assert.match((await run('disabled', 'invalid-steps')).output, /producto/, 'invalid non-array step shape fails closed');
   const guarded = await run('search', [{ action: { tool: 'buscar_productos' }, observation }]);
   assert.doesNotMatch(guarded.output, /10\$/);
   assert.equal(guarded.intermediateSteps, undefined);

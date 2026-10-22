@@ -40,10 +40,24 @@ const DELAY_BETWEEN_CHATS_MS = 8000;
 const LOCK_TIMEOUT_MS = 10 * 60 * 1000; // 10 min
 const RECENT_COOLDOWN_MS = 15 * 60 * 1000; // 15 min
 
+function rotateLogIfNeeded(filePath, maxBytes = 5 * 1024 * 1024) {
+  try {
+    if (fs.existsSync(filePath)) {
+      const stats = fs.statSync(filePath);
+      if (stats.size > maxBytes) {
+        const backup = `${filePath}.1`;
+        if (fs.existsSync(backup)) fs.unlinkSync(backup);
+        fs.renameSync(filePath, backup);
+      }
+    }
+  } catch (e) {}
+}
+
 function log(msg) {
   const timestamp = new Date().toLocaleString('es-VE', { timeZone: 'America/Caracas' });
   const line = `[${timestamp}] [CATCHUP] ${msg}\n`;
   try {
+    rotateLogIfNeeded(LOG_FILE);
     fs.appendFileSync(LOG_FILE, line, 'utf8');
   } catch (e) {}
   console.log(line.trim());
@@ -214,9 +228,9 @@ async function fetchCandidatesData(maxAgeHours) {
 
   let wahaChats = [];
   try {
-    const res = await fetch(`${WAHA_BASE}/api/default/chats/overview?limit=50`, {
+    const res = await fetch(`${WAHA_BASE}/api/default/chats/overview?limit=25`, {
       headers: { 'X-Api-Key': WAHA_API_KEY },
-      signal: AbortSignal.timeout(30000)
+      signal: AbortSignal.timeout(15000)
     });
     if (res.ok) wahaChats = await res.json();
   } catch (e) {
@@ -265,6 +279,28 @@ async function fetchCandidatesData(maxAgeHours) {
   }
 
   return { supabaseMsgs, wahaChats, sessionsMap, botMsgsMap, aliasMap };
+}
+
+/**
+ * Red de seguridad: consulta los últimos mensajes reales del chat en WAHA y devuelve
+ * true si ya hay un saliente (empleado o bot) posterior al mensaje del cliente.
+ * Cubre chats fuera del top del overview. Si la consulta falla, devuelve false.
+ */
+async function hasOutgoingAfter(chatId, clientTsSec) {
+  try {
+    const url = `${WAHA_BASE}/api/default/chats/${encodeURIComponent(chatId)}/messages?limit=10&downloadMedia=false`;
+    const res = await fetch(url, { headers: { 'X-Api-Key': WAHA_API_KEY }, signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return false;
+    const msgs = await res.json();
+    if (!Array.isArray(msgs)) return false;
+    return msgs.some(m => {
+      let ts = Number(m.timestamp) || 0;
+      if (ts > 1e12) ts = Math.floor(ts / 1000);
+      return m.fromMe === true && ts >= clientTsSec;
+    });
+  } catch (e) {
+    return false;
+  }
 }
 
 async function main() {
@@ -327,6 +363,13 @@ async function main() {
       if (dryRun) {
         injectedCount++;
         log(`[DRY-RUN] Se inyectaría catchup a ${masked}`);
+        continue;
+      }
+
+      if (await hasOutgoingAfter(item.chatId, item.timestamp)) {
+        log(`Omitido ${masked}: ya existe una respuesta saliente posterior al mensaje del cliente.`);
+        state.processed[item.chatId] = { injectedAt: Date.now(), timestamp: item.timestamp, text: item.text.slice(0, 50) };
+        saveState(state);
         continue;
       }
 
