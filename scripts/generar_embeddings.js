@@ -1,11 +1,11 @@
-// Embebe el catálogo con OpenAI (text-embedding-3-small) hacia productos_embedding.
+// Embebe el catálogo con text-embedding-3-small (vía OpenRouter) hacia productos_embedding.
 // Incremental por hash: solo re-embebe lo nuevo o lo que cambió de descripción.
 //
 //   node scripts/generar_embeddings.js          # incremental
 //   node scripts/generar_embeddings.js --full   # re-embebe TODO
 //   node scripts/generar_embeddings.js --dry    # solo dice qué haría y cuánto costaría
 //
-// Requiere OPENAI_API_KEY en .env. Costo real: los 7.565 productos son ~76k tokens
+// Requiere OPENROUTER_API_KEY en .env. Costo real: los 7.565 productos son ~76k tokens
 // = $0.0015 a $0.02/M. Cada corrida incremental posterior cuesta céntimos.
 const fs = require('fs');
 const path = require('path');
@@ -20,11 +20,11 @@ const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || 
 const SB = pick('SUPABASE_URL') || pick('SUPABASE_URL');
 const ANON = pick('SUPABASE_ANON_KEY');
 // .env manda, pero se acepta la variable de entorno para probar sin tocar el archivo
-const OAI = pick('OPENAI_API_KEY') || (process.env.OPENAI_API_KEY || '').trim();
 const OR = pick('OPENROUTER_API_KEY') || (process.env.OPENROUTER_API_KEY || '').trim();
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
 
-const MODELO = 'text-embedding-3-small';
+const MODELO = 'text-embedding-3-small';            // se guarda en productos_embedding.modelo
+const MODELO_OR = 'openai/text-embedding-3-small';  // id del mismo modelo en OpenRouter
 const DIMS = 1536;
 const LOTE = 256;          // inputs por llamada a OpenAI (su limite es mayor, vamos conservadores)
 // El lote de ESCRITURA es mucho mas chico y va aparte a proposito: un vector de 1536
@@ -82,52 +82,21 @@ function textoDe(p) {
 }
 const hashDe = t => crypto.createHash('md5').update(t).digest('hex');
 
-let proveedorActivo = OAI ? 'OpenAI' : 'OpenRouter';
+// Todo va por OpenRouter, igual que Luna y la Edge Function embed-productos: una sola
+// factura. Es el mismo modelo de OpenAI por debajo, así que los vectores son compatibles.
 async function embeber(textos) {
-  if (OAI && proveedorActivo === 'OpenAI') {
-    try {
-      const r = await fetch('https://api.openai.com/v1/embeddings', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${OAI}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: MODELO, input: textos, dimensions: DIMS }),
-      });
-      const j = await r.json();
-      if (r.ok && !j.error) {
-        return { vectores: j.data.map(d => d.embedding), tokens: j.usage.total_tokens };
-      }
-      const esGeo = r.status === 403 && /country|region|territory/i.test(JSON.stringify(j));
-      if (OR && (esGeo || r.status >= 400)) {
-        console.log(`\n  \x1b[38;2;224;175;104m▲\x1b[0m OpenAI no disponible (${esGeo ? 'bloqueo geográfico' : `HTTP ${r.status}`}). Conmutando automáticamente a OpenRouter...`);
-        proveedorActivo = 'OpenRouter';
-      } else {
-        throw new Error(`OpenAI ${r.status}: ${JSON.stringify(j.error || j).slice(0, 300)}`);
-      }
-    } catch (err) {
-      if (OR) {
-        console.log(`\n  \x1b[38;2;224;175;104m▲\x1b[0m OpenAI error: ${err.message}. Conmutando automáticamente a OpenRouter...`);
-        proveedorActivo = 'OpenRouter';
-      } else {
-        throw err;
-      }
-    }
-  }
-
-  if (OR && proveedorActivo === 'OpenRouter') {
-    const r = await fetch('https://openrouter.ai/api/v1/embeddings', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${OR}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: MODELO, input: textos, dimensions: DIMS }),
-    });
-    const j = await r.json();
-    if (!r.ok || j.error) throw new Error(`OpenRouter ${r.status}: ${JSON.stringify(j.error || j).slice(0, 300)}`);
-    return { vectores: j.data.map(d => d.embedding), tokens: (j.usage && j.usage.total_tokens) || (textos.length * 25) };
-  }
-
-  throw new Error('No hay proveedor de embeddings funcional (falta OPENAI_API_KEY u OPENROUTER_API_KEY)');
+  const r = await fetch('https://openrouter.ai/api/v1/embeddings', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${OR}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: MODELO_OR, input: textos, dimensions: DIMS }),
+  });
+  const j = await r.json();
+  if (!r.ok || j.error) throw new Error(`OpenRouter ${r.status}: ${JSON.stringify(j.error || j).slice(0, 300)}`);
+  return { vectores: j.data.map(d => d.embedding), tokens: (j.usage && j.usage.total_tokens) || (textos.length * 25) };
 }
 
 (async () => {
-  if (!OAI && !OR) throw new Error('falta OPENAI_API_KEY u OPENROUTER_API_KEY en .env');
+  if (!OR) throw new Error('falta OPENROUTER_API_KEY en .env');
   if (!ANON) throw new Error('falta SUPABASE_ANON_KEY en .env');
 
   const c = {
@@ -213,7 +182,7 @@ async function embeber(textos) {
     console.log('      ' + c.cyan('create index idx_productos_embedding_hnsw on productos_embedding'));
     console.log('      ' + c.cyan('  using hnsw (embedding extensions.vector_cosine_ops);\n'));
   }
-  if (DRY) { console.log('\n ' + c.darkGray('--dry: no se llamó a OpenAI ni se escribió nada.') + '\n'); return; }
+  if (DRY) { console.log('\n ' + c.darkGray('--dry: no se llamó a OpenRouter ni se escribió nada.') + '\n'); return; }
 
   let tokens = 0, escritos = 0;
   const P = progreso(pendientes.length, { etiqueta: `embebiendo` });

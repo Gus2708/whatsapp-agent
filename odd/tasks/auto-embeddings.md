@@ -50,6 +50,8 @@ Pieces:
       Pre-existing drift found (not caused by this feature): 7198/7935 stored hashes no
       longer match the manual script's text, almost all because catalogo_vocabulario
       changed after the last full embed. Fix = run the manual script with --rehash.
+      2026-10-22 drift fixed: manual script now OpenRouter-only; HNSW dropped, ran
+      `--rehash` (7,198 products, $0.0139, 20m47s), HNSW recreated; dry-run now reports 0.
       Earlier blocker (resolved): OPENROUTER_API_KEY Edge Function secret.
       2026-10-22: embeddings switched to OpenRouter only (single bill with Luna),
       model id `openai/text-embedding-3-small`; deployed v3, verified it answers
