@@ -376,6 +376,14 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
   s = s.replace(/\b(pinturas?|caucho)\s+a\b/gi, '$1 clasea');
   s = s.replace(/\b(pinturas?|caucho)\s+c\b/gi, '$1 clasec');
   s = s.replace(/\b(pinturas?|esmaltes?)\s+(de\s+|al\s+|a\s+base\s+de\s+|base\s+)?agua\b/gi, '$1 caucho');
+  if (/\b(pinturas?|esmaltes?|caucho|oleo|satinad\w*)\b/i.test(s)) {
+    s = s.replace(/\b(?:de\s+)?(?:4|3\.78|3\.8)\s*(?:litros?|lts?|l\b)/gi, 'galon');
+    s = s.replace(/\b(?:de\s+)?1\s*(?:litro|lt|l\b)/gi, 'cuarto');
+    s = s.replace(/\b(?:de\s+)?(?:16|19|20)\s*(?:litros?|lts?|l\b)/gi, 'cunete');
+  }
+  s = s.replace(/\b(?:4|3\.78|3\.8)\s*(?:litros?|lts?|l\b)\s+(?:de\s+)?(pinturas?|esmaltes?|caucho|oleo|satinad\w*)\b/gi, '$1 galon');
+  s = s.replace(/\b1\s*(?:litro|lt|l\b)\s+(?:de\s+)?(pinturas?|esmaltes?|caucho|oleo|satinad\w*)\b/gi, '$1 cuarto');
+  s = s.replace(/\b(?:16|19|20)\s*(?:litros?|lts?|l\b)\s+(?:de\s+)?(pinturas?|esmaltes?|caucho|oleo|satinad\w*)\b/gi, '$1 cunete');
   s = s.replace(/\b(de\s+colores?|de\s+color)\b/gi, 'prepintada');
   s = s.replace(/\b(pintadas?|pintados?)\b/gi, 'prepintada');
   s = s.replace(/\b(prepintadas?|prepintados?)\b/gi, 'lamina prepintada');
@@ -1496,6 +1504,20 @@ const NO_VENDIDO_JSON = () => JSON.stringify({ ...searchDecision('not_sold'), en
 // producto concreto para una consulta asi, ese hallazgo es mas fresco que la marca negativa.
 if (aprBoost.length===0 && await esNoVendido()) return NO_VENDIDO_JSON();
 
+const _npb_arena = norm(_pb);
+const _isArenaQuery = /\barena\b/.test(_npb_arena);
+const _hasRoja = /\b(roja|rojo|roj)\b/.test(_npb_arena);
+const _hasBlanca = /\b(blanca|blanco|blanc|lavada)\b/.test(_npb_arena);
+if (_isArenaQuery && _hasRoja && !_hasBlanca) {
+  return JSON.stringify({
+    ...searchDecision('not_sold'),
+    encontrados: 0,
+    no_vendido: true,
+    instruccion: 'En El Serrucho NO vendemos ni manejamos arena roja. Dile al cliente con honestidad y amabilidad que no disponemos de arena roja y que las arenas que tenemos en el catálogo (Arena Fina y Arena Gruesa) NO son arena roja. Pregúntale si para su obra le sirve arena fina o arena gruesa de construcción.',
+    mensaje: 'No vendemos arena roja.'
+  });
+}
+
 const granelIntent = /\b(por|al|x|cada|el|un|1)\s*(metro|metros|mt|mts)\b/.test(norm(_pb)) || /\bmetros?\s+de\b/.test(norm(_pb));
 const rolloIntent = /\b(rollos?)\b/.test(norm(p_busqueda||'')); // "rollo de cable" -> rollo completo, no por metro
 
@@ -1533,7 +1555,8 @@ function casanDeVerdad(rows, tokens){
 // primera tanda con resultados y que palabra hubo que ignorar (hay que confesarlo).
 async function relajarDropOne(toks){
   if (!(toks.length>=2 && toks.length<=6)) return { rows: [], dropped: null };
-  const _esMod = w => MODIFIERS.has(w) || COLOR_STEM[w] || stemColor(w)!==w;
+  const _COLOR_ROOTS = new Set(Object.values(COLOR_STEM));
+  const _esMod = w => MODIFIERS.has(w) || COLOR_STEM[w] || _COLOR_ROOTS.has(w) || stemColor(w)!==w;
   // La PRIMERA palabra de contenido es la categoria del producto; soltarla devuelve
   // cualquier cosa que comparta el adjetivo ("tornillos galvanizados" -> Bushing Galvanizado).
   // Orden de sacrificio: modificadores -> palabras posteriores mas cortas -> nunca la cabeza.
@@ -1869,6 +1892,8 @@ for(const p of res){ if(!seen.has(p.codigo_interno)){ seen.add(p.codigo_interno)
 { const nbq = norm(_pb); const accesorioFregadero = /\b(desague|l{1,3}ave|grifo|tapa|sifon|tapon|tornillo|herraje|balancin)\b/; if (qTokens.includes('fregadero') && !accesorioFregadero.test(nbq)) { const principal = unicos.filter(p => !accesorioFregadero.test(norm(p.descripcion))); if (principal.length>0){ unicos.length=0; for(const x of principal) unicos.push(x); } } }
 
 // Regla negocio PINTURA: clases (A, B, C), acabados (caucho, aceite/esmalte, satinada, impermeabilizante, spray), uso (exterior, interior), color y presentación (cuñete, galón, 1/4)
+let _isPaintNoColor = false;
+let _coloresPinturaStock = [];
 {
   const nbq = norm(_pb);
   const isPaint = /\b(pinturas?|esmalte|esmaltes|satinad\w*|caucho|oleo|anticorrosiv\w*|sellafill|imperflex|impermeabilizante|spray|aerosol)\b/.test(nbq) || qTokens.includes('pintura');
@@ -1883,9 +1908,9 @@ for(const p of res){ if(!seen.has(p.codigo_interno)){ seen.add(p.codigo_interno)
     const wantSatinada = /\b(satinad\w*|brillo\s*de?\s*seda|seda\s*styl)\b/.test(nbq);
     const wantImpermeabilizante = /\b(impermeabiliz\w*|sellafill|imperflex|para\s*goteras?|filtraci\w*)\b/.test(nbq);
     const wantSpray = /\b(spray|aerosol|en\s*lata)\b/.test(nbq);
-    const wantCunete = /\b(cu[nñ]etes?|4\s*gl|4\s*gal\w*|5\s*gl|5\s*gal\w*|tobo|balde)\b/.test(nbq);
-    const wantCuarto = /\b(1\/4|cuartico|cuarto)\b/.test(nbq);
-    const wantGalon = /\b(galon|galones|x\s*galon|por\s*galon)\b/.test(nbq) && !wantCunete && !wantCuarto;
+    const wantCunete = /\b(cu[nñ]etes?|4\s*gl|4\s*gal\w*|5\s*gl|5\s*gal\w*|tobo|balde|16\s*l|20\s*l|16\s*litros?|20\s*litros?)\b/.test(nbq);
+    const wantCuarto = /\b(1\/4|cuartico|cuarto|1\s*l\b|1\s*litro)\b/.test(nbq);
+    const wantGalon = /\b(galon|galones|x\s*galon|por\s*galon|4\s*l\b|4\s*litros?|4\s*lts?|3\.8\s*l)\b/.test(nbq) && !wantCunete && !wantCuarto;
 
     const _esA = d => /\bCLASE\s+A\b|\bTIPO\s+A\b|\bA\s+GAL\b|\bA\s+GALON\b|\bA\s+X\s+GALON\b|SUN\s+DECO|DELUXE\s+A|\bEVERY\b.*\bA\b|\bEVERCRIL\b.*\bA\b|\bEVERMAX\b.*\bA\b|PREMIUM.*FLORIPAINT/i.test(d) && !/\bCLASE\s+[BC]\b|\bTIPO\s+[BC]\b/i.test(d);
     const _esB = d => /\bCLASE\s+B\b|\bTIPO\s+B\b|\bB\s+GAL\b|\bB\s+GALON\b|\bB\s+X\s+GALON\b|MAR\s+DECO|VINILEVERY|KOLOR\s*FLEX.*(?:\bB\b|CONC\.B)|INVERCOLOR.*TIPO\s*B|INVECOLOR.*TIPO\s*B|\bEVERY\b.*\bB\b/i.test(d) && !/\bCLASE\s+[AC]\b|\bTIPO\s+[AC]\b/i.test(d);
@@ -1914,6 +1939,7 @@ for(const p of res){ if(!seen.has(p.codigo_interno)){ seen.add(p.codigo_interno)
     ];
     let qColor = null;
     for (const cp of _colorP) { if (cp.re.test(nbq)) { qColor = cp.r; break; } }
+
 
     const _matchColorDesc = (desc, cr) => {
       const nd = norm(desc);
@@ -1990,6 +2016,31 @@ for(const p of res){ if(!seen.has(p.codigo_interno)){ seen.add(p.codigo_interno)
     if (pf.length > 0) {
       unicos.length = 0;
       for (const x of pf) unicos.push(x);
+    }
+
+    if (!qColor) {
+      _isPaintNoColor = true;
+      const _colorNames = [
+        { re: /\b(blanco|blanca|hueso|ostra|nieve|almendra)\b/i, name: 'blanco' },
+        { re: /\b(marfil|beige|crema|arena)\b/i, name: 'beige/marfil' },
+        { re: /\b(gris|plomo|concreto)\b/i, name: 'gris' },
+        { re: /\b(azul|azules|glacial|marino|cielo|turquesa|milano|bahia|profundo)\b/i, name: 'azul' },
+        { re: /\b(verde|verdes|manzana|menta|pistacho|primavera|prado|esmeralda|oliva)\b/i, name: 'verde' },
+        { re: /\b(amarillo|amarilla|girasol|mostaza|ocre|canario)\b/i, name: 'amarillo' },
+        { re: /\b(rojo|roja|colonial|teja|terracota|ladrillo|vinotinto)\b/i, name: 'rojo/terracota' },
+        { re: /\b(rosado|rosada|rosa|coral|salmon|durazno|melon|melocoton)\b/i, name: 'rosado/durazno' },
+        { re: /\b(morado|morada|violeta|lila|fucsia|magenta|orquidea)\b/i, name: 'morado/lila' },
+        { re: /\b(aguamarina|agua marina|celeste)\b/i, name: 'aguamarina/celeste' }
+      ];
+      const setColores = new Set();
+      for (const p of pf) {
+        if (esGranel(p.descripcion) || Number(p.existencia) > 0) {
+          for (const cn of _colorNames) {
+            if (cn.re.test(p.descripcion)) { setColores.add(cn.name); break; }
+          }
+        }
+      }
+      _coloresPinturaStock = Array.from(setColores);
     }
   }
 }
@@ -2178,6 +2229,28 @@ unicos.sort((a,b)=>{
   return (vMap[b.codigo_interno]||0)-(vMap[a.codigo_interno]||0);
 });
 
+if (_isPaintNoColor && unicos.length > 0) {
+  const _esA = d => /\bCLASE\s+A\b|\bTIPO\s+A\b|\bA\s+GAL\b|\bA\s+GALON\b|\bA\s+X\s+GALON\b|SUN\s+DECO|DELUXE\s+A|\bEVERY\b.*\bA\b|\bEVERCRIL\b.*\bA\b|\bEVERMAX\b.*\bA\b|PREMIUM.*FLORIPAINT/i.test(d) && !/\bCLASE\s+[BC]\b|\bTIPO\s+[BC]\b/i.test(d);
+  const _esB = d => /\bCLASE\s+B\b|\bTIPO\s+B\b|\bB\s+GAL\b|\bB\s+GALON\b|\bB\s+X\s+GALON\b|MAR\s+DECO|VINILEVERY|KOLOR\s*FLEX.*(?:\bB\b|CONC\.B)|INVERCOLOR.*TIPO\s*B|INVECOLOR.*TIPO\s*B|\bEVERY\b.*\bB\b/i.test(d) && !/\bCLASE\s+[AC]\b|\bTIPO\s+[AC]\b/i.test(d);
+  const _esC = d => /\bCLASE\s+C\b|\bTIPO\s+C\b|\bC\s+GAL\b|\bC\s+GALON\b|\bC\s+X\s+GALON\b|RIO\s+DECO|RIO\s+BLANCO|COLOR\s+PLUS.*TIPO\s*C|EVERAMA|EVERY.*C300|EVERY.*C-300|\bEVERY\b.*\bC\b/i.test(d) && !/\bCLASE\s+[AB]\b|\bTIPO\s+[AB]\b/i.test(d);
+  const matchBlanco = d => /\b(blanco|blanca)\b/i.test(d);
+  const findBest = (matcher) => {
+    const subset = unicos.filter(p => matcher(p.descripcion));
+    return subset.find(p => matchBlanco(p.descripcion) && (esGranel(p.descripcion) || Number(p.existencia) > 0)) ||
+           subset.find(p => esGranel(p.descripcion) || Number(p.existencia) > 0) ||
+           subset[0];
+  };
+  const topC = findBest(_esC);
+  const topB = findBest(_esB);
+  const topA = findBest(_esA);
+  const rep = [topC, topB, topA].filter(Boolean);
+  if (rep.length > 1) {
+    const rest = unicos.filter(p => !rep.includes(p));
+    unicos.length = 0;
+    for (const x of [...rep, ...rest]) unicos.push(x);
+  }
+}
+
 const tasa = await getTasa();
 const RECARGO = await getRecargo();
 const productos = unicos.slice(0,4).map(p=>{
@@ -2271,6 +2344,13 @@ if (unicos && unicos.length > 0 && !_weak && !_out.aclarar && !_rescate) {
 Object.assign(_out, searchDecision(_out.aclarar ? 'vague' : _rescate ? 'semantic' : _weak ? 'weak' : medMismatch ? 'measure_mismatch' :
   medParcial ? 'multiple_measures' : _fuzzy ? 'approximate' : _colorMismatch ? 'relaxed' : _dropped ? 'relaxed' :
   _unicaPalabra ? 'single_word' : productos.length ? 'exact' : 'missing'));
+if (_isPaintNoColor && unicos.length > 0) {
+  _out.consulta_generica_pintura = true;
+  if (_coloresPinturaStock && _coloresPinturaStock.length > 0) {
+    _out.colores_disponibles = _coloresPinturaStock.slice(0, 8);
+    _out.instruccion = 'El cliente consultó por pintura pero NO especificó color. Muestra las opciones principales según su clase/calidad (Clase C económica, Clase B intermedia, Clase A primera calidad) con sus precios base. Aclara con entusiasmo que disponemos de blanco y amplia variedad de colores en stock (menciona varios: ' + _out.colores_disponibles.slice(0, 6).join(', ') + ') y pregúntale qué color o tono busca para cotizárselo exactamente.';
+  }
+}
 // Si lo unico que no calza es un color/modificador, el calificador no debe vaciar el resultado.
 _out.atributo_ignorado = !!(_colorMismatch || (_dropped && _droppedEsMod));
 await qualifyProductCandidates({ axios, env: typeof $env !== 'undefined' ? $env : process.env,
@@ -2278,4 +2358,15 @@ await qualifyProductCandidates({ axios, env: typeof $env !== 'undefined' ? $env 
   eligible: !_out.aclarar && !_weak && !medMismatch && !medParcial &&
     !!(_rescate || _fuzzy || _colorMismatch || _dropped || _unicaPalabra) });
 delete _out.atributo_ignorado;
+if (_isArenaQuery && unicos.length > 0) {
+  if (_hasRoja && _hasBlanca) {
+    _out.parcial = false;
+    _out.instruccion = 'IMPORTANTE: En El Serrucho NO vendemos arena roja. Ofrece las opciones disponibles de Arena Fina y Arena Gruesa explicando con amabilidad que no manejamos arena roja, pero que para arena blanca / construcción sí disponemos de estas presentaciones en metro y volteo.';
+    Object.assign(_out, searchDecision('exact'));
+  } else if (_hasBlanca) {
+    _out.parcial = false;
+    _out.instruccion = 'Para arena blanca / lavada de construcción disponemos de Arena Fina y Arena Gruesa en presentaciones por metro y por volteo. Ofrécelas al cliente.';
+    Object.assign(_out, searchDecision('exact'));
+  }
+}
 return JSON.stringify(_out);

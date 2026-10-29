@@ -104,3 +104,20 @@ test('Pink Beige incident: Pintura de agua color pink Beige never hallucinates A
   assert.strictEqual(res.parcial, true);
 });
 
+test('Paint presentation: 4 litros maps to galon without measure_mismatch', async () => {
+  const res = await buscar('pinturas de caucho , de 4 litros');
+  assert.strictEqual(res.encontrados > 0, true);
+  assert.notStrictEqual(res.match_status, 'measure_mismatch');
+  assert.strictEqual(!res.instruccion || !res.instruccion.includes('medida/calibre "4" NO existe'), true);
+  assert.strictEqual(res.productos.every(p => /GAL|galon/i.test(p.nombre) && !/Cunete/i.test(p.nombre)), true);
+  assert.strictEqual(res.consulta_generica_pintura, true);
+  assert.strictEqual(Array.isArray(res.colores_disponibles) && res.colores_disponibles.length > 0, true);
+});
+
+test('Paint presentation with specific color: 4 litros de pintura blanca', async () => {
+  const res = await buscar('4 litros de pintura blanca');
+  assert.strictEqual(res.encontrados > 0, true);
+  assert.notStrictEqual(res.match_status, 'measure_mismatch');
+  assert.strictEqual(res.productos.every(p => /Blanc/i.test(p.nombre)), true);
+  assert.strictEqual(res.consulta_generica_pintura, undefined);
+});
