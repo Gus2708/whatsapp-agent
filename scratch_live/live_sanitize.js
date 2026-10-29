@@ -19,10 +19,21 @@ function searchGuard(steps) {
     if (step?.action?.tool !== 'buscar_productos') continue;
     const query = step.action.toolInput?.p_busqueda;
     const key = typeof query === 'string' ? query.trim().toLowerCase() : index;
-    latest.set(key, step.observation);
+    latest.set(key, { query: typeof query === 'string' ? query : '', observation: step.observation });
   }
+  // A handoff is superseded only by a find for the SAME product: the agent often retries a
+  // missed search with other wording ("tienen cajetines 2x4" -> "cajetin 2x4"). Two searches
+  // are the same product when they share a content word (4-letter prefix, so plurals match).
+  // Searches for different products never cover each other, so a missing one still escalates.
+  const generic = new Set(['tienen', 'tiene', 'tendran', 'venden', 'vende', 'hay', 'para', 'precio',
+    'cuanto', 'cuesta', 'cuestan', 'vale', 'valen', 'busco', 'necesito', 'quiero', 'quisiera', 'tengo',
+    'unos', 'unas', 'como', 'donde', 'esta', 'estan', 'disponible', 'disponibles']);
+  const stems = text => new Set(String(text).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .split(/[^a-z0-9]+/).filter(w => w.length >= 4 && /[a-z]/.test(w) && !generic.has(w)).map(w => w.slice(0, 4)));
+  const handoffs = [];
+  const found = [];
   let response = null;
-  for (const observation of latest.values()) {
+  for (const { query, observation } of latest.values()) {
     let result;
     try {
       if (typeof observation !== 'string' || observation.length > 20000) return clarify;
@@ -33,7 +44,10 @@ function searchGuard(steps) {
     if (!result || result.decision_version !== 1 || !statuses.includes(result.match_status)) return clarify;
     const expected = searchDecision(result.match_status);
     if (result.action !== expected.action || result.requires_confirmation !== expected.requires_confirmation) return clarify;
-    if (result.action === 'handoff') return '[PEDIR_AYUDA]';
+    if (result.action === 'handoff') { handoffs.push(query); continue; }
+    const listed = Array.isArray(result.productos) ? result.productos.length : 0;
+    const count = result.encontrados === undefined ? listed : Number(result.encontrados);
+    if (['show_results', 'confirm'].includes(result.action) && count > 0) found.push(stems(query));
     if (result.action === 'clarify') response = clarify;
     if (result.action === 'unavailable') response = 'Ese producto no lo trabajamos. ¿Qué otro producto necesitas?';
     if (result.action === 'confirm') {
@@ -43,6 +57,8 @@ function searchGuard(steps) {
         names.map(name => '• ' + name).join('\n') : clarify;
     }
   }
+  const covered = query => { const own = stems(query); return found.some(f => [...f].some(s => own.has(s))); };
+  if (handoffs.some(query => !covered(query))) return '[PEDIR_AYUDA]';
   return response;
 }
 // END CONVERSATION FUNCTIONS

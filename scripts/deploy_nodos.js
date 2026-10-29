@@ -2,7 +2,7 @@
 // La cadena de verdad del proyecto es: lib -> scratch_live -> n8n. Este script cierra
 // el último tramo, que hasta ahora se hacía con un patch_*.js distinto por cambio.
 //
-//   node scripts/deploy_nodos.js           # despliega buscar + presupuesto + prompt
+//   node scripts/deploy_nodos.js           # despliega buscar + presupuesto + sanitize + prompt
 //   node scripts/deploy_nodos.js --dry     # muestra qué cambiaría, sin tocar n8n
 const fs = require('fs');
 const path = require('path');
@@ -16,11 +16,21 @@ const DRY = process.argv.includes('--dry');
 
 const lf = s => s.replace(/\r\n/g, '\n');
 const leer = f => lf(fs.readFileSync(path.join(ROOT, 'scratch_live', f), 'utf8'));
+const deWorkflow = nodo => {
+  const wf = JSON.parse(fs.readFileSync(path.join(ROOT, 'n8n_workflow.json'), 'utf8'));
+  const n = wf.nodes.filter(x => x.name === nodo);
+  if (n.length !== 1) throw new Error(`n8n_workflow.json: se esperaba exactamente un nodo "${nodo}"`);
+  return lf(String(n[0].parameters.jsCode || ''));
+};
 
 // nodo -> [campo, contenido]
 const MAPA = [
   { nodo: 'buscar_productos_tool', campo: 'jsCode', valor: leer('live_buscar.js') },
   { nodo: 'hacer_presupuesto_tool', campo: 'jsCode', valor: leer('live_presupuesto.js') },
+  // El Sanitize vivo es el que arma lib/workflow-overlay (baseline + searchGuard de
+  // lib/conversation-context) y queda en n8n_workflow.json via scripts/build_workflow.js.
+  // OJO: scratch_live/live_sanitize.js NO es lo que corre en n8n (difiere del nodo vivo).
+  { nodo: 'Sanitize Agent Output', campo: 'jsCode', valor: deWorkflow('Sanitize Agent Output') },
   { nodo: 'AI Agent', campo: 'systemMessage', valor: leer('live_systemMessage.txt'), enOptions: true },
 ];
 

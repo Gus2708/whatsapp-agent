@@ -24,8 +24,13 @@ e.g. "tienen cajetines 2x4" while CAJETIN 2X4 PLAST CREOLE is in stock.
       `llaves`, `cables`, `tubos`; tests first (RED -> GREEN).
       Done: buscar-local `singularToken()` in `tokensDe` (shared `singular()` untouched, presupuesto unaffected).
       RED: 4/10 failing in `tests/plural_search.test.js` (cajetines 2x4, cajetines, papeles, niveles). GREEN: 10/10;
-      full `node --test` 314/314 (incl. the 10 new); sources/workflow sync OK.
-- [ ] T2 `searchGuard`: only hand off when no `buscar_productos` call in the turn found products; tests.
+      full `node --test` 314/314 (incl. the 10 new); sources/workflow sync OK. Commit: 1d8fcfc.
+- [x] T2 `searchGuard`: only hand off when no `buscar_productos` call in the turn found products; tests.
+      Done: a handoff is superseded only by a find (show_results/confirm with products) for the SAME product
+      (shared content word, 4-letter prefix, generic verbs ignored); different products still escalate, so the
+      existing multi-product test keeps passing. Sanitize added to `deploy_nodos.js` MAPA, sourced from
+      `n8n_workflow.json` (the live node equals HEAD's overlay build: --dry reported "ya está al día (7665)";
+      `scratch_live/live_sanitize.js` is NOT the live code). RED 1 failing -> GREEN; full suite 316/316; sync OK.
 - [ ] T3 Synchronous Sonnet review inside the search tool before returning `missing`: bounded timeout,
       normalized/singular candidates, fail-open to the existing handoff on error.
 - [ ] T4 Verify: `npm test` subset, `debug_buscar.js "cajetines 2x4"`, deploy `--dry`.

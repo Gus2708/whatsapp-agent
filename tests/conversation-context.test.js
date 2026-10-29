@@ -58,6 +58,28 @@ test('guard uses the last result per query but retains unresolved other searches
   steps[1].action.toolInput.p_busqueda = 'cemento';
   assert.equal(searchGuard(steps), '[PEDIR_AYUDA]');
 });
+const searchStep = (query, status, encontrados = 1) => ({
+  action: { tool: 'buscar_productos', toolInput: { p_busqueda: query } },
+  observation: JSON.stringify({ ...searchDecision(status), encontrados,
+    productos: encontrados ? [{ nombre: 'Cajetin 2x4 Plast Creole', precio_divisas_texto: '1$' }] : [] }),
+});
+test('guard does not hand off when a retry of the same product in the turn found it', () => {
+  assert.equal(searchGuard([searchStep('tienen cajetines 2x4', 'missing', 0), searchStep('cajetin 2x4', 'exact')]), null);
+  assert.equal(searchGuard([searchStep('cajetin 2x4', 'exact'), searchStep('cajetines 2x4', 'missing', 0)]), null,
+    'order inside the turn does not matter');
+  assert.equal(searchGuard([searchStep('cajetines', 'weak'), searchStep('cajetin plastico', 'exact')]), null);
+  assert.match(searchGuard([searchStep('cajetines', 'missing', 0), searchStep('cajetin', 'approximate')]),
+    /Cajetin 2x4/, 'an approximate retry still asks for confirmation instead of escalating');
+});
+test('guard keeps the handoff when nothing in the turn found that product', () => {
+  assert.equal(searchGuard([searchStep('cajetines 2x4', 'missing', 0), searchStep('cajetin 2x4', 'missing', 0)]), '[PEDIR_AYUDA]');
+  assert.equal(searchGuard([searchStep('cajetines', 'missing', 0), searchStep('cajetin', 'vague', 0)]), '[PEDIR_AYUDA]');
+  assert.equal(searchGuard([searchStep('cajetines', 'missing', 0), searchStep('cajetin', 'not_sold', 0)]), '[PEDIR_AYUDA]');
+  assert.equal(searchGuard([searchStep('tienen cemento', 'missing', 0), searchStep('tienen cable', 'exact')]), '[PEDIR_AYUDA]',
+    'generic words such as "tienen" never make two products look like a retry');
+  assert.equal(searchGuard([searchStep('cajetines', 'exact', 0), searchStep('cajetin', 'missing', 0)]), '[PEDIR_AYUDA]',
+    'a non-handoff decision with zero products is not a find');
+});
 test('malformed, oversized and unknown search contracts fail closed', () => {
   assert.equal(searchGuard(undefined), null, 'tool-free turns omit intermediate steps in n8n runtime');
   assert.equal(searchGuard(null), null, 'null steps are treated as tool-free turns');
