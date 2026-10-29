@@ -120,6 +120,14 @@ test('A3 truth table: (e) simLex null + catDiff + vec 0.60 -> adopt', async () =
   assert.equal(result.productos[0].nombre, 'Inodoro Blanco Completo');
 });
 
+test('A3 truth table: (f2) placeholder-named vector rows (".", "..") are dropped -> NO', async () => {
+  const junk = (code, desc) => ({ codigo_interno: code, descripcion: desc, precio_venta: 8, existencia: 24, similitud: 0.62 });
+  const { result } = await runCase({ vector: { simLex: 0.4, rows: [junk('J1', '.'), junk('J2', '..'), junk('J3', 'A')] } });
+  assert.equal(result.rescate, undefined);
+  assert.equal(result.productos[0].nombre, 'Tapa P/toma 270');
+  assert.ok(!result.productos.some((p) => /^\W*\w?\W*$/.test(p.nombre)));
+});
+
 test('A3 truth table: (f) empty vector -> NO', async () => {
   const { result } = await runCase({ vector: { simLex: 0.4, rows: [] } });
   assert.equal(result.rescate, undefined);

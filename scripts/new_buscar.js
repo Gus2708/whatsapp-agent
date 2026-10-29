@@ -1812,7 +1812,11 @@ async function buscarVectorial(_codLex){
         if (Array.isArray(_s.data) && _s.data[0]) _sl = Number(_s.data[0].similitud);
       } catch (e) { /* sin simLex se cae al comportamiento anterior */ }
     }
-    return { filas: Array.isArray(_r.data) ? _r.data : [], simLex: _sl };
+    // Fichas sin nombre (".", "..", "A" en HybridLite) tienen un embedding casi vacio que
+    // se parece a cualquier consulta: superan el umbral y se adoptaban como rescate semantico.
+    const _filas = (Array.isArray(_r.data) ? _r.data : [])
+      .filter(r => (norm(r.descripcion || '').match(/[a-z]/g) || []).length >= 3);
+    return { filas: _filas, simLex: _sl };
   } catch (e) { console.warn('[vectorial] fallo:', e.message); return { filas: [], simLex: null }; }
 }
 // Por debajo de esto, lo que trajo la busqueda lexica no tiene que ver con lo que pidio el
