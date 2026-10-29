@@ -30,9 +30,17 @@ e.g. "tienen cajetines 2x4" while CAJETIN 2X4 PLAST CREOLE is in stock.
       (shared content word, 4-letter prefix, generic verbs ignored); different products still escalate, so the
       existing multi-product test keeps passing. Sanitize added to `deploy_nodos.js` MAPA, sourced from
       `n8n_workflow.json` (the live node equals HEAD's overlay build: --dry reported "ya está al día (7665)";
-      `scratch_live/live_sanitize.js` is NOT the live code). RED 1 failing -> GREEN; full suite 316/316; sync OK.
-- [ ] T3 Synchronous Sonnet review inside the search tool before returning `missing`: bounded timeout,
+      `scratch_live/live_sanitize.js` is NOT the live code). RED 1 failing -> GREEN; full suite 316/316; sync OK. Commit: cae66fe.
+- [x] T3 Synchronous Sonnet review inside the search tool before returning `missing`: bounded timeout,
       normalized/singular candidates, fail-open to the existing handoff on error.
+      Done: `revisionGuardrail()` in `scratch_live/live_buscar.js` runs on `missing` and on `weak` (after the
+      not-sold check). Candidates: up to 10 previous rows + per-token 70% prefix ilike + `buscar_fuzzy`, max 40.
+      OpenRouter via axios (same key/style as `rescateSemantico`), model `SEARCH_GUARDRAIL_MODEL` or
+      `anthropic/claude-sonnet-5`, temperature 0.1, JSON; whole step raced against `SEARCH_GUARDRAIL_TIMEOUT_MS`
+      (default 9000). Accepts only candidate codes with confianza >= 4; returns `approximate` (confirm) with
+      `_guardrail:true`; anything else falls back to the unchanged handoff. `SEARCH_GUARDRAIL_MODE=off` disables.
+      Automejora webhook now gets `query_normalizada` = normalized tokens plus `query_tokens`.
+      RED 8/9 failing in `tests/search_guardrail.test.js` -> GREEN 9/9; full suite 325/325; sync OK.
 - [ ] T4 Verify: `npm test` subset, `debug_buscar.js "cajetines 2x4"`, deploy `--dry`.
 - [ ] T5 Deploy to n8n (user approval required).
 
@@ -40,4 +48,7 @@ e.g. "tienen cajetines 2x4" while CAJETIN 2X4 PLAST CREOLE is in stock.
 - T1-T3: delegated direct (writer trigger: 2+ non-trivial files).
 
 ## Progress
+- T4 evidence so far: `node --test` 325/325, `check_sources_sync` OK, `check_workflow_sync` OK,
+  `deploy_nodos.js --dry`: buscar_productos_tool 139625 -> 145776, Sanitize Agent Output 7665 -> 9129,
+  presupuesto and AI Agent up to date. `debug_buscar.js` only runs the LIVE node with fixed terms: skipped.
 - Pre-existing deployed paint changes committed separately: c33785b.
