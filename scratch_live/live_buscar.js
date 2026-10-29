@@ -1385,8 +1385,19 @@ const MODIFIERS = new Set([
 // "5 metros de cable" / "2 sacos de cemento": el numero es CANTIDAD, no medida del producto
 const _pb = String(p_busqueda==null?'':p_busqueda).replace(/\b\d+(?:[.,]\d+)?\s*(metros?|mts?|mtrs|kilos?|kg|sacos?|unidades?|rollos?)\s+de\s+/gi, '$1 de ');
 
+// singular() prueba /[aeiou]s$/ ANTES que /[^aeiou]es$/, asi que "cajetines" -> "cajetine" y el
+// ilike *cajetine* no casaba con "CAJETIN 2X4 PLAST CREOLE": cero resultados y escalado a un
+// humano con el producto en stock. En español el plural "-es" va sobre singulares que terminan
+// en consonante: si al quitar "es" queda vocal + l/n/r/d (cajetin, papel, riel, pared, canal)
+// ese es el singular. "cables"/"llaves"/"verdes" no cumplen (bl, v, rd) y siguen igual.
+// singular() NO se toca: lo comparten presupuesto y scoreMatch para comparar por igualdad.
+const _PLURAL_VOCAL_E = new Set(['aires', 'hules']); // singular en vocal+[lnrd]+e: aire, hule
+function singularToken(w){
+  if (w.length >= 5 && /[aeiou][lnrd]es$/.test(w) && !_PLURAL_VOCAL_E.has(w)) return w.slice(0, -2);
+  return singular(w);
+}
 // tokenizador (mismo pipeline para consulta, aprendizaje y negativa)
-function tokensDe(t){ return normMedida(t).split(' ').filter(w => (w.length>=2 || /\d/.test(w)) && !IGNORED.has(w)).map(w => /\d/.test(w) ? w : singular(stemColor(w))); }
+function tokensDe(t){ return normMedida(t).split(' ').filter(w => (w.length>=2 || /\d/.test(w)) && !IGNORED.has(w)).map(w => /\d/.test(w) ? w : singularToken(stemColor(w))); }
 
 // DICCIONARIO DEL CATALOGO: vocabulario generado por el LLM leyendo los 7.5k productos
 // (tabla catalogo_vocabulario, ver scripts/generar_vocabulario.js). Traduce como habla
