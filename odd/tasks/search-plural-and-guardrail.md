@@ -40,7 +40,7 @@ e.g. "tienen cajetines 2x4" while CAJETIN 2X4 PLAST CREOLE is in stock.
       (default 9000). Accepts only candidate codes with confianza >= 4; returns `approximate` (confirm) with
       `_guardrail:true`; anything else falls back to the unchanged handoff. `SEARCH_GUARDRAIL_MODE=off` disables.
       Automejora webhook now gets `query_normalizada` = normalized tokens plus `query_tokens`.
-      RED 8/9 failing in `tests/search_guardrail.test.js` -> GREEN 9/9; full suite 325/325; sync OK.
+      RED 8/9 failing in `tests/search_guardrail.test.js` -> GREEN 9/9; full suite 325/325; sync OK. Commit: 7d3d54a.
 - [ ] T4 Verify: `npm test` subset, `debug_buscar.js "cajetines 2x4"`, deploy `--dry`.
 - [ ] T5 Deploy to n8n (user approval required).
 
