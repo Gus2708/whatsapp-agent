@@ -55,3 +55,6 @@ e.g. "tienen cajetines 2x4" while CAJETIN 2X4 PLAST CREOLE is in stock.
   `deploy_nodos.js --dry`: buscar_productos_tool 139625 -> 145776, Sanitize Agent Output 7665 -> 9129,
   presupuesto and AI Agent up to date. `debug_buscar.js` only runs the LIVE node with fixed terms: skipped.
 - Pre-existing deployed paint changes committed separately: c33785b.
+- Follow-up: semantic layer adopted HybridLite rows named "."/".." (near-empty embeddings above 0.45).
+  `buscarVectorial` now drops rows with <3 letters (a0b4dab), deployed 2026-10-29 (PUT 200). Live check:
+  nonsense query no longer returns "." rows; "cajetines 2x4" still exact. Extractor-side filter lives in backend serrucho.
