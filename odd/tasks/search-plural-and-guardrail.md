@@ -41,8 +41,11 @@ e.g. "tienen cajetines 2x4" while CAJETIN 2X4 PLAST CREOLE is in stock.
       `_guardrail:true`; anything else falls back to the unchanged handoff. `SEARCH_GUARDRAIL_MODE=off` disables.
       Automejora webhook now gets `query_normalizada` = normalized tokens plus `query_tokens`.
       RED 8/9 failing in `tests/search_guardrail.test.js` -> GREEN 9/9; full suite 325/325; sync OK. Commit: 7d3d54a.
-- [ ] T4 Verify: `npm test` subset, `debug_buscar.js "cajetines 2x4"`, deploy `--dry`.
-- [ ] T5 Deploy to n8n (user approval required).
+- [x] T4 Verify: `npm test` subset, `debug_buscar.js "cajetines 2x4"`, deploy `--dry`.
+      Live node after deploy: "buen dia tienen cajetines 2x4 y precio" -> exact, 4 CAJETIN 4X2 rows;
+      "papeles de lija" -> semantic confirm (Lija). OpenRouter `anthropic/claude-sonnet-5` answered 200.
+      Guardrail not reached live: semantic layer always returns candidates (even "zxqw..." -> rows named ".").
+- [x] T5 Deploy to n8n (user approved 2026-10-29): buscar_productos_tool 139625->145776, Sanitize 7665->9129, PUT 200; --dry afterwards: no changes.
 
 ## Route
 - T1-T3: delegated direct (writer trigger: 2+ non-trivial files).
