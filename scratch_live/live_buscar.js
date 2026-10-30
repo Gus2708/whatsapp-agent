@@ -156,7 +156,7 @@ function medPresent(med, nd){
     if (new RegExp('(^|[ (x\/])'+med+'(?:v|w|ml|lts?|l|kg|hp|amp|a)($|[ x)\/])').test(nd)) return true;
     // calibre de 2 digitos: "30" matchea "CAL.30"/"CAL 30" y la forma decimal "0.30" (cal 30 = 0.30mm)
     if (med.length===2){
-      if (new RegExp('cal\\.?\\s?'+med+'($|[ x)]|mm)').test(nd)) return true;
+      if (new RegExp('cal\\s?\\.?\\s?'+med+'($|[ x)]|mm)').test(nd)) return true;
       if (new RegExp('(^|[ (.])0\\.'+med+'($|[ x)]|mm)').test(nd)) return true;
     }
     return false;
@@ -168,7 +168,7 @@ function medPresent(med, nd){
   if (/^\d+\.\d$/.test(med) && new RegExp('(^|[ (x]|cal\\.?\\s?)'+esc+'0(mm)?($|[ x)])').test(nd)) return true;
   // calibre decimal "0.30" tambien matchea el entero "CAL.30" (0.30 == cal 30)
   const _ent = /^0\.(\d{2})$/.exec(med);
-  if (_ent && new RegExp('cal\\.?\\s?'+_ent[1]+'($|[ x)]|mm)').test(nd)) return true;
+  if (_ent && new RegExp('cal\\s?\\.?\\s?'+_ent[1]+'($|[ x)]|mm)').test(nd)) return true;
   return false;
 }
 const SIN = {
@@ -1396,7 +1396,34 @@ const MODIFIERS = new Set([
 ]);
 
 // "5 metros de cable" / "2 sacos de cemento": el numero es CANTIDAD, no medida del producto
-const _pb = String(p_busqueda==null?'':p_busqueda).replace(/\b\d+(?:[.,]\d+)?\s*(metros?|mts?|mtrs|kilos?|kg|sacos?|unidades?|rollos?)\s+de\s+/gi, '$1 de ');
+let _pb = String(p_busqueda==null?'':p_busqueda).replace(/\b\d+(?:[.,]\d+)?\s*(metros?|mts?|mtrs|kilos?|kg|sacos?|unidades?|rollos?)\s+de\s+/gi, '$1 de ');
+
+// Calibre de lamina en milimetros: el cliente escribe "25 mm" y el catalogo "0.25" (el espesor
+// de una lamina de techo nunca llega a 1mm). Sin esto la medida "25mm" no casaba con nada y el
+// bot decia que ese calibre no lo trabajamos. Solo 2 digitos (12-40): no toca el PVC "1.2MM".
+// Y la palabra "calibre" delante del numero sobra: se traducia a "cal" y la recuperacion la
+// EXIGIA en la descripcion, asi que solo entraban las que dicen "CAL. 0.20" y quedaban fuera
+// "0.20MM X 0.81MT" o "0.25X810". El numero solo ya casa con "CAL.30" y con "0.30" (medPresent).
+if (/\b(laminas?|techolit|acerolit|zinc)\b/i.test(_pb)) {
+  _pb = _pb.replace(/\b(1[2-9]|[23]\d|40)\s*(mm|milimetros?)\b/gi, '0.$1');
+  _pb = _pb.replace(/\b(?:calibres?|cal\.?)\s*(?=\d|\.\d)/gi, '');
+}
+
+// "azul o roja": dos colores unidos por "o" son ALTERNATIVAS, no un AND. La recuperacion exige
+// todas las palabras, y ningun producto es azul Y rojo: el drop-one soltaba uno de los colores y
+// el cliente solo veia el otro (paso en vivo: solo la roja agotada, con la azul en stock).
+// Se sacan los colores de la consulta y se filtra despues por CUALQUIERA de ellos.
+let _coloresAlternativos = [];
+{
+  const _colorWord = '(' + Object.keys(COLOR_STEM).join('|') + ')';
+  const _reColorO = new RegExp('\\b' + _colorWord + '\\s*(?:\\bo\\b|\\bu\\b|ó|\\/)\\s*' + _colorWord + '\\b', 'i');
+  const _npbC = norm(_pb);
+  if (_reColorO.test(_npbC)) {
+    const _reTodos = new RegExp('\\b' + _colorWord + '\\b', 'gi');
+    _coloresAlternativos = [...new Set((_npbC.match(_reTodos) || []).map(c => stemColor(c.toLowerCase())))];
+    _pb = _npbC.replace(_reTodos, ' ').replace(/\s+(?:o|u|ó|\/)(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+}
 
 // singular() prueba /[aeiou]s$/ ANTES que /[^aeiou]es$/, asi que "cajetines" -> "cajetine" y el
 // ilike *cajetine* no casaba con "CAJETIN 2X4 PLAST CREOLE": cero resultados y escalado a un
@@ -2133,6 +2160,14 @@ let _coloresPinturaStock = [];
   }
 }
 
+// Colores alternativos ("azul o roja"): se quitaron de la consulta para recuperar la categoria;
+// aqui se quedan los productos de CUALQUIERA de esos colores (si ninguno casa, no se filtra).
+if (_coloresAlternativos.length > 0) {
+  const _reAlt = new RegExp('\\b(' + _coloresAlternativos.join('|') + ')', 'i');
+  const _conColor = unicos.filter(p => _reAlt.test(norm(p.descripcion)));
+  if (_conColor.length > 0) { unicos.length = 0; for (const x of _conColor) unicos.push(x); }
+}
+
 // Regla negocio LÁMINA: perfiles (ondulado/canal redondo, arquitectónica/7 canales/cuadrado), acabados (prepintada/color: rojo, azul, verde, naranja, techolit vs zinc natural/galvanizado), materiales (zinc, techolit, acerolit, pvc)
 {
   const nbq = norm(_pb);
@@ -2173,18 +2208,17 @@ let _coloresPinturaStock = [];
       if (fp.length > 0) lf = fp;
     }
 
-    if (wantRojo) {
-      const fr = lf.filter(p => /\b(ROJO|ROJA|TECHOLIT)\b/i.test(p.descripcion));
-      if (fr.length > 0) lf = fr;
-    } else if (wantAzul) {
-      const fa = lf.filter(p => /\bAZUL\b/i.test(p.descripcion));
-      if (fa.length > 0) lf = fa;
-    } else if (wantVerde) {
-      const fv = lf.filter(p => /\bVERDE\b/i.test(p.descripcion));
-      if (fv.length > 0) lf = fv;
-    } else if (wantNaranja) {
-      const fn = lf.filter(p => /\bNARANJA\b/i.test(p.descripcion));
-      if (fn.length > 0) lf = fn;
+    // Varios colores pedidos = alternativas: se acepta CUALQUIERA (antes era if/else-if y el
+    // primero ganaba, descartando el resto aunque estuviera en stock).
+    const _coloresLamina = [
+      wantRojo && /\b(ROJO|ROJA|TECHOLIT)\b/i,
+      wantAzul && /\bAZUL\b/i,
+      wantVerde && /\bVERDE\b/i,
+      wantNaranja && /\bNARANJA\b/i,
+    ].filter(Boolean);
+    if (_coloresLamina.length > 0) {
+      const fc = lf.filter(p => _coloresLamina.some(re => re.test(p.descripcion)));
+      if (fc.length > 0) lf = fc;
     }
 
     if (wantOndulada && !wantCuadrada) {

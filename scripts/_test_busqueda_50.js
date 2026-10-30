@@ -130,6 +130,13 @@ const TESTS = [
   // busqueda, asi que devolvia un tubo AGOTADO sin mencionar la pega. Ver casanDeVerdad().
   { q: 'pega para tubo pvc', exists: true, src: 'subcadena', top: /\bpega\b/i, notTop: /pegable/i },
   { q: 'pega soldadura', exists: true, src: 'subcadena', top: /\bpega\b/i, notTop: /pegable/i },
+  // `incluye`: cada regex debe casar con ALGUN producto devuelto (no solo el primero).
+  // Regresion 2026-10-30: el filtro de color de lamina era if/else-if, asi que "azul o roja"
+  // se quedaba solo con las rojas (agotadas) y descartaba la azul 0.20 con 133 en stock.
+  // Ademas "25 mm" no casaba con el calibre "0.25" ni "30" con "CAL .30" (espacio antes del punto).
+  { q: 'lamina prepintada precio para 30 azul o roja ovalada calibre 20 o 25 mm', exists: true, src: 'real', incluye: [/\bazul\b.*0\.20/i, /\bazul\b.*0\.25/i, /cal \.?30/i] },
+  { q: 'lamina de zinc roja o azul', exists: true, src: 'color-o', incluye: [/\bazul\b/i, /\broj[oa]\b/i] },
+  { q: 'lamina ondulada azul calibre 25 mm', exists: true, src: 'calibre-mm', incluye: [/\bazul\b.*0\.25/i] },
 ];
 
 function classify(parsed, t) {
@@ -159,6 +166,9 @@ function classify(parsed, t) {
     if (t.notTop && t.notTop.test(top1)) flags.push(`❌ TOP-PROHIBIDO (${t.notTop} casa con "${top1.slice(0, 40)}")`);
   } else if (t.top) {
     flags.push(`❌ TOP-INESPERADO (sin resultados, esperaba ${t.top})`);
+  }
+  for (const re of t.incluye || []) {
+    if (!(parsed.productos || []).some(p => re.test(p.nombre))) flags.push(`❌ TOP-FALTA (ningun resultado casa con ${re})`);
   }
   // Un saludo o un texto sin sentido NO es una consulta de producto: cotizarlo con
   // seguridad es peor que no encontrar nada, porque el cliente recibe precios que no pidio.
@@ -194,7 +204,7 @@ function classify(parsed, t) {
   // Un caso marcado `conocido` es un fallo REAL ya diagnosticado que todavía no se arregla.
   // Se cuenta aparte para que el contador principal siga sirviendo de linea base de
   // regresiones, pero se imprime siempre: no es un test silenciado, es deuda a la vista.
-  const rankTodos = results.filter(r => r.flags.some(f => f.includes('TOP-INESPERADO') || f.includes('TOP-PROHIBIDO') || f.includes('RUIDO-COTIZADO')));
+  const rankTodos = results.filter(r => r.flags.some(f => f.includes('TOP-INESPERADO') || f.includes('TOP-PROHIBIDO') || f.includes('TOP-FALTA') || f.includes('RUIDO-COTIZADO')));
   const rank = rankTodos.filter(r => !r.t.conocido);
   const conocidos = rankTodos.filter(r => r.t.conocido);
   console.log('Total:', results.length, '| sin resultados:', noEnc.length, '| FALSO-NEGATIVO sospechoso:', fn.length, '| débiles:', debil.length, '| top-agotado:', agot.length, '| RANKING malo:', rank.length, '| excepciones:', exc.length, '| conocidos pendientes:', conocidos.length);
