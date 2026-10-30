@@ -144,7 +144,8 @@ const CASOS = [
   { n: 'rescate refutado → [PEDIR_AYUDA]', turnos: ['aparato para medir la corriente', 'no, eso no es lo que busco'] },
 ];
 
-(async () => {
+module.exports = { chat, TOOLS_IMPL, SYS, MODEL };
+if (require.main === module) (async () => {
   console.log(`MODELO: ${MODEL} | temp ${TEMP} | prompt ${SYS.length} chars | ${TOOLS.length} tools\n`);
   let tIn = 0, tOut = 0, tMs = 0;
   for (const c of CASOS) {
