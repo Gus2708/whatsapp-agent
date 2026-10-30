@@ -32,6 +32,9 @@ const MAPA = [
   // OJO: scratch_live/live_sanitize.js NO es lo que corre en n8n (difiere del nodo vivo).
   { nodo: 'Sanitize Agent Output', campo: 'jsCode', valor: deWorkflow('Sanitize Agent Output') },
   { nodo: 'AI Agent', campo: 'systemMessage', valor: leer('live_systemMessage.txt'), enOptions: true },
+  // El debounce deslizante (v2) se perdio una vez porque la baseline de produccion traia la
+  // siesta fija de 7 s y nadie lo comparaba con lo vivo. Desde aqui --dry avisa si se desvia.
+  { nodo: 'Debounce Ráfaga', campo: 'jsCode', valor: deWorkflow('Debounce Ráfaga') },
 ];
 
 (async () => {
