@@ -279,7 +279,7 @@ flowchart TD
 
 El sistema separa el estado interno del orquestador respecto de los datos comerciales mediante dos instancias diferenciadas de PostgreSQL:
 
-- **Estado Interno del Orquestador (`n8n_postgres` · `postgres:16-alpine`)**: Contenedor interno en `agent_net` (sin exposición de puertos en el host) que almacena flujos de trabajo de n8n, credenciales cifradas, usuarios, claves API y registros de ejecuciones fallidas sobre el volumen externo `n8n_pgdata`. Opera con concurrencia MVCC (`DB_TYPE=postgresdb`, `DB_POSTGRESDB_POOL_SIZE=10`), eliminando los bloqueos por tiempo de espera de `SqliteWriteConnectionMutex` ante ráfagas concurrentes de webhooks de WhatsApp y el sondeo cada 15 segundos de `Reenviar Ayuda`.
+- **Estado Interno del Orquestador (`n8n_postgres` · `postgres:16-alpine`)**: Contenedor interno en `agent_net` (sin exposición de puertos en el host) que almacena flujos de trabajo de n8n, credenciales cifradas, usuarios, claves API y registros de ejecuciones fallidas sobre el volumen externo `n8n_pgdata`. Opera con concurrencia MVCC (`DB_TYPE=postgresdb`, `DB_POSTGRESDB_POOL_SIZE=25`, `DB_POSTGRESDB_CONNECTION_TIMEOUT=60000`), eliminando los bloqueos por tiempo de espera de `SqliteWriteConnectionMutex` y absorbiendo las ráfagas de webhooks en arranque en frío (`FULLSYNC` de WAHA) junto con el sondeo cada 15 segundos de `Reenviar Ayuda`.
 - **Base de Datos Comercial Remota (Supabase PostgreSQL + `pg_trgm` + `pgvector` + RLS)**: Base de datos en la nube dedicada al inventario comercial, perfiles de clientes, sesiones de conversación y colas del personal.
 
 Tablas clave en Supabase:
@@ -316,8 +316,8 @@ docker volume create n8n_pgdata
 docker compose up -d
 ```
 - **`waha`** (`devlikeapro/waha:latest`, `waha_agent`, `mem_limit: 1200m`, puerto `3000:3000`, volumen `waha_session_storage`): Dashboard WAHA en http://localhost:3000 (escanear código QR)
-- **`postgres`** (`postgres:16-alpine`, `n8n_postgres`, interno en `agent_net`, `mem_limit: 512m`, `max_connections=50`, `shared_buffers=128MB`, `work_mem=4MB`, chequeo `pg_isready`, volumen externo `n8n_pgdata`): Base de datos local de estado de n8n
-- **`n8n`** (`whatsapp-agent-n8n`, `n8n_agent`, `mem_limit: 2048m`, puerto `5678:5678`, `depends_on: waha` (`service_started`) y `postgres` (`service_healthy`), poda de ejecuciones `EXECUTIONS_DATA_SAVE_ON_SUCCESS=none` / `EXECUTIONS_DATA_SAVE_ON_ERROR=all` / `EXECUTIONS_DATA_MAX_AGE=48` / `EXECUTIONS_DATA_PRUNE_MAX_COUNT=500`, volumen externo `n8n_data` en `/home/node/.n8n` para la clave `encryptionKey` de `config` y artefactos de ejecución): Automatización n8n en http://localhost:5678
+- **`postgres`** (`postgres:16-alpine`, `n8n_postgres`, interno en `agent_net`, `mem_limit: 512m`, `max_connections=60`, `shared_buffers=128MB`, `work_mem=4MB`, chequeo `pg_isready`, volumen externo `n8n_pgdata`): Base de datos local de estado de n8n
+- **`n8n`** (`whatsapp-agent-n8n`, `n8n_agent`, `mem_limit: 2048m`, puerto `5678:5678`, `depends_on: waha` (`service_started`) y `postgres` (`service_healthy`), pool PostgreSQL `DB_POSTGRESDB_POOL_SIZE=25` / `DB_POSTGRESDB_CONNECTION_TIMEOUT=60000`, poda de ejecuciones `EXECUTIONS_DATA_SAVE_ON_SUCCESS=none` / `EXECUTIONS_DATA_SAVE_ON_ERROR=all` / `EXECUTIONS_DATA_MAX_AGE=48` / `EXECUTIONS_DATA_PRUNE_MAX_COUNT=500`, volumen externo `n8n_data` en `/home/node/.n8n` para la clave `encryptionKey` de `config` y artefactos de ejecución): Automatización n8n en http://localhost:5678
 
 > **Migración desde SQLite heredado:** Las instalaciones previas con estado en `/home/node/.n8n/database.sqlite` pueden ejecutar `scripts/migrate_sqlite_to_postgres.js` dentro del contenedor `n8n` (`docker exec -i n8n_agent node < scripts/migrate_sqlite_to_postgres.js`) para migrar de manera idempotente flujos, credenciales, usuarios y claves API hacia PostgreSQL en modo fuente de solo lectura.
 

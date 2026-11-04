@@ -279,7 +279,7 @@ flowchart TD
 
 The system separates orchestrator internal state from business data across two distinct PostgreSQL instances:
 
-- **Local Orchestrator State (`n8n_postgres` · `postgres:16-alpine`)**: Internal-only container on `agent_net` (no host port exposure) storing n8n workflows, encrypted credentials, users, API keys, and failed execution logs on external volume `n8n_pgdata`. Uses MVCC concurrency (`DB_TYPE=postgresdb`, `DB_POSTGRESDB_POOL_SIZE=10`), eliminating `SqliteWriteConnectionMutex` lock timeouts under concurrent inbound WhatsApp webhooks and 15-second `Reenviar Ayuda` polling.
+- **Local Orchestrator State (`n8n_postgres` · `postgres:16-alpine`)**: Internal-only container on `agent_net` (no host port exposure) storing n8n workflows, encrypted credentials, users, API keys, and failed execution logs on external volume `n8n_pgdata`. Uses MVCC concurrency (`DB_TYPE=postgresdb`, `DB_POSTGRESDB_POOL_SIZE=25`, `DB_POSTGRESDB_CONNECTION_TIMEOUT=60000`), eliminating `SqliteWriteConnectionMutex` lock timeouts and absorbing cold-boot WAHA `FULLSYNC` webhook bursts alongside 15-second `Reenviar Ayuda` polling.
 - **Remote Business Database (Supabase PostgreSQL + `pg_trgm` + `pgvector` + RLS)**: Cloud database storing commercial inventory, customer profiles, chat session state, and staff queues.
 
 Key Supabase tables:
@@ -316,8 +316,8 @@ docker volume create n8n_pgdata
 docker compose up -d
 ```
 - **`waha`** (`devlikeapro/waha:latest`, `waha_agent`, `mem_limit: 1200m`, port `3000:3000`, volume `waha_session_storage`): WAHA Dashboard at http://localhost:3000 (scan QR code)
-- **`postgres`** (`postgres:16-alpine`, `n8n_postgres`, internal-only on `agent_net`, `mem_limit: 512m`, `max_connections=50`, `shared_buffers=128MB`, `work_mem=4MB`, `pg_isready` healthcheck, external volume `n8n_pgdata`): Local n8n state database
-- **`n8n`** (`whatsapp-agent-n8n`, `n8n_agent`, `mem_limit: 2048m`, port `5678:5678`, `depends_on: waha` (`service_started`) and `postgres` (`service_healthy`), execution pruning `EXECUTIONS_DATA_SAVE_ON_SUCCESS=none` / `EXECUTIONS_DATA_SAVE_ON_ERROR=all` / `EXECUTIONS_DATA_MAX_AGE=48` / `EXECUTIONS_DATA_PRUNE_MAX_COUNT=500`, external volume `n8n_data` at `/home/node/.n8n` for `config` `encryptionKey` and runtime artifacts): n8n Automation at http://localhost:5678
+- **`postgres`** (`postgres:16-alpine`, `n8n_postgres`, internal-only on `agent_net`, `mem_limit: 512m`, `max_connections=60`, `shared_buffers=128MB`, `work_mem=4MB`, `pg_isready` healthcheck, external volume `n8n_pgdata`): Local n8n state database
+- **`n8n`** (`whatsapp-agent-n8n`, `n8n_agent`, `mem_limit: 2048m`, port `5678:5678`, `depends_on: waha` (`service_started`) and `postgres` (`service_healthy`), PostgreSQL pool `DB_POSTGRESDB_POOL_SIZE=25` / `DB_POSTGRESDB_CONNECTION_TIMEOUT=60000`, execution pruning `EXECUTIONS_DATA_SAVE_ON_SUCCESS=none` / `EXECUTIONS_DATA_SAVE_ON_ERROR=all` / `EXECUTIONS_DATA_MAX_AGE=48` / `EXECUTIONS_DATA_PRUNE_MAX_COUNT=500`, external volume `n8n_data` at `/home/node/.n8n` for `config` `encryptionKey` and runtime artifacts): n8n Automation at http://localhost:5678
 
 > **Upgrading from legacy SQLite:** Existing installations with state in `/home/node/.n8n/database.sqlite` can run `scripts/migrate_sqlite_to_postgres.js` inside the `n8n` container (`docker exec -i n8n_agent node < scripts/migrate_sqlite_to_postgres.js`) to idempotently migrate workflows, credentials, users, and API keys to PostgreSQL in read-only source mode.
 
