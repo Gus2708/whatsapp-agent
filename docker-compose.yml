@@ -5,6 +5,8 @@ networks:
 volumes:
   n8n_data:
     external: true
+  n8n_pgdata:
+    external: true
   waha_session_storage:
 
 services:
@@ -62,6 +64,37 @@ services:
     volumes:
       - waha_session_storage:/app/.sessions
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: ${N8N_PG_CONTAINER_NAME:-n8n_postgres}
+    restart: unless-stopped
+    networks:
+      agent_net:
+        aliases:
+          - postgres
+          - n8n_postgres
+          - n8n_postgres_serrucho
+    environment:
+      - POSTGRES_DB=${N8N_PG_DATABASE:-n8n}
+      - POSTGRES_USER=${N8N_PG_USER:-n8n}
+      - POSTGRES_PASSWORD=${N8N_PG_PASSWORD}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    command: ["postgres", "-c", "max_connections=50", "-c", "shared_buffers=128MB", "-c", "effective_cache_size=256MB", "-c", "work_mem=4MB", "-c", "maintenance_work_mem=64MB"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-n8n} -d $${POSTGRES_DB:-n8n}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    mem_limit: 512m
+    volumes:
+      - n8n_pgdata:/var/lib/postgresql/data
+
   n8n:
     build:
       context: .
@@ -77,7 +110,10 @@ services:
           - n8n_agent
           - n8n_serrucho
     depends_on:
-      - waha
+      waha:
+        condition: service_started
+      postgres:
+        condition: service_healthy
     environment:
       - AGENT_NAME=${AGENT_NAME:-Sales Agent}
       - BOT_NAME=${BOT_NAME:-${AGENT_NAME:-Sales Agent}}
@@ -134,16 +170,22 @@ services:
       - N8N_DEFAULT_PRODUCTION_WORKFLOW_ACTIVE=true
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
       - NODE_OPTIONS=--max-old-space-size=1536
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${N8N_PG_DATABASE:-n8n}
+      - DB_POSTGRESDB_USER=${N8N_PG_USER:-n8n}
+      - DB_POSTGRESDB_PASSWORD=${N8N_PG_PASSWORD}
+      - DB_POSTGRESDB_POOL_SIZE=10
       - EXECUTIONS_DATA_PRUNE=true
       - EXECUTIONS_DATA_MAX_AGE=48
       - EXECUTIONS_DATA_PRUNE_MAX_COUNT=500
-      # DB_SQLITE_VACUUM_ON_STARTUP se desactivó el 2026-08-18: con la base ya en 1.5 GB
-      # (más un WAL huérfano de 1.6 GB tras un crash) el VACUUM de arranque nunca terminaba.
-      # n8n se quedaba 13+ min bloqueado sin montar el editor ni los webhooks, así que WAHA
-      # recibía 404 en /webhook/whatsapp/inbound y los mensajes de los clientes se perdían.
-      # El prune incremental de arriba mantiene la base a raya sin bloquear el arranque.
-      # Si hace falta compactar, correr el VACUUM a mano con n8n detenido, no al arrancar.
-      # - DB_SQLITE_VACUUM_ON_STARTUP=true
+      # Solo se persisten las ejecuciones fallidas para acotar el crecimiento en PostgreSQL.
+      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=none
+      - EXECUTIONS_DATA_SAVE_ON_ERROR=all
+      # n8n utiliza PostgreSQL (servicio postgres) como base de datos principal.
+      # El volumen n8n_data permanece montado en /home/node/.n8n para conservar config
+      # (encryptionKey) y preservar database.sqlite intacto como respaldo de reversión.
     logging:
       driver: "json-file"
       options:

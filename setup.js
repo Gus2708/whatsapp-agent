@@ -1,4 +1,5 @@
 const { execSync } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
@@ -229,14 +230,40 @@ async function main() {
 
   // Leer y permitir configuración rápida
   let envContent = fs.readFileSync(envPath, 'utf8');
+  let envModified = false;
+
+  // Ensure local PostgreSQL credentials for n8n exist and have a strong random password
+  if (!/^N8N_PG_DATABASE=/m.test(envContent)) {
+    envContent += `${envContent.endsWith('\n') ? '' : '\r\n'}N8N_PG_DATABASE=n8n\r\n`;
+    envModified = true;
+  }
+  if (!/^N8N_PG_USER=/m.test(envContent)) {
+    envContent += 'N8N_PG_USER=n8n\r\n';
+    envModified = true;
+  }
+  const pgPassMatch = envContent.match(/^N8N_PG_PASSWORD=(.*)$/m);
+  const currentPgPass = pgPassMatch ? pgPassMatch[1].trim() : '';
+  if (!pgPassMatch) {
+    const generatedPgPass = crypto.randomBytes(16).toString('hex');
+    envContent += `N8N_PG_PASSWORD=${generatedPgPass}\r\n`;
+    envModified = true;
+  } else if (!currentPgPass || currentPgPass === 'change_me_local_postgres_password') {
+    const generatedPgPass = crypto.randomBytes(16).toString('hex');
+    envContent = envContent.replace(/^N8N_PG_PASSWORD=.*$/m, `N8N_PG_PASSWORD=${generatedPgPass}`);
+    envModified = true;
+  }
   
   log('Configuración de credenciales de n8n:', colors.gray);
   const n8nApiKey = await question('Ingresa tu N8N_API_KEY (presiona Enter para mantener la actual/ejemplo): ');
   
   if (n8nApiKey.trim()) {
     envContent = envContent.replace(/N8N_API_KEY=.*/, `N8N_API_KEY=${n8nApiKey.trim()}`);
-    fs.writeFileSync(envPath, envContent, 'utf8');
+    envModified = true;
     log(' -> N8N_API_KEY actualizada en .env.', colors.green);
+  }
+
+  if (envModified) {
+    fs.writeFileSync(envPath, envContent, 'utf8');
   }
 
   log('\n======================================================', colors.cyan);
@@ -253,14 +280,17 @@ async function main() {
     const startDocker = await question('¿Deseas levantar la pila Docker (n8n + WAHA) ahora mismo? (s/n): ');
     if (startDocker.toLowerCase() === 's') {
       try {
-        // Asegurar que el volumen externo n8n_data exista antes de levantar compose
-        const volumeCheck = runCmd('docker volume inspect n8n_data');
-        if (!volumeCheck) {
-          log(' -> Creando volumen de Docker externo "n8n_data"...', colors.gray);
-          runCmd('docker volume create n8n_data');
+        // Ensure external Docker volumes n8n_data and n8n_pgdata exist before starting compose
+        for (const volName of ['n8n_data', 'n8n_pgdata']) {
+          const volumeCheck = runCmd(`docker volume inspect ${volName}`);
+          if (!volumeCheck) {
+            log(` -> Creating external Docker volume "${volName}"...`, colors.gray);
+            runCmd(`docker volume create ${volName}`);
+          }
         }
       } catch (e) {
         runCmd('docker volume create n8n_data');
+        runCmd('docker volume create n8n_pgdata');
       }
 
       log('Levantando contenedores con docker-compose...', colors.gray);

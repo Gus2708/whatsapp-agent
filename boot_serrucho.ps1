@@ -71,13 +71,24 @@ try {
         Log "Creando volumen externo n8n_data..."
         docker volume create n8n_data | Out-Null
     }
+    $pgVol = docker volume inspect n8n_pgdata 2>$null
+    if (-not $pgVol) {
+        Log "Creando volumen externo n8n_pgdata..."
+        docker volume create n8n_pgdata | Out-Null
+    }
 
     # 2a) WAHA primero (sin build) -> WhatsApp arriba cueste lo que cueste.
     Log "docker compose up -d waha ..."
     docker compose up -d waha 2>$null
     if ($LASTEXITCODE -eq 0) { Log "WAHA: OK" } else { Log "WAHA: fallo (exit $LASTEXITCODE)" }
 
-    # 2b) n8n despues (aqui SI se compila). Si el build falla, WAHA ya quedo
+    # 2b) PostgreSQL antes de n8n para garantizar la base de datos disponible
+    #     incluso si n8n recurre a --no-build.
+    Log "docker compose up -d postgres ..."
+    docker compose up -d postgres 2>$null
+    if ($LASTEXITCODE -eq 0) { Log "PostgreSQL: OK" } else { Log "PostgreSQL: fallo (exit $LASTEXITCODE)" }
+
+    # 2c) n8n despues (aqui SI se compila). Si el build falla, WAHA ya quedo
     #     arriba; ademas intentamos arrancar la ultima imagen buena con
     #     --no-build para no quedarnos sin agente por un build roto.
     Log "docker compose up -d n8n ..."

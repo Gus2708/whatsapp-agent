@@ -52,15 +52,20 @@ if ($PortCheck) {
     }
 }
 
-# 2. Iniciar contenedores Docker (WAHA y n8n)
-Write-Host "`n[2/3] Levantando pila Docker (n8n + WAHA)..." -ForegroundColor Yellow
+# 2. Iniciar contenedores Docker (PostgreSQL, WAHA y n8n)
+Write-Host "`n[2/3] Levantando pila Docker (PostgreSQL + n8n + WAHA)..." -ForegroundColor Yellow
 
-# Asegurar que el volumen externo de Docker 'n8n_data' exista antes de levantar compose
+# Asegurar que los volúmenes externos de Docker 'n8n_data' y 'n8n_pgdata' existan antes de levantar compose
 if (Get-Command "docker" -ErrorAction SilentlyContinue) {
     $VolumeCheck = docker volume inspect n8n_data 2>$null
     if (!$VolumeCheck) {
         Write-Host " -> Creando volumen de Docker externo 'n8n_data'..." -ForegroundColor Gray
         docker volume create n8n_data >$null
+    }
+    $PgVolumeCheck = docker volume inspect n8n_pgdata 2>$null
+    if (!$PgVolumeCheck) {
+        Write-Host " -> Creando volumen de Docker externo 'n8n_pgdata'..." -ForegroundColor Gray
+        docker volume create n8n_pgdata >$null
     }
 }
 

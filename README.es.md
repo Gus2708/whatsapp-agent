@@ -31,12 +31,13 @@
 
 ## 🏗️ Arquitectura
 
-Basada en eventos. Los mensajes de WhatsApp llegan a través de WAHA, n8n orquesta con LLMs vía OpenRouter, consulta PostgreSQL en Supabase y almacena la memoria de clientes mediante Engram.
+Basada en eventos. Los mensajes de WhatsApp llegan a través de WAHA, n8n (v2.25.7, respaldado por una base de datos PostgreSQL 16 local dedicada para su estado interno) orquesta con LLMs vía OpenRouter, consulta datos comerciales en PostgreSQL de Supabase y almacena la memoria de clientes mediante Engram.
 
 ```mermaid
 graph TD
     Client["📱 Usuario WhatsApp"] <-->|"Mensajes y Notas de Voz"| WAHA["🐋 WAHA · Puerto 3000<br/>Engine NOWEB"]
-    WAHA -->|"Webhook 'message'"| N8N["🐋 Motor n8n · Puerto 5678<br/>4 Zonas"]
+    WAHA -->|"Webhook 'message'"| N8N["🐋 Motor n8n · Puerto 5678<br/>4 Zonas · v2.25.7"]
+    N8N <-->|"Estado Interno y MVCC"| N8NPG[("🐋 PostgreSQL 16 Local<br/>n8n_postgres · agent_net")]
     N8N -->|"Razonamiento"| Model["🧠 OpenRouter / OpenAI<br/>Razonamiento Multi-Herramienta"]
     N8N -->|"Notas de Voz → Texto"| Groq["🎙️ Groq Whisper <800ms"]
     N8N -->|"Catálogo / Precios / Pedidos"| Supabase[("☁️ Supabase PostgreSQL<br/>pg_trgm + pgvector + RLS")]
@@ -49,12 +50,13 @@ graph TD
 
 | Componente | Tecnología | Propósito |
 | --- | --- | --- |
-| HTTP API WhatsApp | WAHA (Docker, motor NOWEB) | Emulación de sesiones multidispositivo y despacho de webhooks |
-| Orquestador de Flujos | n8n (Docker) | Gestión de eventos, enrutamiento de estado, rate limiting y despacho de herramientas |
+| HTTP API WhatsApp | WAHA (`devlikeapro/waha:latest`, motor NOWEB) | Emulación de sesiones multidispositivo y despacho de webhooks (`waha_agent`, puerto `3000`) |
+| Orquestador de Flujos | n8n v2.25.7 (`whatsapp-agent-n8n`) | Gestión de eventos, enrutamiento de estado, rate limiting y despacho de herramientas (`n8n_agent`, puerto `5678`) |
+| BD de Estado Interno n8n | PostgreSQL 16 Local (`postgres:16-alpine`) | Persistencia MVCC interna (`n8n_postgres`, volumen `n8n_pgdata`) para flujos, credenciales, usuarios, claves API y ejecuciones fallidas |
 | Razonamiento LLM | OpenRouter / OpenAI | Razonamiento multiturno e invocación de herramientas |
 | Modelado de Decisiones | TypeSafe Jev vía Vercel AI Gateway + motores deterministas | Enrutamiento protegido y calificación de candidatos ambiguos; reglas locales para cálculos |
 | Transcripción de Voz | Groq Whisper | Transcripción de notas de audio en <800ms |
-| Base de Datos y Búsqueda | Supabase (PostgreSQL + pg_trgm + pgvector) | Catálogo de inventario, cola de pedidos y búsqueda vectorial híbrida |
+| Base de Datos Comercial y Búsqueda | Supabase (PostgreSQL + pg_trgm + pgvector) | Catálogo remoto de inventario, sesiones de chat, cola de pedidos y búsqueda vectorial híbrida |
 | Estado y Memoria | Engram + Contexto de Sesión en Memoria | Perfilado de clientes y caché de atributos con TTL de 30 minutos |
 | Flight Deck & CRM | Next.js 14 (App Router + Tailwind + GSAP + PWA) | Telemetría en vivo, cola de operaciones de chat, estudio RAG, consola DevOps |
 | Runtime y Testing | Node.js 22+ (Native Test Runner) | Herramientas CLI, guardias de sincronización y pruebas automatizadas de regresión |
@@ -273,8 +275,14 @@ flowchart TD
 
 ---
 
-## 🗄️ Esquema de Base de Datos
-PostgreSQL en Supabase con RLS. Tablas clave:
+## 🗄️ Arquitectura y Esquema de Base de Datos
+
+El sistema separa el estado interno del orquestador respecto de los datos comerciales mediante dos instancias diferenciadas de PostgreSQL:
+
+- **Estado Interno del Orquestador (`n8n_postgres` · `postgres:16-alpine`)**: Contenedor interno en `agent_net` (sin exposición de puertos en el host) que almacena flujos de trabajo de n8n, credenciales cifradas, usuarios, claves API y registros de ejecuciones fallidas sobre el volumen externo `n8n_pgdata`. Opera con concurrencia MVCC (`DB_TYPE=postgresdb`, `DB_POSTGRESDB_POOL_SIZE=10`), eliminando los bloqueos por tiempo de espera de `SqliteWriteConnectionMutex` ante ráfagas concurrentes de webhooks de WhatsApp y el sondeo cada 15 segundos de `Reenviar Ayuda`.
+- **Base de Datos Comercial Remota (Supabase PostgreSQL + `pg_trgm` + `pgvector` + RLS)**: Base de datos en la nube dedicada al inventario comercial, perfiles de clientes, sesiones de conversación y colas del personal.
+
+Tablas clave en Supabase:
 - `productos` — Catálogo de productos (SKU, descripción, precio, stock, código de barras)
 - `tazas` — Tasas de cambio dinámicas (BCV USD/EUR, Binance P2P)
 - `clientes` — Registro de clientes
@@ -298,14 +306,20 @@ git clone https://github.com/Gus2708/whatsapp-agent.git
 cd whatsapp-agent
 cp .env.example .env
 ```
-Editar `.env` con los datos de tu empresa (AGENT_NAME, STORE_NAME, STORE_LOCATION, STORE_SCHEDULE, STORE_CURRENCY) y llaves API (WAHA_API_KEY, OPENROUTER_API_KEY, GROQ_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY, opcionalmente OPENAI_API_KEY para embeddings pgvector).
+Editar `.env` con los datos del comercio (`AGENT_NAME`, `STORE_NAME`, `STORE_LOCATION`, `STORE_SCHEDULE`, `STORE_CURRENCY`), las credenciales de PostgreSQL local para n8n (`N8N_PG_DATABASE` por defecto `n8n`, `N8N_PG_USER` por defecto `n8n` y `N8N_PG_PASSWORD`), y las llaves API (`WAHA_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, opcionalmente `OPENAI_API_KEY` para embeddings pgvector). El instalador `node setup.js` aprovisiona `.env` de forma interactiva y genera automáticamente una contraseña aleatoria segura para `N8N_PG_PASSWORD` si no está configurada.
 
 ### 2. Iniciar Servicios con Docker
+Crear los volúmenes externos e iniciar la pila de tres contenedores (`setup.js`, `boot.ps1`, `boot_serrucho.ps1` y `start_agent.ps1` crean ambos volúmenes automáticamente e inician `postgres` antes de `n8n`):
 ```bash
+docker volume create n8n_data
+docker volume create n8n_pgdata
 docker compose up -d
 ```
-- Dashboard WAHA: http://localhost:3000 (escanear código QR)
-- Automatización n8n: http://localhost:5678
+- **`waha`** (`devlikeapro/waha:latest`, `waha_agent`, `mem_limit: 1200m`, puerto `3000:3000`, volumen `waha_session_storage`): Dashboard WAHA en http://localhost:3000 (escanear código QR)
+- **`postgres`** (`postgres:16-alpine`, `n8n_postgres`, interno en `agent_net`, `mem_limit: 512m`, `max_connections=50`, `shared_buffers=128MB`, `work_mem=4MB`, chequeo `pg_isready`, volumen externo `n8n_pgdata`): Base de datos local de estado de n8n
+- **`n8n`** (`whatsapp-agent-n8n`, `n8n_agent`, `mem_limit: 2048m`, puerto `5678:5678`, `depends_on: waha` (`service_started`) y `postgres` (`service_healthy`), poda de ejecuciones `EXECUTIONS_DATA_SAVE_ON_SUCCESS=none` / `EXECUTIONS_DATA_SAVE_ON_ERROR=all` / `EXECUTIONS_DATA_MAX_AGE=48` / `EXECUTIONS_DATA_PRUNE_MAX_COUNT=500`, volumen externo `n8n_data` en `/home/node/.n8n` para la clave `encryptionKey` de `config` y artefactos de ejecución): Automatización n8n en http://localhost:5678
+
+> **Migración desde SQLite heredado:** Las instalaciones previas con estado en `/home/node/.n8n/database.sqlite` pueden ejecutar `scripts/migrate_sqlite_to_postgres.js` dentro del contenedor `n8n` (`docker exec -i n8n_agent node < scripts/migrate_sqlite_to_postgres.js`) para migrar de manera idempotente flujos, credenciales, usuarios y claves API hacia PostgreSQL en modo fuente de solo lectura.
 
 ### 3. Iniciar el Dashboard Flight Deck CRM
 ```bash
@@ -375,10 +389,15 @@ npm test
 | `workflows/` | Flujos auxiliares de n8n (auto-mejora, reenvío de ayuda, vocabulario) |
 | `n8n_workflow.json` | Exportación completa del flujo del agente principal en n8n |
 | `data/business_context.example.json` | Plantilla para reglas de negocio personalizadas, horarios, zonas de entrega |
-| `docker-compose.yml` | Definición de contenedores para WAHA y n8n |
-| `supabase_schema.sql` | Esquema completo de PostgreSQL con RLS, triggers y funciones |
-| `boot.ps1` / `catchup.ps1` | Ejecutor en segundo plano y motor de recuperación de mensajes offline |
-| `waha_watchdog.ps1` | Monitoreo y auto-recuperación de la sesión de WAHA |
+| `docker-compose.yml` | Definición de contenedores para WAHA (`waha_agent`), PostgreSQL local (`n8n_postgres`) y n8n (`n8n_agent`) |
+| `setup.js` | Instalador interactivo; aprovisiona `.env` (generando `N8N_PG_PASSWORD`) y los volúmenes externos (`n8n_data`, `n8n_pgdata`) |
+| `scripts/migrate_sqlite_to_postgres.js` | Utilidad de migración idempotente de solo lectura desde `/home/node/.n8n/database.sqlite` hacia PostgreSQL |
+| `supabase_schema.sql` | Esquema completo de PostgreSQL en Supabase con RLS, triggers y funciones |
+| `boot.ps1` / `boot_serrucho.ps1` / `start_agent.ps1` | Ejecutores ordenados de ciclo de vida (crean `n8n_data` y `n8n_pgdata`, inician `waha` y `postgres` antes de `n8n`, levantan Engram) |
+| `catchup.ps1` | Motor de recuperación de mensajes offline |
+| `waha_watchdog.ps1` | Monitoreo de salud y auto-recuperación para Docker, `n8n_postgres` (`pg_isready`), `n8n_agent` y sesiones de WAHA |
+| `tools/system_health.ps1` | Auditor integral de salud de memoria host/WSL, `waha_agent`, `n8n_postgres`, `n8n_agent`, WAHA y Engram |
+| `tools/prune_n8n_db.js` | Utilitario heredado de poda de ejecuciones en SQLite (reemplazado en producción por PostgreSQL + `EXECUTIONS_DATA_PRUNE`) |
 | `tests/` | Suite de pruebas Node.js test:test (catálogo, workflow, recuperación, etc.) |
 | `ARCHITECTURE.md` | Libro blanco detallado de arquitectura |
 | `RAG.md` | Benchmarks de ingeniería y optimización del pipeline RAG |

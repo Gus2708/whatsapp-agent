@@ -30,6 +30,7 @@ if (Test-Path $envFile) {
 $WahaKey = $env:WAHA_API_KEY
 $WahaContainer = if ($env:WAHA_CONTAINER_NAME) { $env:WAHA_CONTAINER_NAME } else { "waha_agent" }
 $N8nContainer  = if ($env:N8N_CONTAINER_NAME) { $env:N8N_CONTAINER_NAME } else { "n8n_agent" }
+$PgContainer   = if ($env:N8N_PG_CONTAINER_NAME) { $env:N8N_PG_CONTAINER_NAME } else { "n8n_postgres" }
 
 $overallHealthy = $true
 
@@ -102,13 +103,22 @@ if ($dockerOk) {
   try {
     $psOut = docker ps --format "{{.Names}}|{{.Status}}" 2>$null
     $wahaUp = $false
+    $pgUp = $false
     $n8nUp = $false
     foreach ($line in $psOut) {
       $parts = $line -split '\|'
       if ($parts[0] -eq $WahaContainer) { $wahaUp = $parts[1].StartsWith("Up") }
+      if ($parts[0] -eq $PgContainer) { $pgUp = $parts[1].StartsWith("Up") }
       if ($parts[0] -eq $N8nContainer) { $n8nUp = $parts[1].StartsWith("Up") }
     }
+    $pgHealth = "detenido"
+    if ($pgUp) {
+      $hStatus = (docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}activo{{end}}" $PgContainer 2>$null)
+      if ($LASTEXITCODE -eq 0 -and $hStatus) { $pgHealth = $hStatus.Trim() } else { $pgHealth = "activo" }
+    }
+    $pgOk = ($pgUp -and ($pgHealth -eq "healthy" -or $pgHealth -eq "activo"))
     Print-Check "Contenedor WAHA ($WahaContainer)" $wahaUp "Estado: $(if ($wahaUp) {'En ejecucion'} else {'Detenido'})"
+    Print-Check "Contenedor PostgreSQL ($PgContainer)" $pgOk "Estado: $(if ($pgUp) {"En ejecucion ($pgHealth)"} else {'Detenido'})"
     Print-Check "Contenedor n8n ($N8nContainer)" $n8nUp "Estado: $(if ($n8nUp) {'En ejecucion'} else {'Detenido'})"
   } catch {
     Print-Check "Contenedores Docker" $false "Error consultando docker ps"

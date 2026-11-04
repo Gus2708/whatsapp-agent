@@ -50,6 +50,9 @@ try {
 
 $WahaContainer = if ($env:WAHA_CONTAINER_NAME) { $env:WAHA_CONTAINER_NAME } else { "waha_agent" }
 $N8nContainer  = if ($env:N8N_CONTAINER_NAME) { $env:N8N_CONTAINER_NAME } else { "n8n_agent" }
+$PgContainer   = if ($env:N8N_PG_CONTAINER_NAME) { $env:N8N_PG_CONTAINER_NAME } else { "n8n_postgres" }
+$PgUser        = if ($env:N8N_PG_USER) { $env:N8N_PG_USER } else { "n8n" }
+$PgDb          = if ($env:N8N_PG_DATABASE) { $env:N8N_PG_DATABASE } else { "n8n" }
 
 function Rotate-LogFile([string]$path, [int]$maxBytes = 5242880) {
   if (Test-Path $path) {
@@ -227,7 +230,14 @@ try {
           Set-Field $st "lastDockerHeal" ((Get-Date).ToString("o"))
           Set-Field $st "dockerFailedStreak" 0
           Save-State $st
-          Invoke-DockerCommand "start $WahaContainer $N8nContainer" 20 | Out-Null
+          # Iniciar PostgreSQL y WAHA primero y esperar disponibilidad de la base de datos antes de n8n
+          Invoke-DockerCommand "start $PgContainer $WahaContainer" 20 | Out-Null
+          for ($pgWait = 0; $pgWait -lt 15; $pgWait++) {
+            $pgReady = Invoke-DockerCommand "exec $PgContainer pg_isready -U $PgUser -d $PgDb" 5
+            if ($pgReady) { break }
+            Start-Sleep -Seconds 1
+          }
+          Invoke-DockerCommand "start $N8nContainer" 20 | Out-Null
         } else {
           Write-Log "Autorecuperación de Docker en cooldown (<15 min)."
         }
@@ -276,6 +286,17 @@ try {
       if (-not $lastN8n -or ((Get-Date) - $lastN8n).TotalMinutes -ge 8) {
         Write-Log "Reiniciando contenedor $N8nContainer tras $n8nStreak fallos seguidos..."
         try {
+          # Verificar que el contenedor PostgreSQL esté en ejecución antes de reiniciar n8n
+          $pgRunning = Invoke-DockerCommand "inspect $PgContainer --format '{{.State.Running}}'" 10
+          if (-not $pgRunning -or $pgRunning[0].Trim() -ne "true") {
+            Write-Log "Contenedor $PgContainer detenido. Iniciándolo antes de reiniciar $N8nContainer..."
+            Invoke-DockerCommand "start $PgContainer" 20 | Out-Null
+            for ($pgWait = 0; $pgWait -lt 15; $pgWait++) {
+              $pgReady = Invoke-DockerCommand "exec $PgContainer pg_isready -U $PgUser -d $PgDb" 5
+              if ($pgReady) { break }
+              Start-Sleep -Seconds 1
+            }
+          }
           Invoke-DockerCommand "restart $N8nContainer" 30 | Out-Null
           Set-Field $st "lastN8nRestart" ((Get-Date).ToString("o"))
           Set-Field $st "n8nFailedStreak" 0

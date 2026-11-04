@@ -31,12 +31,13 @@
 
 ## 🏗️ Architecture
 
-Event-driven. WhatsApp messages arrive via WAHA, n8n orchestrates with LLMs via OpenRouter, queries PostgreSQL in Supabase, stores customer memory with Engram.
+Event-driven. WhatsApp messages arrive via WAHA, n8n (v2.25.7, backed by a dedicated local PostgreSQL 16 state database) orchestrates with LLMs via OpenRouter, queries business data in Supabase PostgreSQL, and stores customer memory with Engram.
 
 ```mermaid
 graph TD
     Client["📱 WhatsApp User"] <-->|"Messages & Voice"| WAHA["🐋 WAHA · Port 3000<br/>Engine NOWEB"]
-    WAHA -->|"Webhook 'message'"| N8N["🐋 n8n Engine · Port 5678<br/>4 Zones"]
+    WAHA -->|"Webhook 'message'"| N8N["🐋 n8n Engine · Port 5678<br/>4 Zones · v2.25.7"]
+    N8N <-->|"Internal State & MVCC"| N8NPG[("🐋 Local PostgreSQL 16<br/>n8n_postgres · agent_net")]
     N8N -->|"Reasoning"| Model["🧠 OpenRouter / OpenAI<br/>LLM Multi-Tool Reasoning"]
     N8N -->|"Voice Notes → Text"| Groq["🎙️ Groq Whisper <800ms"]
     N8N -->|"Catalog / Prices / Orders"| Supabase[("☁️ Supabase PostgreSQL<br/>pg_trgm + pgvector + RLS")]
@@ -49,12 +50,13 @@ graph TD
 
 | Component | Technology | Purpose |
 | --- | --- | --- |
-| WhatsApp HTTP API | WAHA (Docker, engine NOWEB) | Multi-device session emulation and webhook delivery |
-| Workflow Orchestrator | n8n (Docker) | Event management, state routing, rate limiting, and tool dispatch |
+| WhatsApp HTTP API | WAHA (`devlikeapro/waha:latest`, engine NOWEB) | Multi-device session emulation and webhook delivery (`waha_agent`, port `3000`) |
+| Workflow Orchestrator | n8n v2.25.7 (`whatsapp-agent-n8n`) | Event management, state routing, rate limiting, and tool dispatch (`n8n_agent`, port `5678`) |
+| n8n Internal State DB | Local PostgreSQL 16 (`postgres:16-alpine`) | Internal MVCC persistence (`n8n_postgres`, volume `n8n_pgdata`) for workflows, credentials, users, API keys, and failed executions |
 | LLM Reasoning | OpenRouter / OpenAI | Multi-turn conversational reasoning and tool invocation |
 | Decision Modeling | TypeSafe Jev via Vercel AI Gateway + deterministic engines | Guarded message routing and qualification of ambiguous product candidates; local rules handle calculations |
 | Voice Transcription | Groq Whisper | Audio note transcription in <800ms |
-| Database & Search | Supabase (PostgreSQL + pg_trgm + pgvector) | Inventory catalog, order queue, and hybrid vector search |
+| Business Database & Search | Supabase (PostgreSQL + pg_trgm + pgvector) | Remote inventory catalog, chat sessions, order queue, and hybrid vector search |
 | State & Long-Term Memory | Engram + In-Memory Session Context | Customer profiling & 30-min TTL conversational attribute cache |
 | Flight Deck & CRM | Next.js 14 (App Router + Tailwind + GSAP + PWA) | Live telemetry, chat operations queue, RAG studio, DevOps console |
 | Runtime & Testing | Node.js 22+ (Native Test Runner) | CLI tools, source/workflow sync guards, and automated regression tests |
@@ -273,8 +275,14 @@ flowchart TD
 
 ---
 
-## 🗄️ Database Schema
-Supabase PostgreSQL with RLS. Key tables:
+## 🗄️ Database Architecture & Schema
+
+The system separates orchestrator internal state from business data across two distinct PostgreSQL instances:
+
+- **Local Orchestrator State (`n8n_postgres` · `postgres:16-alpine`)**: Internal-only container on `agent_net` (no host port exposure) storing n8n workflows, encrypted credentials, users, API keys, and failed execution logs on external volume `n8n_pgdata`. Uses MVCC concurrency (`DB_TYPE=postgresdb`, `DB_POSTGRESDB_POOL_SIZE=10`), eliminating `SqliteWriteConnectionMutex` lock timeouts under concurrent inbound WhatsApp webhooks and 15-second `Reenviar Ayuda` polling.
+- **Remote Business Database (Supabase PostgreSQL + `pg_trgm` + `pgvector` + RLS)**: Cloud database storing commercial inventory, customer profiles, chat session state, and staff queues.
+
+Key Supabase tables:
 - `productos` — Product catalog (SKU, description, price, stock, barcode)
 - `tazas` — Dynamic exchange rates (BCV USD/EUR, Binance P2P)
 - `clientes` — Customer registry
@@ -298,14 +306,20 @@ git clone https://github.com/Gus2708/whatsapp-agent.git
 cd whatsapp-agent
 cp .env.example .env
 ```
-Edit `.env` with business branding (AGENT_NAME, STORE_NAME, STORE_LOCATION, STORE_SCHEDULE, STORE_CURRENCY) and API keys (WAHA_API_KEY, OPENROUTER_API_KEY, GROQ_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY, optionally OPENAI_API_KEY for pgvector embeddings).
+Edit `.env` with business branding (`AGENT_NAME`, `STORE_NAME`, `STORE_LOCATION`, `STORE_SCHEDULE`, `STORE_CURRENCY`), local n8n PostgreSQL settings (`N8N_PG_DATABASE` default `n8n`, `N8N_PG_USER` default `n8n`, and `N8N_PG_PASSWORD`), and API keys (`WAHA_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, optionally `OPENAI_API_KEY` for pgvector embeddings). Running `node setup.js` provisions `.env` interactively and auto-generates a strong random `N8N_PG_PASSWORD` when unset.
 
 ### 2. Start Services via Docker
+Create the external volumes and start the three-container stack (`setup.js`, `boot.ps1`, `boot_serrucho.ps1`, and `start_agent.ps1` create both volumes automatically and start `postgres` before `n8n`):
 ```bash
+docker volume create n8n_data
+docker volume create n8n_pgdata
 docker compose up -d
 ```
-- WAHA Dashboard: http://localhost:3000 (scan QR code)
-- n8n Automation: http://localhost:5678
+- **`waha`** (`devlikeapro/waha:latest`, `waha_agent`, `mem_limit: 1200m`, port `3000:3000`, volume `waha_session_storage`): WAHA Dashboard at http://localhost:3000 (scan QR code)
+- **`postgres`** (`postgres:16-alpine`, `n8n_postgres`, internal-only on `agent_net`, `mem_limit: 512m`, `max_connections=50`, `shared_buffers=128MB`, `work_mem=4MB`, `pg_isready` healthcheck, external volume `n8n_pgdata`): Local n8n state database
+- **`n8n`** (`whatsapp-agent-n8n`, `n8n_agent`, `mem_limit: 2048m`, port `5678:5678`, `depends_on: waha` (`service_started`) and `postgres` (`service_healthy`), execution pruning `EXECUTIONS_DATA_SAVE_ON_SUCCESS=none` / `EXECUTIONS_DATA_SAVE_ON_ERROR=all` / `EXECUTIONS_DATA_MAX_AGE=48` / `EXECUTIONS_DATA_PRUNE_MAX_COUNT=500`, external volume `n8n_data` at `/home/node/.n8n` for `config` `encryptionKey` and runtime artifacts): n8n Automation at http://localhost:5678
+
+> **Upgrading from legacy SQLite:** Existing installations with state in `/home/node/.n8n/database.sqlite` can run `scripts/migrate_sqlite_to_postgres.js` inside the `n8n` container (`docker exec -i n8n_agent node < scripts/migrate_sqlite_to_postgres.js`) to idempotently migrate workflows, credentials, users, and API keys to PostgreSQL in read-only source mode.
 
 ### 3. Launch the Flight Deck CRM
 ```bash
@@ -375,10 +389,15 @@ npm test
 | `workflows/` | Auxiliary n8n workflows (auto-improvement, help forwarding, vocabulary) |
 | `n8n_workflow.json` | Complete export of the main n8n agent workflow |
 | `data/business_context.example.json` | Template for custom business rules, hours, delivery zones |
-| `docker-compose.yml` | Container definitions for WAHA and n8n |
-| `supabase_schema.sql` | Full PostgreSQL schema with RLS, triggers, and functions |
-| `boot.ps1` / `catchup.ps1` | Production background runner and offline message recovery engine |
-| `waha_watchdog.ps1` | WAHA session health monitoring and auto-recovery |
+| `docker-compose.yml` | Container definitions for WAHA (`waha_agent`), local PostgreSQL (`n8n_postgres`), and n8n (`n8n_agent`) |
+| `setup.js` | Interactive installer; provisions `.env` (auto-generating `N8N_PG_PASSWORD`) and external volumes (`n8n_data`, `n8n_pgdata`) |
+| `scripts/migrate_sqlite_to_postgres.js` | Idempotent read-only migration utility from legacy `/home/node/.n8n/database.sqlite` to PostgreSQL |
+| `supabase_schema.sql` | Full Supabase PostgreSQL schema with RLS, triggers, and functions |
+| `boot.ps1` / `boot_serrucho.ps1` / `start_agent.ps1` | Ordered lifecycle runners (ensure `n8n_data` & `n8n_pgdata` volumes, start `waha` and `postgres` before `n8n`, boot Engram) |
+| `catchup.ps1` | Offline message recovery engine |
+| `waha_watchdog.ps1` | Health monitoring and auto-recovery for Docker, `n8n_postgres` (`pg_isready`), `n8n_agent`, and WAHA sessions |
+| `tools/system_health.ps1` | End-to-end health auditor for host/WSL memory, `waha_agent`, `n8n_postgres`, `n8n_agent`, WAHA, and Engram |
+| `tools/prune_n8n_db.js` | Legacy SQLite execution log pruner (superseded in production by PostgreSQL + `EXECUTIONS_DATA_PRUNE`) |
 | `tests/` | Node.js test:test suite (catalog, workflow, recovery, etc.) |
 | `ARCHITECTURE.md` | Deep architectural whitepaper |
 | `RAG.md` | RAG pipeline engineering benchmarks and tuning |

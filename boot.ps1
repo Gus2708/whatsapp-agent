@@ -45,7 +45,7 @@ try {
     Log "ERROR starting Docker: $($_.Exception.Message)"
 }
 
-# 2) Containers WAHA + n8n
+# 2) Containers WAHA + PostgreSQL + n8n
 try {
     Set-Location $ProjectDir
     $vol = docker volume inspect n8n_data 2>$null
@@ -53,10 +53,19 @@ try {
         Log "Creating external volume n8n_data..."
         docker volume create n8n_data | Out-Null
     }
+    $pgVol = docker volume inspect n8n_pgdata 2>$null
+    if (-not $pgVol) {
+        Log "Creating external volume n8n_pgdata..."
+        docker volume create n8n_pgdata | Out-Null
+    }
 
     Log "Starting WAHA..."
     docker compose up -d waha 2>$null
     if ($LASTEXITCODE -eq 0) { Log "WAHA: OK" } else { Log "WAHA: Failed (exit $LASTEXITCODE)" }
+
+    Log "Starting PostgreSQL..."
+    docker compose up -d postgres 2>$null
+    if ($LASTEXITCODE -eq 0) { Log "PostgreSQL: OK" } else { Log "PostgreSQL: Failed (exit $LASTEXITCODE)" }
 
     Log "Starting n8n..."
     docker compose up -d n8n 2>$null

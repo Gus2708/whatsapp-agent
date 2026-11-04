@@ -124,7 +124,7 @@ dashboard/
 
 ### Prerequisites
 - Node.js >= 22
-- Running WhatsApp Agent stack (WAHA + n8n + Supabase)
+- Running WhatsApp Agent stack (WAHA + local PostgreSQL `n8n_postgres` + n8n + Supabase)
 
 ### Install & Run
 ```bash
