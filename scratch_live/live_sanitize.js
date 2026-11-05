@@ -1,7 +1,9 @@
-// Guardia anti-salida-corrupta del agente + detección de RESERVA (avisar al empleado).
+// Guardia anti-salida-corrupta del agente + detección de RESERVA y PAGO (avisar al empleado).
 // 1) Si el LLM filtra una tool-call o entra en bucle, reemplaza por un fallback amable.
 // 2) Si el agente marcó [RESERVA: ...], quita el marcador (el cliente NUNCA lo ve) y registra
 //    la reserva en atenciones_pendientes para que la app avise al empleado (nombre + producto).
+// 3) Si el agente promete atención inmediata para procesar un pago, registra la atención
+//    pendiente y cambia chat_sessions a 'manual'.
 // BEGIN CONVERSATION FUNCTIONS
 function searchDecision(status) {
   const action = { exact: 'show_results', vague: 'clarify', missing: 'handoff', weak: 'handoff',
@@ -68,6 +70,7 @@ const ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
 const FALLBACK = 'Disculpa 🙏😊, se me enredó un cable procesando eso 😅🙏🙈. ¿Me repites qué necesitas (o tu lista de materiales)? Así te lo busco y te armo el presupuesto enseguida 😊🙏';
 const RESERVA_RE = /\[\s*RESERVA\s*:?\s*([^\]]*)\]/i;
+const PAGO_HANDOFF_RE = /para\s+procesar\s+el\s+pago\s+con\s+gusto\s+un\s+empleado\s+te\s+atiende\s+enseguida/i;
 
 function looksCorrupt(text) {
   if (!text || typeof text !== 'string') return false;
@@ -163,6 +166,32 @@ for (const item of items) {
         }
       }
     } catch (e) {}
+  }
+
+  if (typeof item.json?.output === 'string' && PAGO_HANDOFF_RE.test(item.json.output)) {
+    item.json._pago_handoff = true;
+    if (telefono) {
+      let clienteMsg = '';
+      try {
+        const p = $('Webhook Trigger').first().json.body.payload;
+        clienteMsg = String((p && p.body) || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+      } catch (e) {}
+      const motivoPago = '💳 PAGO: ' + (clienteMsg || 'el cliente solicita procesar un pago');
+      try {
+        let yaHay = false;
+        try { const r = await axios.get(SB + '/rest/v1/atenciones_pendientes?status=eq.pendiente&select=id&telefono=eq.' + encodeURIComponent(telefono), { headers: H, timeout: 3000 }); yaHay = Array.isArray(r.data) && r.data.length > 0; } catch (e) {}
+        if (!yaHay) {
+          let nombre = null;
+          try { const c = await axios.get(SB + '/rest/v1/clientes_chat?select=nombre&telefono=eq.' + encodeURIComponent(telefono), { headers: H, timeout: 3000 }); nombre = (c.data && c.data[0] && c.data[0].nombre) || null; } catch (e) {}
+          if (!nombre && pushName) nombre = String(pushName).slice(0, 80);
+          await axios.post(SB + '/rest/v1/atenciones_pendientes', { telefono, nombre, motivo: motivoPago, status: 'pendiente' }, { headers: H, timeout: 3000 });
+        }
+      } catch (e) {}
+      try {
+        const nowIso = new Date().toISOString();
+        await axios.post(SB + '/rest/v1/chat_sessions?on_conflict=telefono', { telefono, estado: 'manual', manual_since: nowIso, updated_at: nowIso }, { headers: { ...H, Prefer: 'resolution=merge-duplicates' }, timeout: 3000 });
+      } catch (e) {}
+    }
   }
 }
 

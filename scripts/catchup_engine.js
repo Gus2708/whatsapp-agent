@@ -11,7 +11,16 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { validateCatchupState, validateWahaSession } = require('./schemas/recovery_schemas');
-const { maskChatId, buildCatchupPayload, evaluateCandidates, parseEnv, normalizeToPhoneJid, resolveAliases } = require('./lib/catchup_logic');
+const {
+  maskChatId,
+  buildCatchupPayload,
+  evaluateCandidates,
+  reconcileCandidateWithChatHistory,
+  getProcessedStateForAliases,
+  parseEnv,
+  normalizeToPhoneJid,
+  resolveAliases
+} = require('./lib/catchup_logic');
 
 const PROJECT_DIR = path.resolve(__dirname, '..');
 const ENV_FILE = path.join(PROJECT_DIR, '.env');
@@ -35,6 +44,7 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 const WEBHOOK_URL = `${N8N_BASE}/webhook/whatsapp/inbound`;
 
 const MAX_AGE_HOURS = 48;
+const CATCHUP_HEALTH_WAIT_SEC = parseInt(process.env.CATCHUP_HEALTH_WAIT_SEC, 10) || 900;
 const DEFAULT_MAX_CHATS = 20;
 const DELAY_BETWEEN_CHATS_MS = 8000;
 const LOCK_TIMEOUT_MS = 10 * 60 * 1000; // 10 min
@@ -219,7 +229,7 @@ async function fetchCandidatesData(maxAgeHours) {
 
   let supabaseMsgs = [];
   try {
-    const url = `${SUPABASE_URL}/rest/v1/mensajes_procesados?procesado_at=gte.${encodeURIComponent(sinceIso)}&order=procesado_at.asc`;
+    const url = `${SUPABASE_URL}/rest/v1/mensajes_procesados?procesado_at=gte.${encodeURIComponent(sinceIso)}&order=procesado_at.desc&limit=1000`;
     const res = await fetch(url, { headers: sbHeaders, signal: AbortSignal.timeout(10000) });
     if (res.ok) supabaseMsgs = await res.json();
   } catch (e) {
@@ -228,7 +238,7 @@ async function fetchCandidatesData(maxAgeHours) {
 
   let wahaChats = [];
   try {
-    const res = await fetch(`${WAHA_BASE}/api/default/chats/overview?limit=25`, {
+    const res = await fetch(`${WAHA_BASE}/api/default/chats/overview?limit=100`, {
       headers: { 'X-Api-Key': WAHA_API_KEY },
       signal: AbortSignal.timeout(15000)
     });
@@ -282,25 +292,24 @@ async function fetchCandidatesData(maxAgeHours) {
 }
 
 /**
- * Red de seguridad: consulta los últimos mensajes reales del chat en WAHA y devuelve
- * true si ya hay un saliente (empleado o bot) posterior al mensaje del cliente.
- * Cubre chats fuera del top del overview. Si la consulta falla, devuelve false.
+ * Consulta los últimos mensajes reales del chat en WAHA (probando alias si el JID
+ * principal devuelve vacío) para reconciliar el candidato antes de inyectar.
  */
-async function hasOutgoingAfter(chatId, clientTsSec) {
-  try {
-    const url = `${WAHA_BASE}/api/default/chats/${encodeURIComponent(chatId)}/messages?limit=10&downloadMedia=false`;
-    const res = await fetch(url, { headers: { 'X-Api-Key': WAHA_API_KEY }, signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return false;
-    const msgs = await res.json();
-    if (!Array.isArray(msgs)) return false;
-    return msgs.some(m => {
-      let ts = Number(m.timestamp) || 0;
-      if (ts > 1e12) ts = Math.floor(ts / 1000);
-      return m.fromMe === true && ts >= clientTsSec;
-    });
-  } catch (e) {
-    return false;
+async function fetchChatMessages(chatId, aliases = []) {
+  const candidates = [chatId, ...aliases.filter(a => a && a !== chatId)];
+  for (const jid of candidates) {
+    try {
+      const url = `${WAHA_BASE}/api/default/chats/${encodeURIComponent(jid)}/messages?limit=20&downloadMedia=false`;
+      const res = await fetch(url, {
+        headers: { 'X-Api-Key': WAHA_API_KEY },
+        signal: AbortSignal.timeout(8000)
+      });
+      if (!res.ok) continue;
+      const msgs = await res.json();
+      if (Array.isArray(msgs) && msgs.length > 0) return msgs;
+    } catch (e) {}
   }
+  return [];
 }
 
 async function main() {
@@ -318,10 +327,11 @@ async function main() {
   if (!force && !acquireLock()) return;
 
   try {
-    const ready = await waitForHealth(90, 3);
+    // n8n (SQLite grande) puede tardar varios minutos en montar los webhooks tras un reinicio.
+    const ready = await waitForHealth(CATCHUP_HEALTH_WAIT_SEC, 5);
     if (!ready) {
       const health = await checkHealth();
-      log(`Servicios no listos para catchup tras 90s de espera (WAHA=${health.wahaOk}, n8n=${health.n8nOk}). Se aborta ejecución.`);
+      log(`Servicios no listos para catchup tras ${CATCHUP_HEALTH_WAIT_SEC}s de espera (WAHA=${health.wahaOk}, n8n=${health.n8nOk}). Se aborta ejecución.`);
       return;
     }
 
@@ -358,7 +368,40 @@ async function main() {
       }
 
       const masked = maskChatId(item.chatId);
-      log(`Procesando chat pendiente: ${masked} (origen=${item.source}, texto="${item.text.slice(0, 40)}...")`);
+      const chatMessages = await fetchChatMessages(item.chatId, item.aliases || []);
+      const reconciliation = reconcileCandidateWithChatHistory({
+        candidate: item,
+        messages: chatMessages,
+        maxAgeHours: MAX_AGE_HOURS,
+        nowMs: Date.now()
+      });
+
+      if (reconciliation.action === 'skip_answered') {
+        log(`Omitido ${masked}: ya existe una respuesta saliente posterior al mensaje del cliente.`);
+        if (!dryRun) {
+          state.processed[item.chatId] = {
+            injectedAt: Date.now(),
+            timestamp: item.timestamp,
+            text: item.text.slice(0, 50)
+          };
+          saveState(state);
+        }
+        continue;
+      }
+
+      const activeCandidate = reconciliation.candidate || item;
+      const aliasesToCheck = activeCandidate.aliases || item.aliases || [activeCandidate.chatId];
+      const prevProcessed = getProcessedStateForAliases(aliasesToCheck, state.processed);
+      if (
+        prevProcessed &&
+        (Date.now() - prevProcessed.injectedAt) < RECENT_COOLDOWN_MS &&
+        prevProcessed.timestamp === activeCandidate.timestamp
+      ) {
+        log(`Omitido ${masked}: mensaje reconciliado (ts=${activeCandidate.timestamp}) ya fue inyectado recientemente.`);
+        continue;
+      }
+
+      log(`Procesando chat pendiente: ${masked} (origen=${activeCandidate.source}, reconciliacion=${reconciliation.action}, texto="${activeCandidate.text.slice(0, 40)}...")`);
 
       if (dryRun) {
         injectedCount++;
@@ -366,19 +409,12 @@ async function main() {
         continue;
       }
 
-      if (await hasOutgoingAfter(item.chatId, item.timestamp)) {
-        log(`Omitido ${masked}: ya existe una respuesta saliente posterior al mensaje del cliente.`);
-        state.processed[item.chatId] = { injectedAt: Date.now(), timestamp: item.timestamp, text: item.text.slice(0, 50) };
-        saveState(state);
-        continue;
-      }
-
       let payload;
       try {
         payload = buildCatchupPayload({
-          chatId: item.chatId,
-          text: item.text,
-          timestamp: item.timestamp,
+          chatId: activeCandidate.chatId,
+          text: activeCandidate.text,
+          timestamp: activeCandidate.timestamp,
           nowMs: Date.now()
         });
       } catch (err) {
@@ -397,10 +433,10 @@ async function main() {
         if (postRes.ok) {
           injectedCount++;
           log(`Inyectado con éxito a n8n: ${masked} (HTTP ${postRes.status})`);
-          state.processed[item.chatId] = {
+          state.processed[activeCandidate.chatId] = {
             injectedAt: Date.now(),
-            timestamp: item.timestamp,
-            text: item.text.slice(0, 50)
+            timestamp: activeCandidate.timestamp,
+            text: activeCandidate.text.slice(0, 50)
           };
           saveState(state);
         } else {
@@ -433,6 +469,7 @@ if (require.main === module) {
 module.exports = {
   checkHealth,
   waitForHealth,
+  fetchChatMessages,
   acquireLock,
   releaseLock,
   getState,

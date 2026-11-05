@@ -17,6 +17,8 @@ const {
   isUnanswered,
   buildCatchupPayload,
   evaluateCandidates,
+  reconcileCandidateWithChatHistory,
+  getProcessedStateForAliases,
   parseEnv,
   normalizeToPhoneJid,
   resolveAliases
@@ -109,6 +111,17 @@ describe('Catchup Domain Logic', () => {
     assert.equal(isHumanHandover({ estado: 'automatico' }), false);
     assert.equal(isHumanHandover({ estado: 'automatico', manual_since: '2026-09-23T15:54:22.918Z' }), false);
     assert.equal(isHumanHandover(null), false);
+  });
+
+  test('isHumanHandover honors 30-minute TTL on manual_since while keeping no_atender sticky', () => {
+    const nowMs = 1788585000000;
+    const activeSince = new Date(nowMs - 15 * 60 * 1000).toISOString(); // 15 min ago (<30m)
+    const expiredSince = new Date(nowMs - 31 * 60 * 1000).toISOString(); // 31 min ago (>30m)
+
+    assert.equal(isHumanHandover({ estado: 'manual', manual_since: activeSince }, { nowMs }), true);
+    assert.equal(isHumanHandover({ estado: 'manual', manual_since: expiredSince }, { nowMs }), false);
+    assert.equal(isHumanHandover({ estado: 'manual', manual_since: expiredSince, no_atender: true }, { nowMs }), true);
+    assert.equal(isHumanHandover({ estado: 'manual' }, { nowMs }), true);
   });
 
   test('isUnanswered correctly identifies unanswered customer queries', () => {
@@ -208,6 +221,20 @@ describe('Candidate Evaluation Pipeline (TDD Scenarios)', () => {
       nowMs: NOW
     });
     assert.equal(candidates.length, 0);
+  });
+
+  test('Scenario 3b: Expired manual_since (>30m) is eligible unless no_atender is true', () => {
+    const supabaseMsgs = [
+      { chat_id: '584121112233@c.us', texto: 'Buenos días tienen cemento?', procesado_at: new Date(NOW - 300000).toISOString() },
+      { chat_id: '584129998877@c.us', texto: 'Factura proveedor', procesado_at: new Date(NOW - 300000).toISOString() }
+    ];
+    const sessionsMap = {
+      '584121112233@c.us': { estado: 'manual', manual_since: new Date(NOW - 45 * 60 * 1000).toISOString(), no_atender: false },
+      '584129998877@c.us': { estado: 'manual', manual_since: new Date(NOW - 45 * 60 * 1000).toISOString(), no_atender: true }
+    };
+    const candidates = evaluateCandidates({ supabaseMsgs, sessionsMap, nowMs: NOW });
+    assert.equal(candidates.length, 1);
+    assert.equal(candidates[0].chatId, '584121112233@c.us');
   });
 
   test('Scenario 4: Message from WAHA store during n8n downtime is captured', () => {
@@ -353,6 +380,163 @@ describe('Candidate Evaluation Pipeline (TDD Scenarios)', () => {
     });
 
     assert.equal(candidates.length, 0, 'No debe disparar catchup si algún alias está en handover manual');
+  });
+
+  test('Scenario 10: Descending supabaseMsgs within same second retains newest sub-second message', () => {
+    const baseSecMs = Math.floor((NOW - 120000) / 1000) * 1000;
+    const supabaseMsgs = [
+      { chat_id: '584140655276@c.us', texto: 'Mensaje más reciente', procesado_at: new Date(baseSecMs + 850).toISOString() },
+      { chat_id: '584140655276@c.us', texto: 'Mensaje anterior mismo segundo', procesado_at: new Date(baseSecMs + 150).toISOString() }
+    ];
+    const candidates = evaluateCandidates({ supabaseMsgs, nowMs: NOW });
+    assert.equal(candidates.length, 1);
+    assert.equal(candidates[0].text, 'Mensaje más reciente');
+  });
+});
+
+describe('Chat History Pre-Flight Reconciliation (Stale Message Prevention)', () => {
+  const NOW = 1788585000000; // Today 10:50 a.m. reference
+
+  test('Screenshot bug reproduction: drops yesterday 9:49 a.m. Zelle message and injects today 10:40 a.m. removedor query', () => {
+    const yesterdayHandoffMs = NOW - (25 * 3600 * 1000 + 3 * 60 * 1000); // Yesterday 9:47 a.m.
+    const yesterdayZelleMs = NOW - (25 * 3600 * 1000 + 1 * 60 * 1000);   // Yesterday 9:49 a.m.
+    const todayQuestionSec = Math.floor((NOW - 10 * 60 * 1000) / 1000);  // Today 10:40 a.m.
+
+    // Supabase only has yesterday's 9:49 a.m. message (today's arrived while n8n was down or truncated)
+    const supabaseMsgs = [
+      {
+        chat_id: '584147654321@c.us',
+        texto: 'Me da datos de zelle para cancelar y retirar personalmente',
+        procesado_at: new Date(yesterdayZelleMs).toISOString()
+      }
+    ];
+    const botMsgsMap = {
+      '584147654321@c.us': { created_at: new Date(yesterdayHandoffMs).toISOString() }
+    };
+    const sessionsMap = {
+      '584147654321@c.us': { estado: 'manual', manual_since: new Date(yesterdayHandoffMs).toISOString() }
+    };
+
+    // Overview missed the chat (outside top window), so wahaChats = []
+    const pending = evaluateCandidates({
+      supabaseMsgs,
+      wahaChats: [],
+      sessionsMap,
+      botMsgsMap,
+      nowMs: NOW
+    });
+    assert.equal(pending.length, 1);
+    assert.equal(pending[0].text, 'Me da datos de zelle para cancelar y retirar personalmente');
+
+    // Pre-flight reconciliation fetches real WAHA chat history (newest-first as WAHA returns)
+    const wahaChatHistory = [
+      {
+        id: 'msg_today_1040',
+        fromMe: false,
+        timestamp: todayQuestionSec,
+        body: 'buenos días hay venden removedor de pintura'
+      },
+      {
+        id: 'msg_yest_0949',
+        fromMe: false,
+        timestamp: Math.floor(yesterdayZelleMs / 1000),
+        body: 'Me da datos de zelle para cancelar y retirar personalmente'
+      },
+      {
+        id: 'msg_yest_0947',
+        fromMe: true,
+        timestamp: Math.floor(yesterdayHandoffMs / 1000),
+        body: 'En un momento uno de nuestros asesores comerciales continuará atendiéndote de forma personalizada. ¡Muchas gracias por tu paciencia!'
+      }
+    ];
+
+    const reconciled = reconcileCandidateWithChatHistory({
+      candidate: pending[0],
+      messages: wahaChatHistory,
+      maxAgeHours: 48,
+      nowMs: NOW
+    });
+
+    assert.equal(reconciled.action, 'inject');
+    assert.equal(reconciled.candidate.text, 'buenos días hay venden removedor de pintura');
+    assert.equal(reconciled.candidate.timestamp, todayQuestionSec);
+  });
+
+  test('groups consecutive unanswered bubbles within 30-minute burst window in chronological order', () => {
+    const tBaseSec = Math.floor((NOW - 600000) / 1000);
+    const staleSec = tBaseSec - 7200; // 2 hours earlier (outside 30m burst)
+    const candidate = {
+      chatId: '584140655276@c.us',
+      text: 'buenos días',
+      timestamp: tBaseSec,
+      botTimeMs: (staleSec - 600) * 1000
+    };
+
+    // WAHA newest-first order + duplicate entry to test dedup
+    const messages = [
+      { id: 'm3', fromMe: false, timestamp: tBaseSec + 45, body: 'de un galón por favor' },
+      { id: 'm2', fromMe: false, timestamp: tBaseSec + 12, body: 'venden removedor de pintura?' },
+      { id: 'm2', fromMe: false, timestamp: tBaseSec + 12, body: 'venden removedor de pintura?' },
+      { id: 'm1', fromMe: false, timestamp: tBaseSec, body: 'buenos días' },
+      { id: 'm0_stale', fromMe: false, timestamp: staleSec, body: 'mensaje viejo de hace dos horas' }
+    ];
+
+    const res = reconcileCandidateWithChatHistory({ candidate, messages, nowMs: NOW });
+    assert.equal(res.action, 'inject');
+    assert.equal(res.candidate.text, 'buenos días\nvenden removedor de pintura?\nde un galón por favor');
+    assert.equal(res.candidate.timestamp, tBaseSec + 45);
+  });
+
+  test('returns skip_answered when WAHA history shows an outgoing reply after the latest inbound message', () => {
+    const clientSec = Math.floor((NOW - 900000) / 1000);
+    const candidate = {
+      chatId: '584140655276@c.us',
+      text: 'Tienen tubos 2x1?',
+      timestamp: clientSec,
+      botTimeMs: 0
+    };
+    const messages = [
+      { id: 'out_1', fromMe: true, timestamp: clientSec + 30, body: 'Sí amigo, a la orden' },
+      { id: 'in_1', fromMe: false, timestamp: clientSec, body: 'Tienen tubos 2x1?' }
+    ];
+
+    const res = reconcileCandidateWithChatHistory({ candidate, messages, nowMs: NOW });
+    assert.equal(res.action, 'skip_answered');
+  });
+
+  test('injects new unanswered message even when an older outgoing reply exists after stale candidate timestamp', () => {
+    const yesterdaySec = Math.floor((NOW - 86400000) / 1000);
+    const todaySec = Math.floor((NOW - 300000) / 1000);
+    const candidate = {
+      chatId: '584140655276@c.us',
+      text: 'Consulta vieja',
+      timestamp: yesterdaySec,
+      botTimeMs: 0
+    };
+    const messages = [
+      { id: 'in_today', fromMe: false, timestamp: todaySec, body: 'Tienen discos de corte?' },
+      { id: 'out_yest', fromMe: true, timestamp: yesterdaySec + 60, body: 'Listo amigo' },
+      { id: 'in_yest', fromMe: false, timestamp: yesterdaySec, body: 'Consulta vieja' }
+    ];
+
+    const res = reconcileCandidateWithChatHistory({ candidate, messages, nowMs: NOW });
+    assert.equal(res.action, 'inject');
+    assert.equal(res.candidate.text, 'Tienen discos de corte?');
+    assert.equal(res.candidate.timestamp, todaySec);
+  });
+
+  test('falls back safely with action=keep when WAHA history is empty or unavailable', () => {
+    const candidate = { chatId: '584140655276@c.us', text: 'Hola', timestamp: Math.floor(NOW / 1000) };
+    assert.deepEqual(reconcileCandidateWithChatHistory({ candidate, messages: [], nowMs: NOW }), { action: 'keep', candidate });
+    assert.deepEqual(reconcileCandidateWithChatHistory({ candidate, messages: null, nowMs: NOW }), { action: 'keep', candidate });
+  });
+
+  test('catchup_engine uses desc+limit=1000 on mensajes_procesados, limit=100 on overview, and limit=20 on chat messages', () => {
+    const engineSrc = fs.readFileSync(path.resolve(__dirname, '../scripts/catchup_engine.js'), 'utf8');
+    assert.match(engineSrc, /order=procesado_at\.desc&limit=1000/);
+    assert.match(engineSrc, /\/api\/default\/chats\/overview\?limit=100/);
+    assert.match(engineSrc, /\/messages\?limit=20&downloadMedia=false/);
+    assert.ok(typeof getProcessedStateForAliases === 'function');
   });
 });
 

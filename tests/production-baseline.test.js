@@ -110,3 +110,77 @@ test('published sanitizer fixes a mixed-currency bolivar line without changing p
   assert.equal(await run('Precio USD: 12$\nPrecio Bs (BCV): 12$'),
     'Precio USD: 12$\nPrecio Bs (BCV): 12$');
 });
+
+test('published sanitizer escalates payment handoff to atenciones_pendientes and manual session while keeping Zelle policy non-blocking', async () => {
+  const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+  const code = buildWorkflow(baseline, sources).nodes.find(n=>n.name==='Sanitize Agent Output').parameters.jsCode;
+  const paymentHandoff = 'Para procesar el pago con gusto un empleado te atiende enseguida 👨🏻‍🔧, o si prefieres puedes pasar por la tienda. ¿Te ayudo con algo más?';
+  const zelleInfo = 'Sí, el *Precio Divisas* es el precio en USD y aplica para Zelle. Para coordinar el pago con gusto un empleado te atiende enseguida 👨🏻‍🔧, o si prefieres puedes pasar por la tienda. ¿Te ayudo con algo más?';
+
+  const runSanitizer = async (output, clientBody = 'Me da datos de zelle para cancelar', shouldFailDb = false) => {
+    const posts = [];
+    const axios = {
+      get: async (url) => {
+        if (shouldFailDb) throw new Error('Supabase down');
+        if (url.includes('/clientes_chat')) return { data: [{ nombre: 'Carlos' }] };
+        return { data: [] };
+      },
+      post: async (url, body, cfg) => {
+        if (shouldFailDb) throw new Error('Supabase down');
+        posts.push({ url, body, headers: cfg?.headers });
+        return { data: [] };
+      }
+    };
+    const $ = name => ({
+      first: () => ({
+        json: name === 'Prepare Conversation Context'
+          ? { conversation_context: { action: 'disabled' } }
+          : { body: { payload: { from: '584147654321@c.us', body: clientBody } } }
+      })
+    });
+    const items = [{ json: { output, intermediateSteps: [] } }];
+    const result = await new AsyncFunction('items', '$', '$env', 'require', 'process', code)(
+      items, $, { SUPABASE_URL: 'http://supabase.test', SUPABASE_ANON_KEY: 'test-only' }, () => axios, { env: {} }
+    );
+    return { posts, result };
+  };
+
+  // 1) Payment handoff promises employee attention -> must insert pending attention AND mark manual
+  const handoffRes = await runSanitizer(paymentHandoff);
+  assert.equal(handoffRes.result[0].json.output, paymentHandoff);
+  assert.equal(handoffRes.result[0].json._pago_handoff, true);
+  const atencionPost = handoffRes.posts.find(p => p.url.endsWith('/atenciones_pendientes'));
+  assert.ok(atencionPost, 'Must insert into atenciones_pendientes');
+  assert.equal(atencionPost.body.telefono, '584147654321@c.us');
+  assert.equal(atencionPost.body.nombre, 'Carlos');
+  assert.equal(atencionPost.body.status, 'pendiente');
+  assert.match(atencionPost.body.motivo, /💳 PAGO:.*Me da datos de zelle/);
+
+  const sessionPost = handoffRes.posts.find(p => p.url.includes('/chat_sessions?on_conflict=telefono'));
+  assert.ok(sessionPost, 'Must upsert chat_sessions to manual');
+  assert.equal(sessionPost.body.telefono, '584147654321@c.us');
+  assert.equal(sessionPost.body.estado, 'manual');
+  assert.ok(sessionPost.body.manual_since);
+  assert.equal(sessionPost.headers?.Prefer, 'resolution=merge-duplicates');
+
+  // 2) DB errors never break message delivery
+  const resilientRes = await runSanitizer(paymentHandoff, 'Pásame el pago móvil', true);
+  assert.equal(resilientRes.result[0].json.output, paymentHandoff);
+
+  // 3) Informational Zelle policy leaves chat_sessions non-blocking (automatico)
+  const infoRes = await runSanitizer(zelleInfo, '¿Aceptan Zelle?');
+  assert.equal(infoRes.result[0].json.output, zelleInfo);
+  assert.equal(infoRes.result[0].json._pago_handoff, undefined);
+  assert.ok(!infoRes.posts.some(p => p.url.endsWith('/atenciones_pendientes')));
+  assert.ok(!infoRes.posts.some(p => p.url.includes('/chat_sessions')));
+});
+
+test('systemMessage gives [ESCALAR_HUMANO] precedence for payment confirmations and stays synced with live_systemMessage.txt', () => {
+  const basePrompt = baseline.nodes.find(n => n.name === 'AI Agent').parameters.options.systemMessage.replace(/\r\n/g, '\n');
+  const livePrompt = fs.readFileSync('scratch_live/live_systemMessage.txt', 'utf8').replace(/\r\n/g, '\n');
+  assert.equal(basePrompt, livePrompt);
+  assert.match(basePrompt, /confirma ese zelle/i);
+  assert.match(basePrompt, /verifica el pago para ir a retirar/i);
+  assert.match(basePrompt, /PRIORIDAD.*PROHIBIDO — DATOS DE PAGO/i);
+  assert.match(basePrompt, /EXCEPCIÓN DE PRIORIDAD \(PAGO YA ENVIADO\).*\[ESCALAR_HUMANO\]/);
+});

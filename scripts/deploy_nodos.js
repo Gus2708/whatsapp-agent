@@ -2,7 +2,7 @@
 // La cadena de verdad del proyecto es: lib -> scratch_live -> n8n. Este script cierra
 // el último tramo, que hasta ahora se hacía con un patch_*.js distinto por cambio.
 //
-//   node scripts/deploy_nodos.js           # despliega buscar + presupuesto + sanitize + prompt
+//   node scripts/deploy_nodos.js           # despliega buscar + presupuesto + sanitize + prompt + handoff
 //   node scripts/deploy_nodos.js --dry     # muestra qué cambiaría, sin tocar n8n
 const fs = require('fs');
 const path = require('path');
@@ -35,6 +35,7 @@ const MAPA = [
   // El debounce deslizante (v2) se perdio una vez porque la baseline de produccion traia la
   // siesta fija de 7 s y nadie lo comparaba con lo vivo. Desde aqui --dry avisa si se desvia.
   { nodo: 'Debounce Ráfaga', campo: 'jsCode', valor: deWorkflow('Debounce Ráfaga') },
+  { nodo: 'Detectar Handoff Empleado', campo: 'jsCode', valor: deWorkflow('Detectar Handoff Empleado') },
 ];
 
 (async () => {

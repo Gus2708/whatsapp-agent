@@ -1,7 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const baseline = require('../workflows/production-baseline.json');
 
 const FALLBACK = 'Disculpa 🙏, se me enredó un cable procesando eso 👨🏻‍🔧. ¿Me repites qué necesitas (o tu lista de materiales)? Así te lo busco y te armo el presupuesto enseguida 🪚';
+const PAYMENT_HANDOFF_TPL = 'Para procesar el pago con gusto un empleado te atiende enseguida 👨🏻‍🔧, o si prefieres puedes pasar por la tienda. ¿Te ayudo con algo más?';
+const ZELLE_POLICY_TPL = 'Sí, el *Precio Divisas* es el precio en USD y aplica para Zelle. Para coordinar el pago con gusto un empleado te atiende enseguida 👨🏻‍🔧, o si prefieres puedes pasar por la tienda. ¿Te ayudo con algo más?';
 
 const norm = (t) => String(t || '').toLowerCase().replace(/\*/g, '').replace(/\s+/g, ' ').trim().slice(0, 300);
 
@@ -10,6 +13,8 @@ const PLANTILLAS_BOT = [
   norm('Dame un momentico 👨🏻‍🔧, déjame confirmarlo con un compañero y te escribo enseguida 🪚'),
   norm("👨🏻‍🔧 ¡Hola! Soy *Perucho*, el bot de Ferretería El Serrucho 🪚. Solo respondo mensajes de *texto*, 🎤 *notas de voz* e 🖼️ *imágenes*. Si enviaste un video o documento, por favor escríbeme lo que necesitas 📝"),
   norm(FALLBACK),
+  norm(PAYMENT_HANDOFF_TPL),
+  norm(ZELLE_POLICY_TPL),
 ].filter(Boolean);
 
 const MIN_INCL = 40;
@@ -135,4 +140,35 @@ test('Handoff detector flags human employee response as manual handoff', async (
   assert.equal(result.esBot, false);
   assert.equal(dbCalls.length, 1);
   assert.equal(dbCalls[0].estado, 'manual');
+});
+
+test('Published Detectar Handoff Empleado node recognizes payment and Zelle bot templates without misclassifying as employee', async () => {
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+  const code = baseline.nodes.find(n => n.name === 'Detectar Handoff Empleado').parameters.jsCode;
+
+  const runLiveHandoff = async (body) => {
+    const posts = [];
+    const axios = {
+      get: async () => ({ data: [] }),
+      post: async (url, data) => { posts.push({ url, data }); return { data: [] }; }
+    };
+    const $ = () => ({ first: () => ({ json: { body: { payload: { to: '584241234567@c.us', fromMe: true, body } } } }) });
+    const res = await new AsyncFunction('$', '$env', 'require', 'process', 'console', code)(
+      $, { SUPABASE_URL: 'http://supabase.test', SUPABASE_ANON_KEY: 'test-only' }, () => axios, { env: {} }, { log: () => {} }
+    );
+    return { res: res[0].json, posts };
+  };
+
+  const payEcho = await runLiveHandoff(PAYMENT_HANDOFF_TPL);
+  assert.equal(payEcho.res.esBot, true);
+  assert.equal(payEcho.posts.length, 0);
+
+  const zelleEcho = await runLiveHandoff(ZELLE_POLICY_TPL);
+  assert.equal(zelleEcho.res.esBot, true);
+  assert.equal(zelleEcho.posts.length, 0);
+
+  const humanReply = await runLiveHandoff('Amigo pásame la captura del pago por aquí');
+  assert.equal(humanReply.res.esBot, false);
+  assert.equal(humanReply.res.handoff, true);
+  assert.equal(humanReply.posts.length, 1);
 });
