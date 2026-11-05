@@ -46,7 +46,10 @@ test('Paint Class B: pintura clase b azul', async () => {
 test('Paint Class C: pintura clase c', async () => {
   const res = await buscar('pintura clase c');
   assert.strictEqual(res.encontrados > 0, true);
-  assert.strictEqual(res.productos.some(p => /Rio Deco|Clase C|Tipo C|\bC\b/i.test(p.nombre)), true);
+  assert.strictEqual(res.modo_resumen_pintura, true);
+  assert.strictEqual(res.productos.length, 0);
+  assert.strictEqual(/Clase C/i.test(res.resumen_pinturas_texto), true);
+  assert.strictEqual(/Rio Deco|Floripaint/i.test(res.resumen_pinturas_texto), true);
 });
 
 test('Oil/Enamel Paint: pintura de aceite gris', async () => {
@@ -70,15 +73,19 @@ test('Cuñete Presentation: cuñete de pintura blanca', async () => {
 test('Liliana incident: Buenas tardes por casualidad que marca de pintura clase B para exterior tiene', async () => {
   const res = await buscar('Buenas tardes por casualidad que marca de pintura clase B para exterior tiene');
   assert.strictEqual(res.encontrados > 0, true, 'Should find paint products');
-  const names = res.productos.map(p => p.nombre);
-  assert.strictEqual(names.some(n => /Floripaint/i.test(n)), true, 'Should include Floripaint');
-  assert.strictEqual(names.some(n => /Mar Deco|Impacto|Vinilevery/i.test(n)), true, 'Should include Impacto or other Clase B brands');
+  assert.strictEqual(res.modo_resumen_pintura, true);
+  assert.strictEqual(res.productos.length, 0);
+  assert.strictEqual(/Floripaint/i.test(res.resumen_pinturas_texto), true, 'Should include Floripaint');
+  assert.strictEqual(/Mar Deco|Impacto/i.test(res.resumen_pinturas_texto), true, 'Should include Impacto or other Clase B brands');
 });
 
 test('Floripaint Class B: pintura floripaint clase b', async () => {
   const res = await buscar('pintura floripaint clase b');
   assert.strictEqual(res.encontrados > 0, true);
-  assert.strictEqual(res.productos.some(p => /Floripaint/i.test(p.nombre) && /\bB\b/i.test(p.nombre)), true);
+  assert.strictEqual(res.modo_resumen_pintura, true);
+  assert.strictEqual(res.productos.length, 0);
+  assert.strictEqual(/Floripaint/i.test(res.resumen_pinturas_texto), true);
+  assert.strictEqual(/Clase B/i.test(res.resumen_pinturas_texto), true);
 });
 
 test('Water-based paint: Pintura de agua color Beige maps to pintura caucho', async () => {
@@ -109,8 +116,10 @@ test('Paint presentation: 4 litros maps to galon without measure_mismatch', asyn
   assert.strictEqual(res.encontrados > 0, true);
   assert.notStrictEqual(res.match_status, 'measure_mismatch');
   assert.strictEqual(!res.instruccion || !res.instruccion.includes('medida/calibre "4" NO existe'), true);
-  assert.strictEqual(res.productos.every(p => /GAL|galon/i.test(p.nombre) && !/Cunete/i.test(p.nombre)), true);
+  assert.strictEqual(res.modo_resumen_pintura, true);
+  assert.strictEqual(res.productos.length, 0);
   assert.strictEqual(res.consulta_generica_pintura, true);
+  assert.strictEqual(/Gal[oó]n/i.test(res.resumen_pinturas_texto), true);
   assert.strictEqual(Array.isArray(res.colores_disponibles) && res.colores_disponibles.length > 0, true);
 });
 
@@ -120,4 +129,37 @@ test('Paint presentation with specific color: 4 litros de pintura blanca', async
   assert.notStrictEqual(res.match_status, 'measure_mismatch');
   assert.strictEqual(res.productos.every(p => /Blanc/i.test(p.nombre)), true);
   assert.strictEqual(res.consulta_generica_pintura, undefined);
+});
+
+test('Eliseth incident: Buenas tardes! Me pueden pasar la paleta de colores disponible? Y que tipo de clase es porfa', async () => {
+  const res = await buscar('Buenas tardes! Me pueden pasar la paleta de colores disponible? Y que tipo de clase es porfa');
+  assert.strictEqual(res.encontrados > 0, true);
+  assert.strictEqual(res.match_status, 'exact');
+  assert.strictEqual(res.action, 'show_results');
+  assert.strictEqual(res.modo_resumen_pintura, true);
+  assert.strictEqual(res.productos.length, 0);
+  assert.strictEqual(/Clase A/i.test(res.resumen_pinturas_texto), true);
+  assert.strictEqual(/Clase B/i.test(res.resumen_pinturas_texto), true);
+  assert.strictEqual(/Clase C/i.test(res.resumen_pinturas_texto), true);
+  assert.strictEqual(/Floripaint/i.test(res.resumen_pinturas_texto), true);
+  assert.strictEqual(/Impacto/i.test(res.resumen_pinturas_texto), true);
+  assert.strictEqual(Array.isArray(res.colores_disponibles) && res.colores_disponibles.length > 0, true);
+  assert.strictEqual(!res.instruccion || !res.instruccion.includes('prepintada'), true);
+});
+
+test('General paint query: a como tienen las pinturas', async () => {
+  const res = await buscar('a como tienen las pinturas');
+  assert.strictEqual(res.encontrados > 0, true);
+  assert.strictEqual(res.modo_resumen_pintura, true);
+  assert.strictEqual(res.productos.length, 0);
+  assert.strictEqual(res.match_status, 'exact');
+});
+
+test('Color specific paint query: tienen pintura blanca?', async () => {
+  const res = await buscar('tienen pintura blanca?');
+  assert.strictEqual(res.encontrados > 0, true);
+  assert.strictEqual(res.modo_resumen_pintura, undefined);
+  assert.strictEqual(res.productos.length > 0, true);
+  assert.strictEqual(res.productos.every(p => /Blanc/i.test(p.nombre)), true);
+  assert.strictEqual(res.productos.every(p => p.disponible === true), true);
 });
