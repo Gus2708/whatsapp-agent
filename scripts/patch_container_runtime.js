@@ -72,6 +72,15 @@ const safeErr =
   "const error = result.reason || new Error('Unknown error');\n            if (ctx.continueOnFail()) {\n                returnData.push({\n                    json: { error: error?.message || String(error) },";
 for (const f of execBatchFiles) patchFile(f, targetErr, safeErr, 'executeBatch.js');
 
+// 3) axios — tolerate read-only Error properties in n8n VM sandbox.
+const axiosFiles = findUnder(
+  'axios@',
+  'node_modules/axios/dist/node/axios.cjs'
+);
+const targetAxios = "this.name = 'AxiosError';";
+const safeAxios = "try { this.name = 'AxiosError'; } catch (_) { try { Object.defineProperty(this, 'name', { value: 'AxiosError', configurable: true }); } catch (_) {} }";
+for (const f of axiosFiles) patchFile(f, targetAxios, safeAxios, 'axios.cjs');
+
 if (found === 0) {
   console.error(
     `[FALLO] no se encontro ningun archivo objetivo bajo ${PNPM_ROOT}. ` +

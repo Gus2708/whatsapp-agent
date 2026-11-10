@@ -34,6 +34,7 @@ n8n_local_storage/
 
 # ── QR / imágenes temporales ──
 qr_whatsapp.png
+stickers/
 
 # ── Config local de herramientas de desarrollo ──
 .mcp.json

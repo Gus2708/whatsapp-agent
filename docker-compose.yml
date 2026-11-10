@@ -197,3 +197,5 @@ services:
       - n8n_data:/home/node/.n8n
       - /var/run/docker.sock:/var/run/docker.sock
       - ./n8n_workflow.json:/etc/n8n/n8n_workflow.json:ro
+      - ./stickers:/data/stickers:ro
+      - ./catalogos:/data/catalogos:ro

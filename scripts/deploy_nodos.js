@@ -36,6 +36,7 @@ const MAPA = [
   // siesta fija de 7 s y nadie lo comparaba con lo vivo. Desde aqui --dry avisa si se desvia.
   { nodo: 'Debounce Ráfaga', campo: 'jsCode', valor: deWorkflow('Debounce Ráfaga') },
   { nodo: 'Detectar Handoff Empleado', campo: 'jsCode', valor: deWorkflow('Detectar Handoff Empleado') },
+  { nodo: 'Jev Shadow Decision', campo: 'jsCode', valor: leer('live_jev_shadow.js') },
 ];
 
 (async () => {

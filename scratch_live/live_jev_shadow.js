@@ -338,12 +338,16 @@ const metadata = await classifyShadow({ message: latest,
     } };
   },
   transport: async request => {
-    const response = await client().post(request.url, request.body, {
-      headers: request.headers, timeout: request.timeout, signal: request.signal,
-      maxRedirects: 0, maxContentLength: 16000, maxBodyLength: 16000,
-      responseType: 'text', transformResponse: [value => value], validateStatus: () => true,
-    });
-    return { status: response.status, body: response.data };
+    try {
+      const response = await client().post(request.url, request.body, {
+        headers: request.headers, signal: request.signal,
+        maxRedirects: 0, maxContentLength: 16000, maxBodyLength: 16000,
+        responseType: 'text', transformResponse: [value => value], validateStatus: () => true,
+      });
+      return { status: response.status, body: response.data };
+    } catch (e) {
+      return { status: 500, body: String(e.message) };
+    }
   },
 });
 let updatedContext = original.conversation_context;
