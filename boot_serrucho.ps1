@@ -125,6 +125,47 @@ try {
             default { Log "AVISO: el blindaje de runtime fallo (exit $patchCode). n8n sigue sin blindar." }
         }
     }
+
+    # 2.5) Verificación y re-enganche del Webhook de WhatsApp en n8n
+    # Si n8n se reinició, a veces el router interno no registra el webhook en memoria
+    # (/webhook/whatsapp/inbound responde 404 aunque el workflow figure activo).
+    # Este chequeo valida el webhook y, si da 404, reactiva el workflow ugHOTQv3Vb6cuTct.
+    try {
+        Log "Verificando registro del webhook /webhook/whatsapp/inbound en n8n..."
+        $envFile = Join-Path $ProjectDir ".env"
+        $n8nKey = ""
+        if (Test-Path $envFile) {
+            $m = Select-String -Path $envFile -Pattern "^N8N_API_KEY=(.*)$"
+            if ($m -and $m.Matches.Groups.Count -gt 1) { $n8nKey = $m.Matches.Groups[1].Value.Trim() }
+        }
+        $wbOk = $false
+        for ($wbTry = 1; $wbTry -le 10; $wbTry++) {
+            try {
+                $wbRes = Invoke-RestMethod -Uri "http://127.0.0.1:5678/webhook/whatsapp/inbound" -Method Post -Body "{}" -ContentType "application/json" -TimeoutSec 5 -ErrorAction Stop
+                $wbOk = $true
+                break
+            } catch {
+                $statusCode = 0
+                if ($_.Exception -and $_.Exception.Response) {
+                    $statusCode = [int]$_.Exception.Response.StatusCode
+                }
+                if ($statusCode -eq 404 -and $n8nKey) {
+                    Log "AVISO: Webhook n8n devolvio 404 (no registrado). Reactivando workflow ugHOTQv3Vb6cuTct..."
+                    $n8nH = @{ "X-N8N-API-KEY" = $n8nKey; "Content-Type" = "application/json" }
+                    try {
+                        Invoke-RestMethod -Uri "http://127.0.0.1:5678/api/v1/workflows/ugHOTQv3Vb6cuTct/deactivate" -Headers $n8nH -Method Post -Body "{}" -TimeoutSec 10 -ErrorAction SilentlyContinue | Out-Null
+                        Start-Sleep -Seconds 2
+                        Invoke-RestMethod -Uri "http://127.0.0.1:5678/api/v1/workflows/ugHOTQv3Vb6cuTct/activate" -Headers $n8nH -Method Post -Body "{}" -TimeoutSec 10 -ErrorAction SilentlyContinue | Out-Null
+                    } catch {}
+                }
+                Start-Sleep -Seconds 3
+            }
+        }
+        if ($wbOk) { Log "Webhook n8n: VERIFICADO Y OPERATIVO (200 OK)." }
+        else { Log "AVISO: No se pudo verificar el webhook de n8n tras 10 intentos." }
+    } catch {
+        Log "ERROR verificando webhook de n8n: $($_.Exception.Message)"
+    }
 } catch {
     Log "ERROR en docker compose: $($_.Exception.Message)"
 }

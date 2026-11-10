@@ -257,9 +257,51 @@ try {
   }
 
   if ($n8nHealthy) {
-    if ([int]$st.n8nFailedStreak -gt 0) {
-      Set-Field $st "n8nFailedStreak" 0
+    # Validar que el webhook de WhatsApp no esté desenganchado (404 en runtime)
+    $webhookOk = $false
+    try {
+      $wbRes = Invoke-RestMethod -Uri "$N8nBase/webhook/whatsapp/inbound" -Method Post -Body "{}" -ContentType "application/json" -TimeoutSec 10 -ErrorAction Stop
+      $webhookOk = $true
+    } catch {
+      $statusCode = 0
+      if ($_.Exception -and $_.Exception.Response) {
+        $statusCode = [int]$_.Exception.Response.StatusCode
+      }
+      if ($statusCode -eq 404) {
+        Write-Log "AVISO: n8n /healthz está ok pero el webhook /webhook/whatsapp/inbound devolvió 404 (no registrado). Reactivando workflow ugHOTQv3Vb6cuTct..."
+        $n8nApiKey = $env:N8N_API_KEY
+        if ($n8nApiKey) {
+          $n8nH = @{ "X-N8N-API-KEY" = $n8nApiKey; "Content-Type" = "application/json" }
+          try {
+            Invoke-RestMethod -Uri "$N8nBase/api/v1/workflows/ugHOTQv3Vb6cuTct/deactivate" -Headers $n8nH -Method Post -Body "{}" -TimeoutSec 10 -ErrorAction SilentlyContinue | Out-Null
+            Start-Sleep -Seconds 2
+            Invoke-RestMethod -Uri "$N8nBase/api/v1/workflows/ugHOTQv3Vb6cuTct/activate" -Headers $n8nH -Method Post -Body "{}" -TimeoutSec 10 -ErrorAction SilentlyContinue | Out-Null
+            for ($v = 1; $v -le 5; $v++) {
+              Start-Sleep -Seconds 2
+              try {
+                $wbRes2 = Invoke-RestMethod -Uri "$N8nBase/webhook/whatsapp/inbound" -Method Post -Body "{}" -ContentType "application/json" -TimeoutSec 10 -ErrorAction Stop
+                $webhookOk = $true
+                Write-Log "Webhook de n8n reactivado y verificado exitosamente."
+                break
+              } catch {}
+            }
+          } catch {
+            Write-Log "ERROR al reactivar webhook n8n: $($_.Exception.Message)"
+          }
+        }
+      }
+    }
+
+    if ($webhookOk) {
+      if ([int]$st.n8nFailedStreak -gt 0) {
+        Set-Field $st "n8nFailedStreak" 0
+        Save-State $st
+      }
+    } else {
+      $n8nStreak = [int]$st.n8nFailedStreak + 1
+      Set-Field $st "n8nFailedStreak" $n8nStreak
       Save-State $st
+      Write-Log "AVISO: Webhook de n8n no responde correctamente (racha: $n8nStreak)."
     }
   } else {
     $n8nStreak = [int]$st.n8nFailedStreak + 1
@@ -362,6 +404,33 @@ try {
         } catch {}
         exit 0
       }
+
+      # Revisar si WAHA tiene fallas entregando al webhook de n8n (HTTP 404)
+      try {
+        if ($logs) {
+          $wb404 = @($logs | Select-String -Pattern "POST request failed: Request failed with status code 404" | Where-Object { $_.Line -match "whatsapp/inbound" }).Count
+          if ($wb404 -ge 1) {
+            Write-Log "AVISO: WAHA reportó $wb404 fallos HTTP 404 entregando al webhook. Re-enganchando workflow n8n..."
+            $n8nApiKey = $env:N8N_API_KEY
+            if ($n8nApiKey) {
+              $n8nH = @{ "X-N8N-API-KEY" = $n8nApiKey; "Content-Type" = "application/json" }
+              try {
+                Invoke-RestMethod -Uri "$N8nBase/api/v1/workflows/ugHOTQv3Vb6cuTct/deactivate" -Headers $n8nH -Method Post -Body "{}" -TimeoutSec 10 -ErrorAction SilentlyContinue | Out-Null
+                Start-Sleep -Seconds 2
+                Invoke-RestMethod -Uri "$N8nBase/api/v1/workflows/ugHOTQv3Vb6cuTct/activate" -Headers $n8nH -Method Post -Body "{}" -TimeoutSec 10 -ErrorAction SilentlyContinue | Out-Null
+                for ($v = 1; $v -le 5; $v++) {
+                  Start-Sleep -Seconds 2
+                  try {
+                    $wbRes2 = Invoke-RestMethod -Uri "$N8nBase/webhook/whatsapp/inbound" -Method Post -Body "{}" -ContentType "application/json" -TimeoutSec 10 -ErrorAction Stop
+                    Write-Log "Workflow n8n re-enganchado y verificado con éxito tras reporte de WAHA."
+                    break
+                  } catch {}
+                }
+              } catch {}
+            }
+          }
+        }
+      } catch {}
 
       # Barrido pasivo periódico de mensajes huérfanos (cada 20 min en estado operativo)
       $lastPeriodic = $null

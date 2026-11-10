@@ -240,11 +240,43 @@ async function fetchCandidatesData(maxAgeHours) {
   try {
     const res = await fetch(`${WAHA_BASE}/api/default/chats/overview?limit=100`, {
       headers: { 'X-Api-Key': WAHA_API_KEY },
-      signal: AbortSignal.timeout(15000)
+      signal: AbortSignal.timeout(12000)
     });
     if (res.ok) wahaChats = await res.json();
   } catch (e) {
     log(`Aviso consultando WAHA overview: ${e.message}`);
+  }
+
+  // Fallback si overview falla, da timeout o viene vacío
+  if (!Array.isArray(wahaChats) || wahaChats.length === 0) {
+    try {
+      const res = await fetch(`${WAHA_BASE}/api/default/chats?limit=30`, {
+        headers: { 'X-Api-Key': WAHA_API_KEY },
+        signal: AbortSignal.timeout(8000)
+      });
+      if (res.ok) {
+        const rawChats = await res.json();
+        if (Array.isArray(rawChats)) {
+          const enriched = await Promise.all(rawChats.map(async (c) => {
+            if (!c || !c.id || c.id.includes('broadcast') || c.id.includes('status')) return null;
+            try {
+              const mRes = await fetch(`${WAHA_BASE}/api/default/chats/${encodeURIComponent(c.id)}/messages?limit=1`, {
+                headers: { 'X-Api-Key': WAHA_API_KEY },
+                signal: AbortSignal.timeout(4000)
+              });
+              const msgs = mRes.ok ? await mRes.json() : null;
+              const last = Array.isArray(msgs) && msgs.length > 0 ? msgs[0] : null;
+              return { id: c.id, lastMessage: last };
+            } catch (err) {
+              return { id: c.id, lastMessage: null };
+            }
+          }));
+          wahaChats = enriched.filter(Boolean);
+        }
+      }
+    } catch (e) {
+      log(`Aviso en fallback de chats WAHA: ${e.message}`);
+    }
   }
 
   const aliasMap = await fetchAliasMap();

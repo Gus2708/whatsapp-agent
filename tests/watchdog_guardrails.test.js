@@ -150,3 +150,64 @@ test('Log Rotation: rotates file exceeding 5MB to .1', () => {
   // Clean up
   fs.rmSync(tempDir, { recursive: true, force: true });
 });
+
+// Helper simulating watchdog webhook health decision
+function evaluateWebhookHealth(healthzStatus, webhookHttpStatus) {
+  if (healthzStatus !== 'ok') {
+    return { healthy: false, action: 'wait_or_restart_n8n' };
+  }
+  if (webhookHttpStatus === 404) {
+    return { healthy: false, action: 'reactivate_workflow' };
+  }
+  if (webhookHttpStatus === 200) {
+    return { healthy: true, action: 'none' };
+  }
+  return { healthy: false, action: 'investigate_http_error' };
+}
+
+// Helper simulating WAHA payload safety guard
+function validateWahaOutboundPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return { valid: false, error: 'Payload must be an object' };
+  }
+  if (!payload.chatId || typeof payload.chatId !== 'string' || !payload.chatId.trim()) {
+    return { valid: false, error: 'chatId is required and cannot be empty' };
+  }
+  if (!payload.chatId.includes('@')) {
+    return { valid: false, error: 'chatId must be a valid JID containing @' };
+  }
+  if (!payload.text || typeof payload.text !== 'string' || !payload.text.trim()) {
+    return { valid: false, error: 'text is required and cannot be empty' };
+  }
+  return { valid: true };
+}
+
+test('Webhook Resilience: detects 404 unhooked webhook despite healthy healthz and triggers reactivation', () => {
+  const result = evaluateWebhookHealth('ok', 404);
+  assert.equal(result.healthy, false);
+  assert.equal(result.action, 'reactivate_workflow');
+});
+
+test('Webhook Resilience: reports healthy when healthz is ok and webhook is 200', () => {
+  const result = evaluateWebhookHealth('ok', 200);
+  assert.equal(result.healthy, true);
+  assert.equal(result.action, 'none');
+});
+
+test('WAHA Payload Safety: rejects missing or undefined chatId to prevent WAHA crash', () => {
+  const missingChatId = validateWahaOutboundPayload({ text: 'Hola' });
+  assert.equal(missingChatId.valid, false);
+  assert.match(missingChatId.error, /chatId is required/);
+
+  const undefinedChatId = validateWahaOutboundPayload({ chatId: undefined, text: 'Hola' });
+  assert.equal(undefinedChatId.valid, false);
+
+  const invalidJid = validateWahaOutboundPayload({ chatId: '584141234567', text: 'Hola' });
+  assert.equal(invalidJid.valid, false);
+  assert.match(invalidJid.error, /must be a valid JID/);
+});
+
+test('WAHA Payload Safety: accepts well-formed outbound payloads', () => {
+  const valid = validateWahaOutboundPayload({ chatId: '584141234567@c.us', text: 'Hola' });
+  assert.equal(valid.valid, true);
+});
