@@ -98,13 +98,27 @@ const nodes = [
   { id: 'sched', name: 'Cada 15s', type: 'n8n-nodes-base.scheduleTrigger', typeVersion: 1.2, position: [0, 0],
     parameters: { rule: { interval: [{ field: 'seconds', secondsInterval: 15 }] } } },
   { id: 'code_comp', name: 'Componer y Marcar', type: 'n8n-nodes-base.code', typeVersion: 2, position: [220, 0],
-    parameters: { jsCode: composeCode } },
-  { id: 'http_waha', name: 'Enviar WAHA', type: 'n8n-nodes-base.httpRequest', typeVersion: 4.4, position: [440, 0],
+    parameters: { mode: 'runOnceForAllItems', jsCode: composeCode } },
+  { id: 'filter_valid', name: 'Validar Destino', type: 'n8n-nodes-base.if', typeVersion: 2.2, position: [440, 0],
+    parameters: {
+      conditions: {
+        string: [
+          {
+            value1: '={{ $json.chatId }}',
+            operation: 'contains',
+            value2: '@'
+          }
+        ]
+      }
+    }
+  },
+  { id: 'http_waha', name: 'Enviar WAHA', type: 'n8n-nodes-base.httpRequest', typeVersion: 4.4, position: [660, 0],
     parameters: { method: 'POST', url: 'http://waha_serrucho:3000/api/sendText', sendHeaders: true, headerParameters: { parameters: [{ name: 'X-API-Key', value: '={{ $env.WAHA_API_KEY }}' }] }, sendBody: true, specifyBody: 'json', jsonBody: "={{ JSON.stringify({ session: 'default', chatId: $json.chatId, text: $json.text }) }}", options: { timeout: 12000 } } },
 ];
 const connections = {
   'Cada 15s': { main: [[{ node: 'Componer y Marcar', type: 'main', index: 0 }]] },
-  'Componer y Marcar': { main: [[{ node: 'Enviar WAHA', type: 'main', index: 0 }]] },
+  'Componer y Marcar': { main: [[{ node: 'Validar Destino', type: 'main', index: 0 }]] },
+  'Validar Destino': { main: [[{ node: 'Enviar WAHA', type: 'main', index: 0 }]] },
 };
 
 (async () => {
