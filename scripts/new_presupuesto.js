@@ -180,7 +180,13 @@ const ALIAS = {
   'techolit':       ['techolit','techolits'],
   'acerolit':       ['acerolit','acerolits'],
   'zinc':           ['zinc','galv','techo galv','calamina'],
-  'sinz':           ['zinc','galv','techo galv','calamina']
+  'sinz':           ['zinc','galv','techo galv','calamina'],
+  'poceta':         ['poceta','poseta','inodoro','wc','sanitario','sala sanitaria'],
+  'poseta':         ['poceta','poseta','inodoro','wc','sanitario','sala sanitaria'],
+  'inodoro':        ['inodoro','poceta','poseta','wc','sanitario','sala sanitaria'],
+  'wc':             ['wc','poceta','poseta','inodoro','sanitario','sala sanitaria'],
+  'sanitario':      ['sanitario','sanitaria','poceta','poseta','inodoro','wc','sala sanitaria'],
+  'sanitaria':      ['sanitario','sanitaria','poceta','poseta','inodoro','wc','sala sanitaria']
 };
 // DEVERBALES: el cliente pide con el VERBO, el catalogo nombra con el SUSTANTIVO.
 // "resina para empalmAR" vs "KIT DE EMPALME DE RESINA": comparten la raiz "empalm" pero
@@ -302,6 +308,16 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
   }
   if (/\bdisco\s+(de\s+)?corte\s+(de\s+|para\s+|p\/)?madera\b/.test(s)) {
     s = s.replace(/\bdisco\s+(de\s+)?corte\s+(de\s+|para\s+|p\/)?madera\b/g, 'disco madera');
+  }
+  if (!/\baccesorios?\b/.test(s)) {
+    if (/^\s*wc\s*$/.test(s)) s = 'poceta';
+    s = s.replace(/\b(?:juegos?|salas?)\s+(?:de\s+)?ba[nñ]o\b/g, 'poceta');
+    s = s.replace(/\btazas?\s+(?:de\s+ba[nñ]o|sanitarias?)\b/g, 'poceta');
+  }
+  if (/\b(?:pocetas?|posetas?|inodoros?|sanitarios?|wc)\b/.test(s) && !/\b(?:herraje|asiento|tapa|tornillos?|canilla|manguera|anillo|aro|cuello|valvula|flapper|balancin|goma|surtidor|flotante|bidet|codo|yee|sifon|tubo|pvc|desague)\b/.test(s)) {
+    s = s.replace(/\bcomo\s+tal\b/g, ' ');
+    s = s.replace(/\bsol[oa]s?\b/g, ' ');
+    s = s.replace(/\b(?:pero\s+)?sin\s+(?:el\s+)?lavamanos?\b/g, ' ');
   }
   // SIN se aplica con LIMITE DE PALABRA, no como subcadena. Con split/join naive, una clave
   // que aparece DENTRO de otra palabra la destroza: "media"->"1/2" convertia "mediano" en
@@ -624,8 +640,9 @@ async function buscarUno(nombre){
   const textLargasSql = isPaintQuery ? textLargas.filter(w => !['exterior','exteriores','interior','interiores','fachada','intemperie','clase','tipo','calidad'].includes(w)) : textLargas;
   let cand=[];
   // si hay categoria de texto, trae amplio por categoria y filtra medida en JS
+  const sqlTerm = w => { if (ALIAS[w]) return 'or=(' + ALIAS[w].map(a=>'descripcion.ilike.*'+encodeURIComponent(a)+'*').join(',') + ')'; if (ACCENTS[w]) return `or=(descripcion.ilike.*${w}*,descripcion.ilike.*${ACCENTS[w]}*)`; return 'descripcion=ilike.*' + encodeURIComponent(w) + '*'; };
   if (textLargasSql.length>0){
-    const q = textLargasSql.map(w => { if (ACCENTS[w]) return `or=(descripcion.ilike.*${w}*,descripcion.ilike.*${ACCENTS[w]}*)`; return 'descripcion=ilike.*' + encodeURIComponent(w) + '*'; }).join('&');
+    const q = textLargasSql.map(sqlTerm).join('&');
     if (granelIntent){ try{ const r=await axios.get(SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+'&'+GRANEL_OR+'&order=existencia.desc.nullslast&limit=1000',{headers:H}); cand=r.data||[]; }catch(e){} }
     if (cand.length===0){ try{ const r=await axios.get(SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+'&order=existencia.desc.nullslast&limit=1000',{headers:H}); cand=r.data||[]; }catch(e){} }
   }
@@ -637,7 +654,7 @@ async function buscarUno(nombre){
   if (cand.length===0 && textLargasSql.length>=2 && textLargasSql.length<=6){
     for (let _i=textLargasSql.length-1; _i>=1 && cand.length===0; _i--){
       const _sub = textLargasSql.filter((_w,_j)=>_j!==_i);
-      const q = _sub.map(w => { if (ACCENTS[w]) return `or=(descripcion.ilike.*${w}*,descripcion.ilike.*${ACCENTS[w]}*)`; return 'descripcion=ilike.*' + encodeURIComponent(w) + '*'; }).join('&');
+      const q = _sub.map(sqlTerm).join('&');
       try{ const r=await axios.get(SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+'&order=existencia.desc.nullslast&limit=1000',{headers:H}); cand=r.data||[]; }catch(e){}
     }
   }
@@ -646,8 +663,7 @@ async function buscarUno(nombre){
     const q = largas.slice(0,i).map(w => {
       if (w === 'corte') return 'or=(descripcion.ilike.*corte*,descripcion.ilike.*c/*)';
       if (SIZEQ[w]){ const _alts=[]; for (const a of SIZEQ[w]){ _alts.push('descripcion.ilike.*'+a+'*'); if(/mm$/.test(a)) _alts.push('descripcion.ilike.*'+a.replace(/mm$/,' mm')+'*'); } return 'or=('+_alts.join(',')+')'; }
-      if (ACCENTS[w]) return `or=(descripcion.ilike.*${w}*,descripcion.ilike.*${ACCENTS[w]}*)`;
-      return 'descripcion=ilike.*' + encodeURIComponent(w) + '*';
+      return sqlTerm(w);
     }).join('&');
     try{ const r=await axios.get(SB+'/rest/v1/productos?select=codigo_interno,descripcion,precio_venta,existencia&'+q+'&order=existencia.desc.nullslast&limit=1000',{headers:H}); cand=r.data||[]; }catch(e){}
   }
@@ -658,6 +674,21 @@ async function buscarUno(nombre){
 
   // Regla CABILLA
   { const nbq = norm(nombre); if (qTokens.includes('cabilla')) { const wantCuadrada=nbq.includes('cuadrada'); const wantRedonda=nbq.includes('redonda'); const wantLisa=nbq.includes('lisa'); let filt=null; if(wantCuadrada||wantRedonda||wantLisa){ filt = cand.filter(p => { const d=norm(p.descripcion); if(wantCuadrada) return d.includes('cuadrada'); if(wantRedonda) return d.includes('redonda'); if(wantLisa) return d.includes('lisa'); return true; }); } else { const est = cand.filter(p => norm(p.descripcion).includes('estriada')); if (medLargas.length>0){ const estM = est.filter(p=>{ const nd=normMedida(p.descripcion); return medLargas.every(m=>medPresent(m,nd)); }); filt = (estM.length>0) ? est : null; } else { filt = est; } } if (filt && filt.length>0) cand = filt; } }
+
+  // Regla SANITARIO: sanitario completo vs repuestos/tuberias
+  {
+    const nbq = norm(nombre);
+    const accesorioSanitario = /\b(herraje|asiento|tapa|tornillos?|canilla|manguera|anillo|aro|cuello|valvula|flapper|balancin|goma|surtidor|flotante|bidet|desague|sifon|codo|yee|tee|tubo|pvc|chupa|destapador)\b/;
+    const sanitarioTokens = new Set(['poceta', 'poseta', 'inodoro', 'sanitario', 'sanitaria', 'wc']);
+    if (qTokens.some(t => sanitarioTokens.has(t)) && !accesorioSanitario.test(nbq)) {
+      let filt = cand.filter(p => !accesorioSanitario.test(norm(p.descripcion)));
+      if (/\bsin\s+(?:el\s+)?lavamanos?\b/.test(nbq)) {
+        const sinLav = filt.filter(p => !/\bc\/\s*lavamanos?\b|\bcon\s+lavamanos?\b/.test(norm(p.descripcion)));
+        if (sinLav.length > 0) filt = sinLav;
+      }
+      if (filt.length > 0) cand = filt;
+    }
+  }
 
   // Regla negocio PINTURA
   {
@@ -817,7 +848,7 @@ async function buscarUno(nombre){
   // (coincidió por subcadena/número) -> no lo sustituyas; va a "no encontrados".
   if (textLargas.length>0 && cand.length>0){
     const w0 = norm(cand[0].descripcion); // includes (no split por 'x') para no partir "oxido" ni fallar por plural
-    if (!textLargas.some(t => w0.includes(t))) return null;
+    if (!textLargas.some(t => aliasDe(t).some(a => w0.includes(a)))) return null;
   }
   // best = mas vendido de la medida pedida. Si el EXACTO esta AGOTADO, ofrece sustitutos
   // DISPONIBLES de la MISMA familia (estructural/herreria/...) en vez de callar o saltar a otro producto.

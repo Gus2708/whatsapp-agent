@@ -273,7 +273,13 @@ const ALIAS = {
   'techolit':       ['techolit','techolits'],
   'acerolit':       ['acerolit','acerolits'],
   'zinc':           ['zinc','galv','techo galv','calamina'],
-  'sinz':           ['zinc','galv','techo galv','calamina']
+  'sinz':           ['zinc','galv','techo galv','calamina'],
+  'poceta':         ['poceta','poseta','inodoro','wc','sanitario','sala sanitaria'],
+  'poseta':         ['poceta','poseta','inodoro','wc','sanitario','sala sanitaria'],
+  'inodoro':        ['inodoro','poceta','poseta','wc','sanitario','sala sanitaria'],
+  'wc':             ['wc','poceta','poseta','inodoro','sanitario','sala sanitaria'],
+  'sanitario':      ['sanitario','sanitaria','poceta','poseta','inodoro','wc','sala sanitaria'],
+  'sanitaria':      ['sanitario','sanitaria','poceta','poseta','inodoro','wc','sala sanitaria']
 };
 // DEVERBALES: el cliente pide con el VERBO, el catalogo nombra con el SUSTANTIVO.
 // "resina para empalmAR" vs "KIT DE EMPALME DE RESINA": comparten la raiz "empalm" pero
@@ -395,6 +401,16 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
   }
   if (/\bdisco\s+(de\s+)?corte\s+(de\s+|para\s+|p\/)?madera\b/.test(s)) {
     s = s.replace(/\bdisco\s+(de\s+)?corte\s+(de\s+|para\s+|p\/)?madera\b/g, 'disco madera');
+  }
+  if (!/\baccesorios?\b/.test(s)) {
+    if (/^\s*wc\s*$/.test(s)) s = 'poceta';
+    s = s.replace(/\b(?:juegos?|salas?)\s+(?:de\s+)?ba[nñ]o\b/g, 'poceta');
+    s = s.replace(/\btazas?\s+(?:de\s+ba[nñ]o|sanitarias?)\b/g, 'poceta');
+  }
+  if (/\b(?:pocetas?|posetas?|inodoros?|sanitarios?|wc)\b/.test(s) && !/\b(?:herraje|asiento|tapa|tornillos?|canilla|manguera|anillo|aro|cuello|valvula|flapper|balancin|goma|surtidor|flotante|bidet|codo|yee|sifon|tubo|pvc|desague)\b/.test(s)) {
+    s = s.replace(/\bcomo\s+tal\b/g, ' ');
+    s = s.replace(/\bsol[oa]s?\b/g, ' ');
+    s = s.replace(/\b(?:pero\s+)?sin\s+(?:el\s+)?lavamanos?\b/g, ' ');
   }
   // SIN se aplica con LIMITE DE PALABRA, no como subcadena. Con split/join naive, una clave
   // que aparece DENTRO de otra palabra la destroza: "media"->"1/2" convertia "mediano" en
@@ -1582,7 +1598,7 @@ async function ilike(palabras, limit, extra){
   const q = palabras.map(w => {
     if (w === 'corte') return 'or=(descripcion.ilike.*corte*,descripcion.ilike.*c/*)';
     if (SIZEQ[w]){ const _alts=[]; for (const a of SIZEQ[w]){ _alts.push('descripcion.ilike.*'+a+'*'); if(/mm$/.test(a)) _alts.push('descripcion.ilike.*'+a.replace(/mm$/,' mm')+'*'); } return 'or=('+_alts.join(',')+')'; }
-    if (ALIAS[w]) return 'or=(' + ALIAS[w].map(a=>'descripcion.ilike.*'+a+'*').join(',') + ')';
+    if (ALIAS[w]) return 'or=(' + ALIAS[w].map(a=>'descripcion.ilike.*'+encodeURIComponent(a)+'*').join(',') + ')';
     if (ACCENTS[w]) return `or=(descripcion.ilike.*${w}*,descripcion.ilike.*${ACCENTS[w]}*)`;
     return 'descripcion=ilike.*' + encodeURIComponent(w) + '*';
   }).join('&');
@@ -2013,6 +2029,26 @@ for(const p of res){ if(!seen.has(p.codigo_interno)){ seen.add(p.codigo_interno)
 // fregadero completo y ganaban el desempate por stock, tapando el producto que el cliente pidio.
 // Si el cliente SI pidio un repuesto por su nombre, no tocar el resultado.
 { const nbq = norm(_pb); const accesorioFregadero = /\b(desague|l{1,3}ave|grifo|tapa|sifon|tapon|tornillo|herraje|balancin)\b/; if (qTokens.includes('fregadero') && !accesorioFregadero.test(nbq)) { const principal = unicos.filter(p => !accesorioFregadero.test(norm(p.descripcion))); if (principal.length>0){ unicos.length=0; for(const x of principal) unicos.push(x); } } }
+
+// Regla negocio POCETA/SANITARIO: "poseta"/"poceta"/"inodoro"/"wc"/"sanitario"/"juego de bano" a secas
+// = el sanitario completo en si, no repuestos ni tuberias (HERRAJE, ASIENTO, TAPA, TORNILLO, FLAPPER, CODO, SIFON...).
+// Si el cliente pidio "sin lavamanos", priorizar opciones sin C/LAVAMANO. Si pidio un repuesto por su nombre, no tocar.
+{
+  const nbq = norm(_pb);
+  const accesorioSanitario = /\b(herraje|asiento|tapa|tornillos?|canilla|manguera|anillo|aro|cuello|valvula|flapper|balancin|goma|surtidor|flotante|bidet|desague|sifon|codo|yee|tee|tubo|pvc|chupa|destapador)\b/;
+  const sanitarioTokens = new Set(['poceta', 'poseta', 'inodoro', 'sanitario', 'sanitaria', 'wc']);
+  if (qTokens.some(t => sanitarioTokens.has(t)) && !accesorioSanitario.test(nbq)) {
+    let principal = unicos.filter(p => !accesorioSanitario.test(norm(p.descripcion)));
+    if (/\bsin\s+(?:el\s+)?lavamanos?\b/.test(nbq)) {
+      const sinLav = principal.filter(p => !/\bc\/\s*lavamanos?\b|\bcon\s+lavamanos?\b/.test(norm(p.descripcion)));
+      if (sinLav.length > 0) principal = sinLav;
+    }
+    if (principal.length > 0) {
+      unicos.length = 0;
+      for (const x of principal) unicos.push(x);
+    }
+  }
+}
 
 // Regla negocio PINTURA: clases (A, B, C), marcas, acabados (caucho, aceite/esmalte, satinada, impermeabilizante, spray), uso (exterior, interior), color y presentación (cuñete, galón, 1/4)
 let _isPaintNoColor = false;
