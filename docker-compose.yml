@@ -30,13 +30,15 @@ services:
       - WHATSAPP_SWAGGER_PASSWORD=${WAHA_DASHBOARD_PASSWORD}
       - WAHA_API_KEY=${WAHA_API_KEY}
       - WHATSAPP_API_KEY=${WAHA_API_KEY}
-      # WEBJS tiene problemas en Docker Linux. NOWEB es más estable en contenedores.
-      - WHATSAPP_DEFAULT_ENGINE=NOWEB
+      # GOWS (whatsmeow) since 2026-11-12. NOWEB (Baileys) became a "zombie" session:
+      # status WORKING but no inbound delivery and every outbound stuck in PENDING
+      # (2026-11-10 -> 2026-11-12). GOWS handles reconnects and offline delivery better.
+      - WHATSAPP_DEFAULT_ENGINE=GOWS
       # Reinicia automáticamente las sesiones guardadas al (re)arrancar el contenedor.
       # Combinado con restart:unless-stopped y la auth persistida en el volumen,
       # la sesión "default" vuelve a WORKING sola sin re-escanear el QR.
       - WHATSAPP_RESTART_ALL_SESSIONS=True
-      # Store de NOWEB: necesario para historial/contactos y mayor estabilidad de sesión.
+      # NOWEB store kept for rollback only (ignored by GOWS).
       - WHATSAPP_DEFAULT_CONFIG_NOWEB_STORE_ENABLED=True
       - WHATSAPP_DEFAULT_CONFIG_NOWEB_STORE_FULLSYNC=True
       # OJO: el webhook NO se define aquí. La sesión "default" ya lo tiene persistido

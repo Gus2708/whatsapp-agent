@@ -1,4 +1,4 @@
-# ============================================================================
+﻿# ============================================================================
 #  ARRANQUE AUTOMÁTICO DEL AGENTE DE IA "PERUCHO" (Ferretería El Serrucho)
 # ----------------------------------------------------------------------------
 #  Levanta, en orden, todo lo necesario para que el agente quede activo:
@@ -141,7 +141,7 @@ try {
         $wbOk = $false
         for ($wbTry = 1; $wbTry -le 10; $wbTry++) {
             try {
-                $wbRes = Invoke-RestMethod -Uri "http://127.0.0.1:5678/webhook/whatsapp/inbound" -Method Post -Body "{}" -ContentType "application/json" -TimeoutSec 5 -ErrorAction Stop
+                $wbRes = Invoke-RestMethod -Uri "http://127.0.0.1:5678/webhook/whatsapp/inbound" -Method Post -Body '{"probe":true}' -ContentType "application/json" -TimeoutSec 5 -ErrorAction Stop
                 $wbOk = $true
                 break
             } catch {

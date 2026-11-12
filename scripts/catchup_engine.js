@@ -194,8 +194,41 @@ async function waitForHealth(maxWaitSec = 90, intervalSec = 3) {
 
 async function fetchAliasMap() {
   const aliasMap = {};
+
+  const ingestRows = (rows) => {
+    for (const r of rows) {
+      const rawLid = (r && (r.lid || r.id)) || '';
+      const rawPn = (r && r.pn) || '';
+      if (!rawLid || !rawPn) continue;
+      const lid = String(rawLid).trim();
+      const pn = String(rawPn).trim();
+      const phoneJid = normalizeToPhoneJid(pn);
+      aliasMap[lid] = phoneJid;
+      aliasMap[phoneJid] = lid;
+      aliasMap[pn] = lid;
+    }
+  };
+
+  // Engine-agnostic path (works on GOWS, NOWEB, WEBJS)
+  try {
+    const res = await fetch(`${WAHA_BASE}/api/default/lids?limit=5000`, {
+      headers: { 'X-Api-Key': WAHA_API_KEY },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (res.ok) {
+      const rows = await res.json();
+      if (Array.isArray(rows) && rows.length > 0) {
+        ingestRows(rows);
+        return aliasMap;
+      }
+    }
+  } catch (e) {
+    log(`Aviso consultando /api/default/lids de WAHA: ${e.message}`);
+  }
+
+  // Fallback for legacy NOWEB SQLite store if HTTP /lids returned empty
   const containers = ['waha_agent', 'waha_serrucho'];
-  const cmd = "const db=new (require('better-sqlite3'))('/app/.sessions/noweb/default/store.sqlite3');console.log(JSON.stringify(db.prepare('SELECT id, pn FROM lid_map').all()))";
+  const cmd = "const fs=require('fs');const p='/app/.sessions/noweb/default/store.sqlite3';if(fs.existsSync(p)){const db=new (require('better-sqlite3'))(p);console.log(JSON.stringify(db.prepare('SELECT id, pn FROM lid_map').all()))}";
   let raw = '';
   for (const c of containers) {
     try {
@@ -204,21 +237,9 @@ async function fetchAliasMap() {
     } catch (e) {}
   }
   try {
-    if (raw) {
-      const rows = JSON.parse(raw);
-      for (const r of rows) {
-        if (r.id && r.pn) {
-          const lid = r.id.trim();
-          const pn = r.pn.trim();
-          const phoneJid = normalizeToPhoneJid(pn);
-          aliasMap[lid] = phoneJid;
-          aliasMap[phoneJid] = lid;
-          aliasMap[pn] = lid;
-        }
-      }
-    }
+    if (raw) ingestRows(JSON.parse(raw));
   } catch (e) {
-    log(`Aviso leyendo lid_map de WAHA: ${e.message}`);
+    log(`Aviso leyendo lid_map fallback de WAHA: ${e.message}`);
   }
   return aliasMap;
 }
@@ -250,7 +271,7 @@ async function fetchCandidatesData(maxAgeHours) {
   // Fallback si overview falla, da timeout o viene vacío
   if (!Array.isArray(wahaChats) || wahaChats.length === 0) {
     try {
-      const res = await fetch(`${WAHA_BASE}/api/default/chats?limit=30`, {
+      const res = await fetch(`${WAHA_BASE}/api/default/chats?limit=40&sortBy=conversationTimestamp&sortOrder=desc`, {
         headers: { 'X-Api-Key': WAHA_API_KEY },
         signal: AbortSignal.timeout(8000)
       });

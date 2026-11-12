@@ -136,6 +136,9 @@ function validateWatchdogState(obj) {
   if (typeof obj.failedStreak !== 'number' || obj.failedStreak < 0) {
     errors.push(`'failedStreak' debe ser un entero mayor o igual a 0`);
   }
+  if (obj.zombieStreak !== undefined && (typeof obj.zombieStreak !== 'number' || obj.zombieStreak < 0)) {
+    errors.push(`'zombieStreak' debe ser un entero mayor o igual a 0`);
+  }
   return { valid: errors.length === 0, errors };
 }
 

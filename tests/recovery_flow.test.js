@@ -576,3 +576,35 @@ describe('Lockfile Concurrency Protection', () => {
     assert.equal(fs.existsSync(lockPath), false);
   });
 });
+
+describe('Watchdog & GOWS Resilience Hardening', () => {
+  test('validateWatchdogState accepts zombie/alert fields and rejects negative zombieStreak', () => {
+    const valid = validateWatchdogState({
+      failedStreak: 0,
+      zombieStreak: 1,
+      lastZombieHeal: '2026-11-12T18:00:00.000Z',
+      lastAlertKey: 'waha-zombie-session'
+    });
+    assert.equal(valid.valid, true);
+
+    const invalid = validateWatchdogState({ failedStreak: 0, zombieStreak: -1 });
+    assert.equal(invalid.valid, false);
+  });
+
+  test('watchdog and boot probes use {"probe":true}, never bare "{}" to inbound webhook', () => {
+    const wdSrc = fs.readFileSync(path.resolve(__dirname, '../waha_watchdog.ps1'), 'utf8');
+    const bootSrc = fs.readFileSync(path.resolve(__dirname, '../boot_serrucho.ps1'), 'utf8');
+    assert.doesNotMatch(wdSrc, /webhook\/whatsapp\/inbound["']\s+-Method\s+Post\s+-Body\s+["']\{\}["']/i);
+    assert.doesNotMatch(bootSrc, /webhook\/whatsapp\/inbound["']\s+-Method\s+Post\s+-Body\s+["']\{\}["']/i);
+    assert.match(wdSrc, /'\{\"probe\":true\}'/);
+    assert.match(bootSrc, /'\{\"probe\":true\}'/);
+    assert.match(wdSrc, /zombieStreak/);
+    assert.match(wdSrc, /Send-SystemAlert/);
+    assert.match(wdSrc, /waha_alerts\.log/);
+  });
+
+  test('catchup_engine queries WAHA GOWS-compatible /lids API before SQLite fallback', () => {
+    const engineSrc = fs.readFileSync(path.resolve(__dirname, '../scripts/catchup_engine.js'), 'utf8');
+    assert.match(engineSrc, /\/api\/default\/lids\?limit=5000/);
+  });
+});

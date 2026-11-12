@@ -1,4 +1,4 @@
-# -- Watchdog del ecosistema WhatsApp (WAHA + n8n + Catchup Autónomo) --------
+﻿# -- Watchdog del ecosistema WhatsApp (WAHA + n8n + Catchup Autónomo) --------
 # Verifica cada ejecución que:
 #   1) La sesión WAHA "default" esté en WORKING (si falla, la recupera).
 #   2) n8n esté activo y respondiendo en /healthz (si cae, lo recupera).
@@ -22,6 +22,7 @@ $Base      = "http://127.0.0.1:3000"
 $N8nBase   = "http://127.0.0.1:5678"
 $Session   = "default"
 $LogFile   = Join-Path $ProjectDir "waha_watchdog.log"
+$AlertFile = Join-Path $ProjectDir "waha_alerts.log"
 $headers   = @{ "X-Api-Key" = $ApiKey; "Content-Type" = "application/json" }
 $StateFile = Join-Path $ProjectDir "waha_watchdog_state.json"
 $LockFile  = Join-Path $ProjectDir "waha_watchdog.lock"
@@ -105,6 +106,11 @@ function Get-State {
     n8nFailedStreak      = 0
     dockerFailedStreak   = 0
     lastDockerHeal       = $null
+    zombieStreak         = 0
+    lastZombieHeal       = $null
+    lastSilentCheck      = $null
+    lastAlertKey         = $null
+    lastAlertAt          = $null
   }
   if (Test-Path $StateFile) {
     try {
@@ -145,6 +151,43 @@ function Restart-Session {
   foreach ($act in @("stop","start")) {
     try { Invoke-RestMethod -Uri "$Base/api/sessions/$Session/$act" -Method POST -Headers $headers -Body "{}" -TimeoutSec 30 | Out-Null } catch {}
     Start-Sleep -Seconds 4
+  }
+}
+
+function Send-SystemAlert([string]$key, [string]$message, $st, [int]$cooldownMin = 30) {
+  if ($st -and $st.lastAlertKey -eq $key -and $st.lastAlertAt) {
+    try {
+      $lastAt = [datetime]$st.lastAlertAt
+      if (((Get-Date) - $lastAt).TotalMinutes -lt $cooldownMin) { return }
+    } catch {}
+  }
+
+  try {
+    Rotate-LogFile $AlertFile 1048576
+    $line = "{0}  [{1}]  {2}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $key, $message
+    Add-Content -Path $AlertFile -Value $line -Encoding utf8
+  } catch {}
+  Write-Log "ALERTA [$key]: $message"
+
+  try {
+    if ([Environment]::UserInteractive) {
+      Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+      $notify = New-Object System.Windows.Forms.NotifyIcon
+      $notify.Icon = [System.Drawing.SystemIcons]::Warning
+      $notify.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Warning
+      $notify.BalloonTipTitle = "Ferretería El Serrucho — Alerta WhatsApp Bot"
+      $notify.BalloonTipText = $message
+      $notify.Visible = $true
+      $notify.ShowBalloonTip(8000)
+      Start-Sleep -Milliseconds 300
+      $notify.Dispose()
+    }
+  } catch {}
+
+  if ($st) {
+    Set-Field $st "lastAlertKey" $key
+    Set-Field $st "lastAlertAt" ((Get-Date).ToString("o"))
+    Save-State $st
   }
 }
 
@@ -260,7 +303,7 @@ try {
     # Validar que el webhook de WhatsApp no esté desenganchado (404 en runtime)
     $webhookOk = $false
     try {
-      $wbRes = Invoke-RestMethod -Uri "$N8nBase/webhook/whatsapp/inbound" -Method Post -Body "{}" -ContentType "application/json" -TimeoutSec 10 -ErrorAction Stop
+      $wbRes = Invoke-RestMethod -Uri "$N8nBase/webhook/whatsapp/inbound" -Method Post -Body '{"probe":true}' -ContentType "application/json" -TimeoutSec 10 -ErrorAction Stop
       $webhookOk = $true
     } catch {
       $statusCode = 0
@@ -279,7 +322,7 @@ try {
             for ($v = 1; $v -le 5; $v++) {
               Start-Sleep -Seconds 2
               try {
-                $wbRes2 = Invoke-RestMethod -Uri "$N8nBase/webhook/whatsapp/inbound" -Method Post -Body "{}" -ContentType "application/json" -TimeoutSec 10 -ErrorAction Stop
+                $wbRes2 = Invoke-RestMethod -Uri "$N8nBase/webhook/whatsapp/inbound" -Method Post -Body '{"probe":true}' -ContentType "application/json" -TimeoutSec 10 -ErrorAction Stop
                 $webhookOk = $true
                 Write-Log "Webhook de n8n reactivado y verificado exitosamente."
                 break
@@ -421,13 +464,101 @@ try {
                 for ($v = 1; $v -le 5; $v++) {
                   Start-Sleep -Seconds 2
                   try {
-                    $wbRes2 = Invoke-RestMethod -Uri "$N8nBase/webhook/whatsapp/inbound" -Method Post -Body "{}" -ContentType "application/json" -TimeoutSec 10 -ErrorAction Stop
+                    $wbRes2 = Invoke-RestMethod -Uri "$N8nBase/webhook/whatsapp/inbound" -Method Post -Body '{"probe":true}' -ContentType "application/json" -TimeoutSec 10 -ErrorAction Stop
                     Write-Log "Workflow n8n re-enganchado y verificado con éxito tras reporte de WAHA."
                     break
                   } catch {}
                 }
               } catch {}
             }
+          }
+        }
+      } catch {}
+
+      # Detección de sesión zombie (reporta WORKING pero salientes quedan en PENDING > 3 min)
+      try {
+        $nowSec = [int64][DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+        $minOutSec = $nowSec - 7200
+        $recentOut = Invoke-RestMethod -Uri "$Base/api/$Session/chats/all/messages?limit=20&filter.fromMe=true&filter.timestamp.gte=$minOutSec&sortBy=timestamp&sortOrder=desc" -Headers $headers -TimeoutSec 10 -ErrorAction SilentlyContinue
+        $stuckPending = @()
+        if ($recentOut) {
+          $stuckPending = @($recentOut | Where-Object {
+            if (-not $_ -or ($_.fromMe -ne $true) -or ($null -eq $_.timestamp)) { return $false }
+            $isPending = ($_.ack -eq 0 -or $_.ackName -eq "PENDING")
+            $ageSec = $nowSec - [int64]$_.timestamp
+            $toJid = if ($_.to) { [string]$_.to } else { "" }
+            $fromJid = if ($_.from) { [string]$_.from } else { "" }
+            $isCustomerChat = ($toJid -notmatch "@broadcast|@newsletter|status@broadcast") -and ($fromJid -notmatch "@broadcast|@newsletter|status@broadcast")
+            return ($isPending -and ($ageSec -ge 180) -and $isCustomerChat)
+          })
+        }
+
+        if ($stuckPending.Count -ge 1) {
+          $zStreak = [int]$st.zombieStreak + 1
+          Set-Field $st "zombieStreak" $zStreak
+          $lastZHeal = $null
+          if ($st.lastZombieHeal) { try { $lastZHeal = [datetime]$st.lastZombieHeal } catch {} }
+          if ($lastZHeal -and ((Get-Date) - $lastZHeal).TotalMinutes -lt 10) {
+            Write-Log "AVISO ZOMBIE: $($stuckPending.Count) saliente(s) en PENDING >3m (racha: $zStreak), recuperación en cooldown (<10 min)."
+            Save-State $st
+            exit 0
+          }
+
+          if ($zStreak -ge 2) {
+            Write-Log "ALERTA ZOMBIE: $($stuckPending.Count) saliente(s) siguen en PENDING >3m (racha: $zStreak). Reiniciando contenedor WAHA..."
+            Send-SystemAlert "waha-zombie-restart" "WAHA en sesión zombie ($($stuckPending.Count) mensajes en PENDING >3m). Reiniciando contenedor." $st 15
+            try { Invoke-DockerCommand "restart $WahaContainer" 25 | Out-Null } catch {}
+            Set-Field $st "lastZombieHeal" ((Get-Date).ToString("o"))
+            Save-State $st
+            Start-Sleep -Seconds 12
+          } else {
+            Write-Log "AVISO ZOMBIE: $($stuckPending.Count) saliente(s) en PENDING >3m. Reiniciando sesión WAHA..."
+            Send-SystemAlert "waha-zombie-session" "WAHA presentó $($stuckPending.Count) saliente(s) en PENDING >3m. Reiniciando sesión." $st 30
+            Restart-Session
+            Set-Field $st "lastZombieHeal" ((Get-Date).ToString("o"))
+            Save-State $st
+            Start-Sleep -Seconds 6
+          }
+
+          try {
+            $sZ = Invoke-RestMethod -Uri "$Base/api/sessions/$Session" -Headers $headers -TimeoutSec 15
+            Write-Log "Estado tras recuperación zombie: $($sZ.status)"
+            if ($sZ.status -eq "WORKING") {
+              Trigger-Catchup "Recuperación tras sesión zombie (PENDING)"
+            }
+          } catch {}
+          exit 0
+        } elseif ([int]$st.zombieStreak -gt 0) {
+          Set-Field $st "zombieStreak" 0
+          Save-State $st
+        }
+      } catch {}
+
+      # Detección de silencio prolongado de mensajes entrantes en horario comercial (Lun-Sáb 09:00-17:00)
+      try {
+        $nowLocal = Get-Date
+        $isStoreHours = ($nowLocal.DayOfWeek -ne [DayOfWeek]::Sunday) -and ($nowLocal.Hour -ge 9) -and ($nowLocal.Hour -lt 17)
+        if ($isStoreHours) {
+          $lastSilCheck = $null
+          if ($st.lastSilentCheck) { try { $lastSilCheck = [datetime]$st.lastSilentCheck } catch {} }
+          if (-not $lastSilCheck -or ($nowLocal - $lastSilCheck).TotalMinutes -ge 240) {
+            $recentIn = Invoke-RestMethod -Uri "$Base/api/$Session/chats/all/messages?limit=5&filter.fromMe=false&sortBy=timestamp&sortOrder=desc" -Headers $headers -TimeoutSec 10 -ErrorAction SilentlyContinue
+            $latestInTs = 0
+            if ($recentIn) {
+              foreach ($im in $recentIn) {
+                $imFrom = if ($im.from) { [string]$im.from } else { "" }
+                if ($imFrom -notmatch "@broadcast|@newsletter|status@broadcast" -and [int64]$im.timestamp -gt $latestInTs) {
+                  $latestInTs = [int64]$im.timestamp
+                }
+              }
+            }
+            $nowSec2 = [int64][DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+            if ($latestInTs -gt 0 -and ($nowSec2 - $latestInTs) -ge 14400) {
+              $silentHrs = [math]::Round(($nowSec2 - $latestInTs) / 3600, 1)
+              Send-SystemAlert "waha-silent-inbound" "Sesión WAHA en WORKING sin mensajes entrantes hace ${silentHrs}h en horario laboral. Verificar teléfono/QR." $st 120
+            }
+            Set-Field $st "lastSilentCheck" ($nowLocal.ToString("o"))
+            Save-State $st
           }
         }
       } catch {}
@@ -446,6 +577,7 @@ try {
 
     if ($s.status -eq "SCAN_QR_CODE") {
       Write-Log "Sesión esperando escaneo de QR -- no se interviene (http://127.0.0.1:3000)."
+      Send-SystemAlert "waha-scan-qr" "Sesión WAHA desconectada esperando escaneo de QR en http://127.0.0.1:3000/dashboard" $st 60
       exit 0
     }
 
@@ -467,6 +599,7 @@ try {
         exit 0
       }
       Write-Log "Sesión '$($s.status)' por $streak corridas seguidas. Reiniciando contenedor WAHA..."
+      Send-SystemAlert "waha-down" "Sesión WAHA en '$($s.status)' por $streak revisiones seguidas. Reiniciando contenedor." $st 30
       try { Invoke-DockerCommand "restart $WahaContainer" 20 | Out-Null } catch { Write-Log "docker restart fallo: $($_.Exception.Message)" }
       Set-Field $st "lastContainerRestart" ((Get-Date).ToString("o"))
       Set-Field $st "failedStreak" 0
@@ -496,6 +629,7 @@ try {
 
   } catch {
     Write-Log "ERROR consultando WAHA (contenedor caído?): $($_.Exception.Message)"
+    Send-SystemAlert "waha-unreachable" "WAHA no responde en HTTP ($Base): $($_.Exception.Message)" $st 30
     try { Invoke-DockerCommand "start $WahaContainer" 10 | Out-Null } catch {}
   }
 } finally {
