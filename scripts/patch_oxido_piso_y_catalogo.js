@@ -48,7 +48,7 @@ try {
   userQuery = String($('Prepare Conversation Context').first().json.conversation_context.query || '');
 } catch (e) {}
 const uqNorm = userQuery.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
-const pidioCatalogoExplicit = /\\b(catalogo|carta\\s+de\\s+colores|paleta|floripaint)\\b/.test(uqNorm);
+const pidioCatalogoExplicit = /\\b(catalogo|carta\\s+de\\s+colores|paleta|floripaint|foto\\s+de\\s+los\\s+colores|ver\\s+los\\s+colores|colores\\s+disponibles|colores\\s+q(?:ue)?\\s+tien\\w*)\\b/.test(uqNorm);
 if (uqNorm && !pidioCatalogoExplicit) {
   const esAceiteOFloor = /\\b(aceite|esmalte|oxido|piso|pisos|cera|el\\s+pro)\\b/.test(uqNorm);
   if (esAceiteOFloor) {

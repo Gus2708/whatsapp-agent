@@ -214,7 +214,7 @@ const SIN = {
   'cris':'gris','griss':'gris','asul':'azul','asules':'azul',
   'blanvo':'blanco','vlanco':'blanco','vlancom':'blanco',
   'amariyo':'amarillo',
-  'cunete':'cuñete','cunetes':'cuñete','cuñetes':'cuñete','tobo de pintura':'cuñete','balde de pintura':'cuñete',
+  'cunete':'cuñete','cunetes':'cuñete','cuñetes':'cuñete','cuñe':'cuñete','cune':'cuñete','cuñes':'cuñete','cunes':'cuñete','tobo de pintura':'cuñete','balde de pintura':'cuñete',
   'cuartico':'1/4','cuartico de pintura':'1/4',
   'pintura de agua':'pintura caucho','pinturas de agua':'pintura caucho',
   'pintura al agua':'pintura caucho','pinturas al agua':'pintura caucho',
@@ -251,9 +251,10 @@ const ALIAS = {
   'nordica':     ['nordik','nordico'],
   'nordik':      ['nordik','nordico'],
   // Clases de pintura (A, B, C): en el catalogo conviven como "CLASE B", "TIPO B", "B GAL" (Floripaint), etc.
-  'claseb':     ['clase b','tipo b','b gal','mar deco','vinilevery'],
-  'clasea':     ['clase a','tipo a','a gal','sun deco'],
-  'clasec':     ['clase c','tipo c','c gal','rio deco'],
+  'cunete':     ['cunete','cuñete','4gl','4 gal','4 galones','5 galones','5gl'],
+  'claseb':     ['clase b','tipo b','b gal','b cunete','b cuñete','conc.b','mar deco','vinilevery'],
+  'clasea':     ['clase a','tipo a','a gal','a cunete','a cuñete','sun deco','deluxe a'],
+  'clasec':     ['clase c','tipo c','c gal','c cunete','c cuñete','rio deco','rio blanco','everama'],
   // Perfiles y acabados de láminas de techo
   'ondulada':       ['ondulada','ondulado','ondu','ond','canal redondo','canal redonda'],
   'ondulado':       ['ondulado','ondulada','ondu','ond','canal redondo','canal redonda'],
@@ -310,7 +311,7 @@ const ACCENTS = {
   'fregadero': 'lavaplato','herreria': 'herrería','carbon': 'carbón','cautin': 'cautín','exhibicion': 'exhibición','gavilan': 'gavilán',
   'hidraulico': 'hidráulico','lampara': 'lámpara','periferica': 'periférica','polimero': 'polímero','presion': 'presión',
   'reduccion': 'reducción','refrigeracion': 'refrigeración','silicon': 'silicón','sintetico': 'sintético','tuberia': 'tubería',
-  'plastico': 'plástico','lamina': 'lámina','bateria': 'batería','medicion': 'medición','fijacion': 'fijación'
+  'plastico': 'plástico','lamina': 'lámina','bateria': 'batería','medicion': 'medición','fijacion': 'fijación','cunete': 'cuñete'
 };
 // colores: neutraliza genero/numero a una raiz (blanco/blanca/blancos/blancas -> blanc)
 // asi "pintura blanca" coincide con "PINTURA ... BLANCO" en la BD.
@@ -326,11 +327,15 @@ const COLOR_STEM = {
   'pink':'rosad','pinc':'rosad',
   'lila':'lila','lilas':'lila',
   'marfil':'marfil','durazno':'durazno',
+  'ocre':'ocre','mostaza':'mostaza','caramelo':'caramelo','terracota':'terracota','vinotinto':'vinotinto',
+  'melon':'melon','melocoton':'melocoton','coral':'coral','salmon':'salmon',
+  'turquesa':'turquesa','aguamarina':'aguamarina','crema':'crema','greige':'greige',
+  'fucsia':'fucsia','magenta':'magenta','violeta':'violeta','orquidea':'orquidea','champana':'champana',
   'gris':'gris','grises':'gris','cris':'gris','griss':'gris',
   'verde':'verde','verdes':'verde',
   'azul':'azul','azules':'azul','asul':'azul','asules':'azul',
   'marron':'marron','marrones':'marron',
-  'naranja':'naranja','naranjas':'naranja','beige':'beige','beig':'beige','beis':'beige','veige':'beige','cafe':'cafe',
+  'naranja':'naranja','naranjas':'naranja','naramja':'naranja','beige':'beige','beig':'beige','beis':'beige','veige':'beige','cafe':'cafe',
   'celeste':'celeste','celestes':'celeste'
 };
 function stemColor(w){ return COLOR_STEM[w] || w; }
@@ -430,6 +435,17 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
   }
   s = s.replace(/\blamina\s+(de\s+)?lamina\s+zinc\b/gi, 'lamina zinc');
   s = s.replace(/\b(lamina\s+zinc|zinc)\s+lamina\b/gi, '$1');
+  if (!/\b(pinturas?|esmaltes?|satinad\w*|caucho|oleo|anticorrosiv\w*|sellafill|imperflex|impermeabilizante|oxido)\b/i.test(s) &&
+      !/\b(tubos?|pvc|conduit|aguas?|cables?|estuco|pasta|mastique|pega|primer|bituplast|asfalt\w*|cemento|soldadura|herreria|hierro|laminas?|techolit|acerolit|zinc|bloques?|cabillas?|angulos?|cerchas?|electrodos?|tomacorrientes?|interruptor\w*|apagador\w*|suiches?|breakers?|driza|mangueras?|bombillos?|brochas?|rodillos?|thinner|tiner|cera)\b/i.test(s)) {
+    const _hasPaintClass = /\bclase[abc]\b/i.test(s);
+    const _hasPaintBrand = /\b(floripaint|vinilevery|evercril|evermax|everama|inve?rcolor|kolor\s*flex|color\s+plus|mar\s+deco|sun\s+deco|rio\s+deco|seda\s+styl|caribe\s+paint)\b/i.test(s);
+    const _hasCunete = /\b(cu[nñ]ete|cunetes|cuñetes)\b/i.test(s);
+    const _hasGalonWithColor = /\b(galon|galones)\b/i.test(s) && /\b(blanco|blanca|negro|negra|rojo|roja|amarillo|amarilla|azul|verde|gris|marron|naranja|rosado|rosada|beige|lila|morado|morada|marfil|durazno|celeste|dorado|dorada|plateado|plateada|ocre|melon|melocoton|coral|salmon|turquesa|aguamarina|vinotinto|terracota|colores|color|paleta)\b/i.test(s);
+    const _hasPaintColorQuery = /\b(?:foto|fotos|imagen|imagenes|carta|paleta|catalogo|muestra|muestrario)\s+(?:de\s+)?(?:los\s+)?colores\b|\bcolores\s+(?:que\s+tienes?\s+|q\s+tienes?\s+)?disponibles\b/i.test(s);
+    if (_hasPaintClass || _hasPaintBrand || _hasCunete || _hasGalonWithColor || _hasPaintColorQuery) {
+      s = 'pintura ' + s;
+    }
+  }
   return s.replace(/\s+/g,' ').trim(); }
 // productos a granel (se venden por metro/kilo): su existencia es irreal, SIEMPRE disponibles
 function esGranel(desc){ const d=norm(desc); return /(^| )x ?(mtrs|mtr|mts|mt|metros|metro|kilos|kilo|kg|gr|ml)( |$)/.test(d) || / por metro( |$)/.test(d); }
@@ -1418,6 +1434,8 @@ const MODIFIERS = new Set([
   'multifuncional', 'pulgada', 'pulgadas', 'media', 'cuarto', 'octavo', 'metro', 'metros', 'pies', 'pulg', 'mm', 'cm', 'mts',
   'negro', 'negra', 'blanco', 'blanca', 'gris', 'cris', 'griss', 'azul', 'asul', 'rojo', 'roja', 'verde', 'amarillo', 'amarilla',
   'beige', 'beig', 'beis', 'rosado', 'rosada', 'pink', 'lila', 'morado', 'morada', 'marron', 'naranja', 'marfil', 'durazno',
+  'ocre', 'melon', 'melocoton', 'coral', 'salmon', 'turquesa', 'aguamarina', 'vinotinto', 'terracota', 'crema', 'greige',
+  'fucsia', 'magenta', 'violeta', 'orquidea', 'mostaza', 'caramelo', 'dorado', 'dorada', 'plateado', 'plateada',
   'exterior', 'exteriores', 'interior', 'interiores', 'fachada', 'intemperie', 'clase', 'tipo', 'calidad'
 ]);
 
@@ -1651,7 +1669,7 @@ let res = [];
 let _fuzzy = false;
 const _esOxidoPisoQuery = qTokens.includes('oxido') && qTokens.includes('piso');
 const isPaintQuery = !_esOxidoPisoQuery && (qTokens.includes('pintura') || /\b(pinturas?|esmalte|esmaltes|satinad\w*|caucho|oleo|anticorrosiv\w*|sellafill|imperflex|impermeabilizante)\b/.test(norm(_pb)) || (/\b(spray|aerosol)\b/.test(norm(_pb)) && /\b(pintur|color|esmalte)\b/.test(norm(_pb))));
-const textLargasSql = isPaintQuery ? textLargas.filter(w => !['exterior','exteriores','interior','interiores','fachada','intemperie','clase','clases','tipo','tipos','calidad','calidades','paleta','carta','catalogo','muestra','muestras','color','colores','tono','tonos','disponible','disponibles','precio','precios','marca','marcas'].includes(w)) : textLargas;
+const textLargasSql = isPaintQuery ? textLargas.filter(w => !['exterior','exteriores','interior','interiores','fachada','intemperie','clase','clases','tipo','tipos','calidad','calidades','paleta','carta','catalogo','muestra','muestras','color','colores','tono','tonos','disponible','disponibles','precio','precios','marca','marcas','foto','fotos','imagen','imagenes'].includes(w)) : textLargas;
 if (granelIntent && textLargasSql.length>0) res = casanDeVerdad(await ilike(textLargasSql, 60, GRANEL_OR), textLargasSql);
 if (res.length===0 && textLargasSql.length>0) {
   const _sqlToks = (isPaintQuery && textLargasSql.includes('pintura') && textLargasSql.includes('caucho')) ? textLargasSql.filter(w => w !== 'caucho') : textLargasSql;
@@ -2082,17 +2100,19 @@ if (qTokens.includes('oxido') && qTokens.includes('piso')) {
 let _isPaintNoColor = false;
 let _coloresPinturaStock = [];
 let _pintaStockDisponibles = [];
+let _paintNoColorMeta = null;
+let _paintCatalogBlock = false;
 
-const _esA = d => /\bCLASE\s+A\b|\bTIPO\s+A\b|\bA\s+GAL\b|\bA\s+GALON\b|\bA\s+X\s+GALON\b|SUN\s+DECO|IMPACTO\s+CARIBE|CARIBE\s+PAINT|\bCARIBE\s+P\b|DELUXE\s+A|\bEVERY\b.*\bA\b|\bEVERCRIL\b.*\bA\b|\bEVERMAX\b.*\bA\b|PREMIU[MN].*FLORIPAINT/i.test(d) && !/\bCLASE\s+[BC]\b|\bTIPO\s+[BC]\b/i.test(d);
-const _esB = d => /\bCLASE\s+B\b|\bTIPO\s+B\b|\bB\s+GAL\b|\bB\s+GALON\b|\bB\s+X\s+GALON\b|(?:^|\s|[A-Z])B\s+GAL\s+FLORIPAINT|FLORIPAINT.*\bCLASE\s+B\b|\bB\s+CUNETE\s+FLORIPAINT\b|MAR\s+DECO|VINILEVERY|KOLOR\s*FLEX.*(?:\bB\b|CONC\.B)|INVE?RCOLOR.*TIPO\s*B|\bEVERY\b.*\bB\b/i.test(d) && !/\bCLASE\s+[AC]\b|\bTIPO\s+[AC]\b/i.test(d);
-const _esC = d => /\bCLASE\s+C\b|\bTIPO\s+C\b|\bC\s+GAL\b|\bC\s+GALON\b|\bC\s+X\s+GALON\b|\bC\s+CUNETE\s+FLORIPAINT\b|RIO\s+DECO|RIO\s+BLANCO|IMPACTO\s+RIO\b|COLOR\s+PLUS.*TIPO\s*C|EVERAMA|EVERY.*C-?300|\bEVERY\b.*\bC\b|KOLOR\s*FLEX.*\bC\b/i.test(d) && !/\bCLASE\s+[AB]\b|\bTIPO\s+[AB]\b/i.test(d);
+const _esA = d => /\bCLASE\s+A\b|\bTIPO\s+A\b|\bA\s+GAL\b|\bA\s+GALON\b|\bA\s+X\s+GALON\b|\bA\s+CU[NÑ]ETE\b|SUN\s+DECO|IMPACTO\s+CARIBE|CARIBE\s+PAINT|\bCARIBE\s+P\b|DELUXE\s+A|\bEVERY\b.*\bA\b|\bEVERCRIL\b.*\bA\b|\bEVERMAX\b.*\bA\b|PREMIU[MN].*FLORIPAINT/i.test(d) && !/\bCLASE\s+[BC]\b|\bTIPO\s+[BC]\b/i.test(d);
+const _esB = d => /\bCLASE\s+B\b|\bTIPO\s+B\b|\bB\s+GAL\b|\bB\s+GALON\b|\bB\s+X\s+GALON\b|\bB\s+CU[NÑ]ETE\b|(?:^|\s|[A-Z])B\s+GAL\s+FLORIPAINT|FLORIPAINT.*\bCLASE\s+B\b|\bB\s+CUNETE\s+FLORIPAINT\b|MAR\s+DECO|VINILEVERY|KOLOR\s*FLEX.*(?:\bB\b|CONC\.B)|INVE?RCOLOR.*TIPO\s*B|\bEVERY\b.*\bB\b/i.test(d) && !/\bCLASE\s+[AC]\b|\bTIPO\s+[AC]\b/i.test(d);
+const _esC = d => /\bCLASE\s+C\b|\bTIPO\s+C\b|\bC\s+GAL\b|\bC\s+GALON\b|\bC\s+X\s+GALON\b|\bC\s+CU[NÑ]ETE\b|\bC\s+CUNETE\s+FLORIPAINT\b|RIO\s+DECO|RIO\s+BLANCO|IMPACTO\s+RIO\b|COLOR\s+PLUS.*TIPO\s*C|EVERAMA|EVERY.*C-?300|\bEVERY\b.*\bC\b|KOLOR\s*FLEX.*\bC\b/i.test(d) && !/\bCLASE\s+[AB]\b|\bTIPO\s+[AB]\b/i.test(d);
 const _esAceite = d => /ACEITE|ESMALTE|2\s*EN\s*1|3\s*EN\s*1|EVERY\s+PLUS\s+E-|EL\s+PRO\s+30-|PRO\s+GOLD/i.test(d);
 const _esSatin = d => /SATINAD|SEDA\s+STYL|BRILLO\s+SEDA|BRILLO\s+DE\s+SEDA|STYLE\s+BRILLO/i.test(d);
 const _esImp = d => /IMPERMEABIL|SELLAFILL|IMPERFLEX|LOXON\s+PISCINA/i.test(d);
 const _esSpray = d => /AEROSOL|AEREOSOL|SPRAY/i.test(d);
-const _esCunete = d => /CUÑETE|CUÑETES|4GL|4GAL|4\s+GALONES|5\s+GALONES|5GL/i.test(d);
+const _esCunete = d => /CU[NÑ]ETES?|4\s*GL|4\s*GAL(?:ONES)?|\b4G\b|5\s*GL|5\s*GAL(?:ONES)?|16\s*L|20\s*L|TOBO|BALDE/i.test(d);
 const _esCuarto = d => /\b1\/4\b/i.test(d);
-const _esGalon = d => (/GALON|GAL\b|POR\s+GALON|X\s+GALON/i.test(d) || (!_esCunete(d) && !_esCuarto(d) && !_esSpray(d)));
+const _esGalon = d => !_esCunete(d) && !_esCuarto(d) && !_esSpray(d);
 
 function _marcaPintura(desc) {
   const d = norm(desc);
@@ -2119,7 +2139,7 @@ function _marcaPintura(desc) {
 
 function _presentacionPintura(desc) {
   const d = norm(desc);
-  if (/cu[nñ]ete|4\s*gl|4\s*gal|5\s*gl|5\s*gal|16\s*l|20\s*l|tobo|balde/.test(d)) return 'Cuñete';
+  if (/cu[nñ]ete|4\s*gl|4\s*gal|\b4g\b|5\s*gl|5\s*gal|16\s*l|20\s*l|tobo|balde/.test(d)) return 'Cuñete';
   if (/\b1\/4\b|cuartico|1\s*litro|\b1\s*l\b/.test(d)) return '1/4 de galón';
   if (/spray|aerosol|400\s*ml|450\s*ml|350\s*ml/.test(d)) return 'Spray';
   return 'Galón';
@@ -2131,6 +2151,7 @@ const _COLOR_PATTERNS = [
   { name: 'Blanco Hueso', re: /\bblanco\s+hueso\b/i },
   { name: 'Blanco Nácar', re: /\bblanco\s+nacar\b/i },
   { name: 'Blanco Mate', re: /\bblanco\s+mate\b/i },
+  { name: 'Blanco Almendra', re: /\bblanco\s+almendra\b/i },
   { name: 'Blanco', re: /\b(blanco|blanca)\b/i },
   { name: 'Marfil Clásico', re: /\bmarfil\s+clasico\b/i },
   { name: 'Marfil', re: /\bmarfil\b/i },
@@ -2141,6 +2162,9 @@ const _COLOR_PATTERNS = [
   { name: 'Gris Claro', re: /\bgris\s+claro\b/i },
   { name: 'Gris Concreto', re: /\bgris\s+concreto\b/i },
   { name: 'Gris Plomo', re: /\bgris\s+plomo\b/i },
+  { name: 'Gris Humo', re: /\bgris\s+humo\b/i },
+  { name: 'Gris Nube', re: /\bgris\s+nube\b/i },
+  { name: 'Gris Perla', re: /\bgris\s+perla\b/i },
   { name: 'Gris', re: /\b(gris|plomo|concreto)\b/i },
   { name: 'Azul Cielo', re: /\bazul\s+cielo\b/i },
   { name: 'Azul Marino', re: /\bazul\s+marino\b/i },
@@ -2150,6 +2174,8 @@ const _COLOR_PATTERNS = [
   { name: 'Azul Rey', re: /\bazul\s+rey\b/i },
   { name: 'Azul Medieval', re: /\bazul\s+medieval\b/i },
   { name: 'Azul Milano', re: /\bazul\s+milano\b/i },
+  { name: 'Azul Bahía', re: /\bazul\s+bahia\b/i },
+  { name: 'Azul Mar', re: /\bazul\s+mar\b/i },
   { name: 'Azul', re: /\bazul\b/i },
   { name: 'Turquesa Real', re: /\bturquesa\s+real\b/i },
   { name: 'Turquesa', re: /\bturquesa\b/i },
@@ -2159,24 +2185,34 @@ const _COLOR_PATTERNS = [
   { name: 'Verde Claro', re: /\bverde\s+claro\b/i },
   { name: 'Verde Primavera', re: /\bverde\s+primaver\w*\b/i },
   { name: 'Verde Tentación', re: /\bverde\s+tentaci\w*\b/i },
+  { name: 'Verde Alegría', re: /\bverde\s+alegria\b/i },
+  { name: 'Verde Pistacho', re: /\bverde\s+pistacho\b/i },
+  { name: 'Verde Pino', re: /\bverde\s+pino\b/i },
   { name: 'Esmeralda', re: /\besmeralda\b/i },
   { name: 'Verde', re: /\bverde\b/i },
   { name: 'Amarillo Caterpillar', re: /\bamarillo\s+caterpillar\b/i },
   { name: 'Amarillo Vibrante', re: /\bamarillo\s+vibrante\b/i },
   { name: 'Girasol', re: /\bgirasol\b/i },
+  { name: 'Ocre', re: /\bocre\b/i },
   { name: 'Amarillo', re: /\bamarill\w*\b/i },
   { name: 'Naranja Milenium', re: /\bnaranja\s+milenium\b/i },
+  { name: 'Naranja', re: /\b(naranj\w*|naramja)\b/i },
   { name: 'Mandarina Chic', re: /\bmandarina\s+chic\b/i },
   { name: 'Mandarina Tropical', re: /\bmandarina\s+tropical\b/i },
+  { name: 'Mandarina', re: /\bmandarina\b/i },
+  { name: 'Durazno', re: /\bdurazno\b/i },
   { name: 'Melón', re: /\bmelon\b/i },
   { name: 'Melocotón', re: /\bmelocoton\b/i },
   { name: 'Terracota', re: /\bterracota\b/i },
+  { name: 'Vinotinto', re: /\bvinotinto\b/i },
   { name: 'Rojo Colonial', re: /\brojo\s+colonial\b/i },
   { name: 'Rojo Teja', re: /\brojo\s+teja\b/i },
   { name: 'Rojo Bermellón', re: /\brojo\s+bermellon\b/i },
   { name: 'Rojo', re: /\broj\w*\b/i },
   { name: 'Salmón', re: /\bsalmon\b/i },
   { name: 'Rosa Infantil', re: /\brosa\s+infantil\b/i },
+  { name: 'Rosa Fuerte', re: /\brosa\s+fuerte\b/i },
+  { name: 'Rosa Country', re: /\brosa\s+country\b/i },
   { name: 'Palo de Rosa', re: /\bpalo\s+de\s+rosa\b/i },
   { name: 'Rosado', re: /\brosad\w*\b/i },
   { name: 'Orquídea', re: /\borquidea\w*\b/i },
@@ -2184,6 +2220,7 @@ const _COLOR_PATTERNS = [
   { name: 'Lila', re: /\blila\b/i },
   { name: 'Violeta', re: /\bvioleta\b/i },
   { name: 'Magenta', re: /\bmagenta\b/i },
+  { name: 'Fucsia', re: /\bfucsia\b/i },
   { name: 'Coral', re: /\bcoral\b/i },
   { name: 'Negro Mate', re: /\bnegro\s+mate\b/i },
   { name: 'Negro', re: /\bnegr\w*\b/i },
@@ -2200,9 +2237,55 @@ function _extraerTonoPintura(desc) {
   return null;
 }
 
+function _agruparMarcasPintura(prods, tasa, recargo) {
+  const marcasMap = new Map();
+  for (const p of prods) {
+    const marca = _marcaPintura(p.descripcion);
+    const pres = _presentacionPintura(p.descripcion);
+    const tono = _extraerTonoPintura(p.descripcion);
+    const precioUSD = Number(p.precio_venta);
+
+    if (!marcasMap.has(marca)) marcasMap.set(marca, new Map());
+    const presMap = marcasMap.get(marca);
+
+    if (!presMap.has(pres)) {
+      presMap.set(pres, { min: precioUSD, max: precioUSD, colores: new Set() });
+    }
+    const data = presMap.get(pres);
+    data.min = Math.min(data.min, precioUSD);
+    data.max = Math.max(data.max, precioUSD);
+    if (tono) data.colores.add(tono);
+  }
+
+  const marcasArray = [];
+  for (const [marca, presMap] of marcasMap.entries()) {
+    const presentaciones = [];
+    const todosColores = new Set();
+    for (const [pres, data] of presMap.entries()) {
+      const precioDivisas = data.min === data.max ? (nUSD(data.min) + '$') : (nUSD(data.min) + '$ a ' + nUSD(data.max) + '$');
+      const bsMin = tasa ? nBs(data.min * recargo * tasa) : null;
+      const bsMax = tasa ? nBs(data.max * recargo * tasa) : null;
+      const precioBs = !tasa ? 'tasa BCV no disponible' : (data.min === data.max ? (bsMin + ' Bs') : (bsMin + ' Bs a ' + bsMax + ' Bs'));
+      presentaciones.push({
+        presentacion: pres,
+        precio_divisas: precioDivisas,
+        precio_bs: precioBs,
+        colores: Array.from(data.colores)
+      });
+      for (const col of data.colores) todosColores.add(col);
+    }
+    marcasArray.push({
+      marca,
+      presentaciones,
+      colores: Array.from(todosColores)
+    });
+  }
+  return marcasArray;
+}
+
 function _generarResumenPinturas(items, tasa, recargo) {
   const inStock = items.filter(p => esGranel(p.descripcion) || Number(p.existencia) > 0);
-  
+
   const clasesConfig = [
     { id: 'clase_a', label: 'Clase A (Primera calidad / Alta durabilidad y cubrimiento)', match: _esA },
     { id: 'clase_b', label: 'Clase B (Calidad intermedia / Excelente relación precio-valor)', match: _esB },
@@ -2214,58 +2297,24 @@ function _generarResumenPinturas(items, tasa, recargo) {
   for (const c of clasesConfig) {
     const prodsClase = inStock.filter(p => c.match(p.descripcion));
     if (prodsClase.length === 0) continue;
-    
-    const marcasMap = new Map();
-    for (const p of prodsClase) {
-      const marca = _marcaPintura(p.descripcion);
-      const pres = _presentacionPintura(p.descripcion);
-      const tono = _extraerTonoPintura(p.descripcion);
-      const precioUSD = Number(p.precio_venta);
-
-      if (!marcasMap.has(marca)) marcasMap.set(marca, new Map());
-      const presMap = marcasMap.get(marca);
-
-      if (!presMap.has(pres)) {
-        presMap.set(pres, { min: precioUSD, max: precioUSD, colores: new Set() });
-      }
-      const data = presMap.get(pres);
-      data.min = Math.min(data.min, precioUSD);
-      data.max = Math.max(data.max, precioUSD);
-      if (tono) data.colores.add(tono);
-    }
-
-    const marcasArray = [];
-    for (const [marca, presMap] of marcasMap.entries()) {
-      const presentaciones = [];
-      const todosColores = new Set();
-      for (const [pres, data] of presMap.entries()) {
-        const precioDivisas = data.min === data.max ? (nUSD(data.min) + '$') : (nUSD(data.min) + '$ a ' + nUSD(data.max) + '$');
-        const bsMin = nBs(data.min * recargo * tasa);
-        const bsMax = nBs(data.max * recargo * tasa);
-        const precioBs = data.min === data.max ? (bsMin + ' Bs') : (bsMin + ' Bs a ' + bsMax + ' Bs');
-        presentaciones.push({
-          presentacion: pres,
-          precio_divisas: precioDivisas,
-          precio_bs: precioBs,
-          colores: Array.from(data.colores)
-        });
-        for (const col of data.colores) todosColores.add(col);
-      }
-      marcasArray.push({
-        marca,
-        presentaciones,
-        colores: Array.from(todosColores)
-      });
-    }
-
     grupos.push({
       clase: c.id,
       titulo: c.label,
-      marcas: marcasArray
+      marcas: _agruparMarcasPintura(prodsClase, tasa, recargo)
     });
   }
 
-  // If no classes matched (e.g. only other finishes like Aceite or Satinada were in stock), summarize finishes
+  // Include Satinada items not already classified into Clase A/B/C
+  const satinProds = inStock.filter(p => _esSatin(p.descripcion) && !_esA(p.descripcion) && !_esB(p.descripcion) && !_esC(p.descripcion));
+  if (satinProds.length > 0) {
+    grupos.push({
+      clase: 'satinada',
+      titulo: 'Satinada / Brillo de Seda',
+      marcas: _agruparMarcasPintura(satinProds, tasa, recargo)
+    });
+  }
+
+  // If no classes matched (e.g. only other finishes like Aceite or Spray were in stock), summarize finishes
   if (grupos.length === 0) {
     const finishes = [
       { id: 'aceite', label: 'Esmalte / Aceite', match: _esAceite },
@@ -2275,35 +2324,7 @@ function _generarResumenPinturas(items, tasa, recargo) {
     for (const f of finishes) {
       const prodsF = inStock.filter(p => f.match(p.descripcion));
       if (prodsF.length === 0) continue;
-      const marcasMap = new Map();
-      for (const p of prodsF) {
-        const marca = _marcaPintura(p.descripcion);
-        const pres = _presentacionPintura(p.descripcion);
-        const tono = _extraerTonoPintura(p.descripcion);
-        const precioUSD = Number(p.precio_venta);
-        if (!marcasMap.has(marca)) marcasMap.set(marca, new Map());
-        const presMap = marcasMap.get(marca);
-        if (!presMap.has(pres)) presMap.set(pres, { min: precioUSD, max: precioUSD, colores: new Set() });
-        const data = presMap.get(pres);
-        data.min = Math.min(data.min, precioUSD);
-        data.max = Math.max(data.max, precioUSD);
-        if (tono) data.colores.add(tono);
-      }
-      const marcasArray = [];
-      for (const [marca, presMap] of marcasMap.entries()) {
-        const presentaciones = [];
-        const todosColores = new Set();
-        for (const [pres, data] of presMap.entries()) {
-          const precioDivisas = data.min === data.max ? (nUSD(data.min) + '$') : (nUSD(data.min) + '$ a ' + nUSD(data.max) + '$');
-          const bsMin = nBs(data.min * recargo * tasa);
-          const bsMax = nBs(data.max * recargo * tasa);
-          const precioBs = data.min === data.max ? (bsMin + ' Bs') : (bsMin + ' Bs a ' + bsMax + ' Bs');
-          presentaciones.push({ presentacion: pres, precio_divisas: precioDivisas, precio_bs: precioBs, colores: Array.from(data.colores) });
-          for (const col of data.colores) todosColores.add(col);
-        }
-        marcasArray.push({ marca, presentaciones, colores: Array.from(todosColores) });
-      }
-      grupos.push({ clase: f.id, titulo: f.label, marcas: marcasArray });
+      grupos.push({ clase: f.id, titulo: f.label, marcas: _agruparMarcasPintura(prodsF, tasa, recargo) });
     }
   }
 
@@ -2355,113 +2376,258 @@ function _generarResumenPinturas(items, tasa, recargo) {
     const wantGalon = /\b(galon|galones|x\s*galon|por\s*galon|4\s*l\b|4\s*litros?|4\s*lts?|3\.8\s*l)\b/.test(nbq) && !wantCunete && !wantCuarto;
 
     const _colorP = [
-      { r: 'gris', re: /\b(gris|grises|cris|griss|plomo|concreto|cemento)\b/i },
-      { r: 'blanc', re: /\b(blanco|blanca|blancos|blancas|blanvo|vlanco|vlancom|hueso|ostra|nieve|almendra)\b/i },
-      { r: 'negr', re: /\b(negro|negra|negros|negras)\b/i },
-      { r: 'roj', re: /\b(rojo|roja|rojos|rojas|colonial|teja|bermellon|escarlata|terracota|ladrillo|vinotinto)\b/i },
-      { r: 'amarill', re: /\b(amarillo|amarilla|amarillos|amarillas|amariyo|girasol|tractor|mostaza|ocre|caramelo)\b/i },
-      { r: 'azul', re: /\b(azul|azules|asul|asules|glacial|marino|cielo|rey|turquesa|milano|bahia|profundo)\b/i },
-      { r: 'verde', re: /\b(verde|verdes|manzana|menta|pistacho|primavera|prado|morichal|esmeralda|oliva|jade)\b/i },
-      { r: 'marfil', re: /\b(marfil|beige|crema|arena)\b/i },
-      { r: 'morad', re: /\b(morado|morada|morados|moradas|violeta|lila|fucsia|magenta|orquidea)\b/i },
-      { r: 'rosad', re: /\b(rosado|rosada|rosados|rosadas|rosa|coral|salmon|durazno|melon|melocoton)\b/i },
-      { r: 'dorad', re: /\b(dorado|dorada|oro)\b/i },
-      { r: 'platead', re: /\b(plateado|plateada|plata|aluminio|cromo)\b/i }
+      { r: 'gris', label: 'Gris', sql: 'gris', re: /\b(gris|grises|cris|griss|plomo|concreto|cemento)\b/i },
+      { r: 'blanc', label: 'Blanco', sql: 'blanc', re: /\b(blanco|blanca|blancos|blancas|blanvo|vlanco|vlancom|hueso|ostra|nieve|almendra)\b/i },
+      { r: 'negr', label: 'Negro', sql: 'negr', re: /\b(negro|negra|negros|negras)\b/i },
+      { r: 'terracota', label: 'Terracota', sql: 'terracota', re: /\b(terracota|ladrillo)\b/i },
+      { r: 'vinotinto', label: 'Vinotinto', sql: 'vinotinto', re: /\bvinotinto\b/i },
+      { r: 'roj', label: 'Rojo', sql: 'roj', re: /\b(rojo|roja|rojos|rojas|colonial|teja|bermellon|escarlata|carnesi)\b/i },
+      { r: 'ocre', label: 'Ocre', sql: 'ocre', re: /\bocre\b/i },
+      { r: 'mostaza', label: 'Mostaza', sql: 'mostaza', re: /\bmostaza\b/i },
+      { r: 'amarill', label: 'Amarillo', sql: 'amarill', re: /\b(amarillo|amarilla|amarillos|amarillas|amariyo|girasol|tractor|caramelo)\b/i },
+      { r: 'turquesa', label: 'Turquesa', sql: 'turquesa', re: /\bturquesa\b/i },
+      { r: 'aguamarina', label: 'Aguamarina', sql: 'aguamarina', re: /\b(aguamarina|agua\s*marina)\b/i },
+      { r: 'celeste', label: 'Celeste', sql: 'celeste', re: /\bceleste\b/i },
+      { r: 'azul', label: 'Azul', sql: 'azul', re: /\b(azul|azules|asul|asules|glacial|marino|cielo|rey|milano|bahia|profundo|capri|hispano|medieval|mediterraneo)\b/i },
+      { r: 'verde', label: 'Verde', sql: 'verde', re: /\b(verde|verdes|manzana|menta|pistacho|primaver\w*|prado|morichal|esmeralda|oliva|jade|pino|alegria)\b/i },
+      { r: 'beige', label: 'Beige', sql: 'beige', re: /\b(beige|beig|beis|veige)\b/i },
+      { r: 'greige', label: 'Greige', sql: 'greige', re: /\bgreige\b/i },
+      { r: 'crema', label: 'Crema', sql: 'crema', re: /\bcrema\b/i },
+      { r: 'marfil', label: 'Marfil', sql: 'marfil', re: /\b(marfil|champana|champaña|arena)\b/i },
+      { r: 'lila', label: 'Lila', sql: 'lila', re: /\blila\b/i },
+      { r: 'violeta', label: 'Violeta', sql: 'violeta', re: /\bvioleta\b/i },
+      { r: 'fucsia', label: 'Fucsia', sql: 'fucsia', re: /\bfucsia\b/i },
+      { r: 'magenta', label: 'Magenta', sql: 'magenta', re: /\bmagenta\b/i },
+      { r: 'orquidea', label: 'Orquídea', sql: 'orquidea', re: /\borquidea\w*\b/i },
+      { r: 'morad', label: 'Morado', sql: 'morad', re: /\b(morado|morada|morados|moradas|malva|mora)\b/i },
+      { r: 'durazno', label: 'Durazno', sql: 'durazno', re: /\bdurazno\b/i },
+      { r: 'melon', label: 'Melón', sql: 'melon', re: /\bmelon\b/i },
+      { r: 'melocoton', label: 'Melocotón', sql: 'melocoton', re: /\bmelocoton\b/i },
+      { r: 'coral', label: 'Coral', sql: 'coral', re: /\bcoral\b/i },
+      { r: 'salmon', label: 'Salmón', sql: 'salmon', re: /\bsalmon\b/i },
+      { r: 'rosad', label: 'Rosado', sql: 'rosa', re: /\b(rosado|rosada|rosados|rosadas|rosa|pink|pinc)\b/i },
+      { r: 'naranja', label: 'Naranja', sql: 'naranj', re: /\b(naranja|naranjas|naramja|mandarina)\b/i },
+      { r: 'marron', label: 'Marrón', sql: 'marron', re: /\b(marron|marrones|cafe|tabaco|caoba|chocolate)\b/i },
+      { r: 'dorad', label: 'Dorado', sql: 'dorad', re: /\b(dorado|dorada|dorados|doradas|oro)\b/i },
+      { r: 'platead', label: 'Plateado', sql: 'plat', re: /\b(plateado|plateada|plata|aluminio|cromo|cromado|niquel)\b/i }
     ];
-    let qColor = null;
-    for (const cp of _colorP) { if (cp.re.test(nbq)) { qColor = cp.r; break; } }
+    const qColorEntries = _colorP.filter(cp => cp.re.test(nbq));
+    const qColors = qColorEntries.map(cp => cp.r);
+    const qColor = qColors[0] || null;
 
     const _matchColorDesc = (desc, cr) => {
       const nd = norm(desc);
-      if (cr === 'gris') return /gris|plomo|concreto|cemento/.test(nd);
+      if (cr === 'gris') return /\b(gris|plomo|concreto|cemento)\b/.test(nd);
       if (cr === 'blanc') return /blanc|hueso|ostra|nieve|almendra/.test(nd);
       if (cr === 'negr') return /negr/.test(nd);
-      if (cr === 'roj') return /roj|colonial|teja|bermellon|escarlata|terracota|ladrillo|vinotinto/.test(nd);
-      if (cr === 'amarill') return /amarill|girasol|tractor|mostaza|ocre|caramelo/.test(nd);
-      if (cr === 'azul') return /azul|glacial|marino|cielo|rey|turquesa|milano|bahia|profundo/.test(nd);
-      if (cr === 'verde') return /verde|manzana|menta|pistacho|primavera|prado|esmeralda|oliva|jade/.test(nd);
-      if (cr === 'marfil') return /marfil|beige|crema|arena/.test(nd);
-      if (cr === 'morad') return /morad|violeta|lila|fucsia|magenta|orquidea/.test(nd);
-      if (cr === 'rosad') return /rosad|rosa|coral|salmon|durazno|melon|melocoton/.test(nd);
-      if (cr === 'dorad') return /dorad|oro/.test(nd);
-      if (cr === 'platead') return /platead|plata|aluminio|cromo/.test(nd);
+      if (cr === 'terracota') return /terracota|ladrillo/.test(nd);
+      if (cr === 'vinotinto') return /vinotinto/.test(nd);
+      if (cr === 'roj') return /roj|colonial|teja|bermellon|escarlata|carnesi/.test(nd);
+      if (cr === 'ocre') return /\bocre\b/.test(nd);
+      if (cr === 'mostaza') return /\bmostaza\b/.test(nd);
+      if (cr === 'amarill') return /amarill|girasol|tractor|caramelo/.test(nd);
+      if (cr === 'turquesa') return /turquesa/.test(nd);
+      if (cr === 'aguamarina') return /aguamarina|agua\s*marina/.test(nd);
+      if (cr === 'celeste') return /celeste/.test(nd);
+      if (cr === 'azul') return /azul|glacial|marino|cielo|rey|milano|bahia|profundo|capri|hispano|medieval|mediterraneo/.test(nd);
+      if (cr === 'verde') return /verde|manzana|menta|pistacho|primaver|prado|morichal|esmeralda|oliva|jade|pino|alegria/.test(nd);
+      if (cr === 'beige') return /beige/.test(nd);
+      if (cr === 'greige') return /greige/.test(nd);
+      if (cr === 'crema') return /crema/.test(nd);
+      if (cr === 'marfil') return /marfil|champana|arena/.test(nd);
+      if (cr === 'lila') return /\blila\b/.test(nd);
+      if (cr === 'violeta') return /violeta/.test(nd);
+      if (cr === 'fucsia') return /fucsia/.test(nd);
+      if (cr === 'magenta') return /magenta/.test(nd);
+      if (cr === 'orquidea') return /orquidea/.test(nd);
+      if (cr === 'morad') return /morad|malva|mora/.test(nd);
+      if (cr === 'durazno') return /\bdurazno\b/.test(nd);
+      if (cr === 'melon') return /\bmelon\b/.test(nd);
+      if (cr === 'melocoton') return /melocoton/.test(nd);
+      if (cr === 'coral') return /\bcoral\b/.test(nd);
+      if (cr === 'salmon') return /\bsalmon\b/.test(nd);
+      if (cr === 'rosad') return /rosad|\brosa\b/.test(nd);
+      if (cr === 'naranja') return /naranja|naramja|mandarina/.test(nd);
+      if (cr === 'marron') return /marron|cafe|tabaco|caoba|chocolate/.test(nd);
+      if (cr === 'dorad') return /dorad|\boro\b/.test(nd);
+      if (cr === 'platead') return /platead|plata|aluminio|cromo|niquel/.test(nd);
       return nd.includes(cr);
     };
 
+    const _ACC_NO_PINT_RE = /\b(brocha|rodillo|bandeja|carretilla|inflador|inflar|regadera|ducha|pasta\s+profesional|encamisado|thinner|tiner|removedor|barniz|barinz|sellador|limpiador|medidor|cabezal|alicate|funda|llave\s+arresto|guantes?|lampara|tubo|pistola)\b/i;
     // Filter out non-paint accessories unless specifically requested
     const wantAccesorio = /\b(brocha|rodillo|bandeja|thinner|tiner|pasta\s+profesional|removedor|barniz|sellador|pistola)\b/i.test(nbq);
-    let pf = unicos;
+    let pfNonAcc = unicos;
     if (!wantAccesorio) {
-      pf = unicos.filter(p => !/\b(brocha|rodillo|bandeja|carretilla|inflador|inflar|regadera|ducha|pasta\s+profesional|encamisado|thinner|tiner|removedor|barniz|barinz|sellador|limpiador|medidor|cabezal|alicate|funda|llave\s+arresto|guantes?|lampara|tubo|pistola)\b/i.test(p.descripcion));
-      if (pf.length === 0) pf = unicos;
+      const noAcc = unicos.filter(p => !_ACC_NO_PINT_RE.test(p.descripcion));
+      if (noAcc.length > 0) pfNonAcc = noAcc;
     }
 
-    if (qColor) {
-      const fc = pf.filter(p => _matchColorDesc(p.descripcion, qColor));
-      if (fc.length > 0) pf = fc;
-    }
+    const _inStockPaint = p => esGranel(p.descripcion) || Number(p.existencia) > 0;
+    const _matchesClass = d => wantClaseA ? _esA(d) : wantClaseB ? _esB(d) : wantClaseC ? _esC(d) : true;
+    const _matchesFinish = d => wantAceite ? _esAceite(d) : wantCaucho ? (!_esAceite(d) && !_esSpray(d)) : wantSatinada ? _esSatin(d) : wantImpermeabilizante ? _esImp(d) : wantSpray ? _esSpray(d) : true;
+    const _matchesPres = d => wantCunete ? _esCunete(d) : wantCuarto ? _esCuarto(d) : wantGalon ? _esGalon(d) : true;
+    const _matchesUse = d => (isExterior && !wantClaseB && !wantClaseC) ? (_esA(d) || _esAceite(d) || _esImp(d)) : (isInterior && !wantAceite && !wantSpray) ? (!_esAceite(d) && !_esSpray(d)) : true;
+    const _matchesPaintConstraints = p => _matchesClass(p.descripcion) && _matchesFinish(p.descripcion) && _matchesPres(p.descripcion) && _matchesUse(p.descripcion);
 
-    if (wantClaseA) {
-      const fa = pf.filter(p => _esA(p.descripcion));
-      if (fa.length > 0) pf = fa;
-    } else if (wantClaseB) {
-      const fb = pf.filter(p => _esB(p.descripcion));
-      if (fb.length > 0) pf = fb;
-    } else if (wantClaseC) {
-      const fc = pf.filter(p => _esC(p.descripcion));
-      if (fc.length > 0) pf = fc;
-    }
+    _paintCatalogBlock = wantAceite || wantSpray || wantImpermeabilizante;
 
-    if (isExterior && !wantClaseB && !wantClaseC) {
-      const fe = pf.filter(p => _esA(p.descripcion) || _esAceite(p.descripcion) || _esImp(p.descripcion));
-      if (fe.length > 0) pf = fe;
-    } else if (isInterior && !wantAceite && !wantSpray) {
-      const fi = pf.filter(p => !_esAceite(p.descripcion) && !_esSpray(p.descripcion));
-      if (fi.length > 0) pf = fi;
-    }
+    if (qColors.length === 0) {
+      let pf = pfNonAcc;
+      if (wantClaseA) {
+        const fa = pf.filter(p => _esA(p.descripcion));
+        if (fa.length > 0) pf = fa;
+      } else if (wantClaseB) {
+        const fb = pf.filter(p => _esB(p.descripcion));
+        if (fb.length > 0) pf = fb;
+      } else if (wantClaseC) {
+        const fc = pf.filter(p => _esC(p.descripcion));
+        if (fc.length > 0) pf = fc;
+      }
+      if (isExterior && !wantClaseB && !wantClaseC) {
+        const fe = pf.filter(p => _esA(p.descripcion) || _esAceite(p.descripcion) || _esImp(p.descripcion));
+        if (fe.length > 0) pf = fe;
+      } else if (isInterior && !wantAceite && !wantSpray) {
+        const fi = pf.filter(p => !_esAceite(p.descripcion) && !_esSpray(p.descripcion));
+        if (fi.length > 0) pf = fi;
+      }
+      if (wantAceite) {
+        const fo = pf.filter(p => _esAceite(p.descripcion));
+        if (fo.length > 0) pf = fo;
+      } else if (wantCaucho) {
+        const fc = pf.filter(p => !_esAceite(p.descripcion) && !_esSpray(p.descripcion));
+        if (fc.length > 0) pf = fc;
+      } else if (wantSatinada) {
+        const fs = pf.filter(p => _esSatin(p.descripcion));
+        if (fs.length > 0) pf = fs;
+      } else if (wantImpermeabilizante) {
+        const fi = pf.filter(p => _esImp(p.descripcion));
+        if (fi.length > 0) pf = fi;
+      } else if (wantSpray) {
+        const fsp = pf.filter(p => _esSpray(p.descripcion));
+        if (fsp.length > 0) pf = fsp;
+      }
+      if (wantCunete) {
+        const fcu = pf.filter(p => _esCunete(p.descripcion));
+        if (fcu.length > 0) pf = fcu;
+      } else if (wantCuarto) {
+        const f4 = pf.filter(p => _esCuarto(p.descripcion));
+        if (f4.length > 0) pf = f4;
+      } else if (wantGalon) {
+        const fg = pf.filter(p => _esGalon(p.descripcion));
+        if (fg.length > 0) pf = fg;
+      }
 
-    if (wantAceite) {
-      const fo = pf.filter(p => _esAceite(p.descripcion));
-      if (fo.length > 0) pf = fo;
-    } else if (wantCaucho) {
-      const fc = pf.filter(p => !_esAceite(p.descripcion) && !_esSpray(p.descripcion));
-      if (fc.length > 0) pf = fc;
-    } else if (wantSatinada) {
-      const fs = pf.filter(p => _esSatin(p.descripcion));
-      if (fs.length > 0) pf = fs;
-    } else if (wantImpermeabilizante) {
-      const fi = pf.filter(p => _esImp(p.descripcion));
-      if (fi.length > 0) pf = fi;
-    } else if (wantSpray) {
-      const fsp = pf.filter(p => _esSpray(p.descripcion));
-      if (fsp.length > 0) pf = fsp;
-    }
-
-    if (wantCunete) {
-      const fcu = pf.filter(p => _esCunete(p.descripcion));
-      if (fcu.length > 0) pf = fcu;
-    } else if (wantCuarto) {
-      const f4 = pf.filter(p => _esCuarto(p.descripcion));
-      if (f4.length > 0) pf = f4;
-    } else if (wantGalon) {
-      const fg = pf.filter(p => _esGalon(p.descripcion));
-      if (fg.length > 0) pf = fg;
-    }
-
-    if (pf.length > 0) {
-      unicos.length = 0;
-      for (const x of pf) unicos.push(x);
-    }
-
-    if (!qColor) {
-      _isPaintNoColor = true;
-      _pintaStockDisponibles = unicos.filter(p => esGranel(p.descripcion) || Number(p.existencia) > 0);
-    } else {
-      // Color query: if in-stock candidates exist for that color, NEVER include out-of-stock items
-      const inStock = unicos.filter(p => esGranel(p.descripcion) || Number(p.existencia) > 0);
-      if (inStock.length > 0) {
+      if (pf.length > 0) {
         unicos.length = 0;
-        for (const x of inStock) unicos.push(x);
+        for (const x of pf) unicos.push(x);
+      }
+
+      let stockPool = unicos.filter(p => _inStockPaint(p) && _matchesPaintConstraints(p));
+      let contextNote = '';
+      if (stockPool.length === 0 && (wantClaseA || wantClaseB || wantClaseC)) {
+        const _classTok = wantClaseA ? 'clasea' : wantClaseB ? 'claseb' : 'clasec';
+        const _classRows = casanDeVerdad(await ilike(['pintura', _classTok], 60), ['pintura', _classTok]);
+        stockPool = _classRows.filter(p => !_ACC_NO_PINT_RE.test(p.descripcion) && _inStockPaint(p) && _matchesClass(p.descripcion));
+        if (wantCunete && stockPool.length > 0) {
+          contextNote = 'No contamos con *' + (wantClaseA ? 'Clase A' : wantClaseB ? 'Clase B' : 'Clase C') + '* en *Cuñete* en existencia por ahora, pero sí tenemos en estas presentaciones:';
+        }
+      }
+      _isPaintNoColor = true;
+      _pintaStockDisponibles = stockPool.length > 0 ? stockPool : unicos.filter(_inStockPaint);
+      if (contextNote) {
+        _paintNoColorMeta = { colorLabel: null, scopeLabel: null, contextNote, otherColorOpts: [] };
+      }
+    } else {
+      const _exactInStock = pfNonAcc.filter(p => _inStockPaint(p) && _matchesPaintConstraints(p) && qColors.every(c => _matchColorDesc(p.descripcion, c)));
+      const _anyInStock = pfNonAcc.filter(p => _inStockPaint(p) && _matchesPaintConstraints(p) && qColors.some(c => _matchColorDesc(p.descripcion, c)));
+
+      if (_exactInStock.length > 0 || _anyInStock.length > 0) {
+        const chosen = _exactInStock.length > 0 ? _exactInStock : _anyInStock;
+        unicos.length = 0;
+        for (const x of chosen) unicos.push(x);
+        if (_exactInStock.length > 0 && _dropped && ['clasea', 'claseb', 'clasec', 'cunete', 'galon', '1/4'].includes(_dropped)) {
+          _dropped = null;
+          _droppedEsMod = false;
+        }
+        if (qColors.length > 1 && _exactInStock.length === 0) {
+          const _missingColors = qColors.filter(c => !chosen.some(p => _matchColorDesc(p.descripcion, c)));
+          if (_missingColors.length > 0 && !_dropped) {
+            _dropped = _missingColors[0];
+            _droppedEsMod = true;
+          }
+        }
+      } else {
+        // Requested color + class/presentation is unavailable in stock:
+        // NEVER quote unrelated colors as individual product cards.
+        const _dedupAdd = (arr, rows) => {
+          const seenC = new Set(arr.map(x => x.codigo_interno));
+          for (const r of rows || []) {
+            if (!seenC.has(r.codigo_interno)) { seenC.add(r.codigo_interno); arr.push(r); }
+          }
+        };
+
+        let _constPool = pfNonAcc.filter(p => _inStockPaint(p) && _matchesPaintConstraints(p));
+        let contextNote = '';
+        if (_constPool.length === 0 && (wantClaseA || wantClaseB || wantClaseC || wantCunete || wantCuarto || wantAceite || wantSatinada)) {
+          const _cToks = ['pintura'];
+          if (wantClaseA) _cToks.push('clasea');
+          else if (wantClaseB) _cToks.push('claseb');
+          else if (wantClaseC) _cToks.push('clasec');
+          if (wantCunete) _cToks.push('cunete');
+          else if (wantCuarto) _cToks.push('1/4');
+          if (wantAceite) _cToks.push('aceite');
+          else if (wantSatinada) _cToks.push('satinada');
+          if (_cToks.length > 1) {
+            const _cRows = casanDeVerdad(await ilike(_cToks, 60), _cToks);
+            _constPool = _cRows.filter(p => (wantAccesorio || !_ACC_NO_PINT_RE.test(p.descripcion)) && _inStockPaint(p) && _matchesPaintConstraints(p));
+          }
+          if (_constPool.length === 0 && (wantClaseA || wantClaseB || wantClaseC) && (wantCunete || wantCuarto || wantGalon)) {
+            const _classTok = wantClaseA ? 'clasea' : wantClaseB ? 'claseb' : 'clasec';
+            const _classRows = casanDeVerdad(await ilike(['pintura', _classTok], 60), ['pintura', _classTok]);
+            _constPool = _classRows.filter(p => (wantAccesorio || !_ACC_NO_PINT_RE.test(p.descripcion)) && _inStockPaint(p) && _matchesClass(p.descripcion));
+            if (_constPool.length > 0 && wantCunete) {
+              contextNote = 'No contamos con *' + (wantClaseA ? 'Clase A' : wantClaseB ? 'Clase B' : 'Clase C') + '* en *Cuñete* en existencia por ahora, pero sí tenemos en estas presentaciones:';
+            }
+          }
+        }
+
+        const _otherColorOpts = pfNonAcc.filter(p => _inStockPaint(p) && qColors.some(c => _matchColorDesc(p.descripcion, c)));
+        if (_otherColorOpts.length === 0) {
+          for (const ce of qColorEntries.slice(0, 2)) {
+            const _colorRows = await ilike(['pintura', ce.sql], 40);
+            const _valid = _colorRows.filter(p => (wantAccesorio || !_ACC_NO_PINT_RE.test(p.descripcion)) && _inStockPaint(p) && qColors.some(c => _matchColorDesc(p.descripcion, c)));
+            _dedupAdd(_otherColorOpts, _valid);
+          }
+        }
+
+        if (_constPool.length === 0 && _otherColorOpts.length === 0) {
+          const _genRows = await ilike(['pintura'], 80);
+          _constPool = _genRows.filter(p => (wantAccesorio || !_ACC_NO_PINT_RE.test(p.descripcion)) && _inStockPaint(p));
+        }
+
+        const colorLabel = qColorEntries.map(ce => ce.label).join(' / ');
+        const scopeParts = [];
+        if (wantClaseA) scopeParts.push('Clase A');
+        else if (wantClaseB) scopeParts.push('Clase B');
+        else if (wantClaseC) scopeParts.push('Clase C');
+        if (wantAceite) scopeParts.push('Aceite');
+        else if (wantSatinada) scopeParts.push('Satinada');
+        else if (wantSpray) scopeParts.push('Spray');
+        else if (wantImpermeabilizante) scopeParts.push('Impermeabilizante');
+        if (wantCunete) scopeParts.push('en Cuñete');
+        else if (wantCuarto) scopeParts.push('en 1/4 de Galón');
+        else if (wantGalon) scopeParts.push('en Galón');
+        const scopeLabel = scopeParts.join(' ');
+
+        _isPaintNoColor = true;
+        _pintaStockDisponibles = _constPool;
+        _paintNoColorMeta = {
+          colorLabel,
+          scopeLabel,
+          contextNote,
+          otherColorOpts: _otherColorOpts.slice(0, 4)
+        };
       }
     }
   }
@@ -2639,7 +2805,7 @@ unicos.sort((a,b)=>{
     if (Math.abs(_dsim) >= 0.03) return _dsim;
     return (vMap[b.codigo_interno]||0) - (vMap[a.codigo_interno]||0);
   }
-  const qTokensMatch = isPaintQuery ? qTokens.filter(t => !['exterior','exteriores','interior','interiores','fachada','intemperie','clase','tipo','calidad'].includes(t)) : qTokens;
+  const qTokensMatch = isPaintQuery ? qTokens.filter(t => !['exterior','exteriores','interior','interiores','fachada','intemperie','clase','tipo','calidad','paleta','carta','catalogo','muestra','muestras','color','colores','tono','tonos','foto','fotos','imagen','imagenes','marca','marcas'].includes(t)) : qTokens;
   const aFull = fullMatch(a.descripcion, qTokensMatch, _alignment), bFull = fullMatch(b.descripcion, qTokensMatch, _alignment);
   if (aFull !== bFull) return aFull ? -1 : 1;
   const aStock = esGranel(a.descripcion) || Number(a.existencia) > 0;
@@ -2685,102 +2851,153 @@ if (isRoofSheet && !hasDimension && unicos.length > 0) {
 
 // ¿el mejor resultado es de OTRA categoria? (no comparte NINGUNA palabra con lo pedido: coincidio de casualidad)
 let _weak = false;
-// _rescate excluido igual que _fuzzy: por definicion un rescate semantico devuelve algo que
-// NO comparte palabras con lo que escribio el cliente ("motor para hacer huecos" -> hoyadora),
-// asi que _weak lo marcaria como coincidencia de casualidad y anularia el rescate entero.
-if (!_fuzzy && !_rescate && textLargas.length>0 && unicos.length>0 && !unicos[0]._aprendido){
-  // ¿aparece alguna palabra de categoria (ya en singular/raiz) en la descripcion?
-  // Usamos includes (no split por 'x') para no partir "oxido"/"exxel" ni fallar por plural (tornillo⊂tornillos).
-  const _wd = norm(unicos[0].descripcion);
-  if (!textLargas.some(t => aliasDe(t).some(a => _wd.includes(a)))) _weak = true;
-}
-if (_rescate){
-  // Nunca presentar una interpretacion como certeza: es una HIPOTESIS y hay que confirmarla.
-  _out.parcial = true;
-  _out.rescate = _rescate.categoria;
-  _out.instruccion = 'OJO: el cliente NO uso las palabras del catalogo, asi que INTERPRETE que se refiere a "' + _rescate.categoria + '". Es una HIPOTESIS, no una certeza. Muestrale estas opciones PREGUNTANDOLE primero si a eso se referia (ej. "¿te refieres a ...?"). NO lo des por confirmado ni le cotices como si lo hubiera pedido asi. Si te dice que no es eso, responde SOLO con el token [PEDIR_AYUDA].';
-} else if (_weak){
-  triggerAutomejora('weak_match_otra_categoria', { unicos_top: unicos.slice(0, 3).map(u => u.descripcion) });
-  if (await esNoVendido()) return NO_VENDIDO_JSON();
-  const _g = await revisionGuardrail(unicos);
-  if (_g) return _g;
-  _out.instruccion = 'Lo que encontré NO coincide con lo que pidió el cliente (es de OTRA categoría o medida; coincidió de casualidad). NO lo ofrezcas como si fuera lo que pidió ni sugieras otra cosa: responde SOLO con el token [PEDIR_AYUDA].';
-} else if (medMismatch){
-  _out.parcial = true;
-  _out.instruccion = 'OJO: la medida/calibre "' + medLargas.join(' ') + '" NO existe en el catalogo para este producto; los resultados son OTRAS medidas de la MISMA categoria. PROHIBIDO presentarlos como si fueran la medida pedida: dile al cliente con honestidad que esa medida no la trabajamos y ofrecele estas variantes indicando claramente la medida de cada una. Si el cliente insiste en la medida exacta o ninguna le sirve, responde SOLO con el token [PEDIR_AYUDA].';
-} else if (medParcial){
-  _out.parcial = true;
-  _out.instruccion = 'El cliente menciono VARIAS medidas. SI existen: ' + medParcial.si.join(' y ') + (medParcial.no.length ? '; NO existen: ' + medParcial.no.join(' y ') : '') + '. Muestra las opciones encontradas indicando la medida REAL de cada una' + (medParcial.no.length ? ', aclara con honestidad que la otra medida no la trabajamos' : '') + ' y preguntale cual necesita. NO des por hecho una medida que no esta.';
-} else if (_fuzzy){
-  _out.parcial = true;
-  _out.instruccion = 'Resultados APROXIMADOS: la consulta no coincidio exacto con el catalogo (posible error de escritura). Preguntale al cliente si se refiere a alguno de estos productos ANTES de darlo por confirmado; si te dice que no, responde SOLO con el token [PEDIR_AYUDA].';
-} else if (_oxidoColorAgotado){
-  _out.parcial = true;
-  _out.instruccion = 'El óxido para piso en color "' + _oxidoColorAgotado + '" está agotado por ahora, pero SÍ tenemos óxido para piso disponible en estos otros colores. Aclara con honestidad que ese color está agotado y ofrece estas opciones de colores disponibles.';
-} else if (_dropped){
-  _out.parcial = true;
-  _out.instruccion = 'OJO: NINGUN producto combina todo lo que pidio el cliente; para poder mostrarte algo tuve que IGNORAR la palabra "' + _dropped + '". Estos resultados son de la categoria correcta pero NO son "' + _dropped + '". PROHIBIDO presentarlos como si lo fueran: muestralos aclarando con honestidad que no tenemos esa variante/linea y preguntale si alguno le sirve. Si te dice que no, responde SOLO con el token [PEDIR_AYUDA].';
-} else if (_unicaPalabra){
-  // Reducir la consulta a UNA palabra es la coincidencia mas debil que devuelve este motor.
-  // Antes salia SIN marca y el bot la cotizaba con total seguridad: asi ofrecio BOMBAS
-  // SUMERGIBLES a quien pidio resina para empalmar cable.
-  _out.parcial = true;
-  _out.instruccion = 'OJO: no encontre nada que combine todo lo que pidio el cliente; estos resultados salen de buscar SOLO la palabra "' + _unicaPalabra + '", ignorando el resto de la consulta. Es la coincidencia mas debil posible. PROHIBIDO presentarlos como si fueran lo que pidio: preguntale con honestidad si alguno le sirve ANTES de cotizar. Si te dice que no, responde SOLO con el token [PEDIR_AYUDA].';
-}
 let _colorMismatch = false;
 let _colorBuscado = null;
-const _queryDept = (typeof _detectedDept !== 'undefined' && _detectedDept) || detectProductDepartment(p_busqueda);
-const _qAttrs = extractDepartmentAttributes(p_busqueda, _queryDept);
-if (_qAttrs.color && unicos && unicos.length > 0) {
-  const _cStem = stemColor(_qAttrs.color);
-  const _hasColor = unicos.some(p => {
-    const nd = norm(p.descripcion);
-    return nd.includes(_qAttrs.color) || nd.includes(_cStem) || aliasDe(_cStem).some(a => nd.includes(a));
-  });
-  if (!_hasColor) {
-    _colorMismatch = true;
-    _colorBuscado = _qAttrs.color;
+if (!_isPaintNoColor) {
+  // _rescate excluido igual que _fuzzy: por definicion un rescate semantico devuelve algo que
+  // NO comparte palabras con lo que escribio el cliente ("motor para hacer huecos" -> hoyadora),
+  // asi que _weak lo marcaria como coincidencia de casualidad y anularia el rescate entero.
+  if (!_fuzzy && !_rescate && textLargas.length>0 && unicos.length>0 && !unicos[0]._aprendido){
+    // ¿aparece alguna palabra de categoria (ya en singular/raiz) en la descripcion?
+    // Usamos includes (no split por 'x') para no partir "oxido"/"exxel" ni fallar por plural (tornillo⊂tornillos).
+    const _wd = norm(unicos[0].descripcion);
+    if (!textLargas.some(t => aliasDe(t).some(a => _wd.includes(a)))) _weak = true;
+  }
+  if (_rescate){
+    // Nunca presentar una interpretacion como certeza: es una HIPOTESIS y hay que confirmarla.
+    _out.parcial = true;
+    _out.rescate = _rescate.categoria;
+    _out.instruccion = 'OJO: el cliente NO uso las palabras del catalogo, asi que INTERPRETE que se refiere a "' + _rescate.categoria + '". Es una HIPOTESIS, no una certeza. Muestrale estas opciones PREGUNTANDOLE primero si a eso se referia (ej. "¿te refieres a ...?"). NO lo des por confirmado ni le cotices como si lo hubiera pedido asi. Si te dice que no es eso, responde SOLO con el token [PEDIR_AYUDA].';
+  } else if (_weak){
+    triggerAutomejora('weak_match_otra_categoria', { unicos_top: unicos.slice(0, 3).map(u => u.descripcion) });
+    if (await esNoVendido()) return NO_VENDIDO_JSON();
+    const _g = await revisionGuardrail(unicos);
+    if (_g) return _g;
+    _out.instruccion = 'Lo que encontré NO coincide con lo que pidió el cliente (es de OTRA categoría o medida; coincidió de casualidad). NO lo ofrezcas como si fuera lo que pidió ni sugieras otra cosa: responde SOLO con el token [PEDIR_AYUDA].';
+  } else if (medMismatch){
+    _out.parcial = true;
+    _out.instruccion = 'OJO: la medida/calibre "' + medLargas.join(' ') + '" NO existe en el catalogo para este producto; los resultados son OTRAS medidas de la MISMA categoria. PROHIBIDO presentarlos como si fueran la medida pedida: dile al cliente con honestidad que esa medida no la trabajamos y ofrecele estas variantes indicando claramente la medida de cada una. Si el cliente insiste en la medida exacta o ninguna le sirve, responde SOLO con el token [PEDIR_AYUDA].';
+  } else if (medParcial){
+    _out.parcial = true;
+    _out.instruccion = 'El cliente menciono VARIAS medidas. SI existen: ' + medParcial.si.join(' y ') + (medParcial.no.length ? '; NO existen: ' + medParcial.no.join(' y ') : '') + '. Muestra las opciones encontradas indicando la medida REAL de cada una' + (medParcial.no.length ? ', aclara con honestidad que la otra medida no la trabajamos' : '') + ' y preguntale cual necesita. NO des por hecho una medida que no esta.';
+  } else if (_fuzzy){
+    _out.parcial = true;
+    _out.instruccion = 'Resultados APROXIMADOS: la consulta no coincidio exacto con el catalogo (posible error de escritura). Preguntale al cliente si se refiere a alguno de estos productos ANTES de darlo por confirmado; si te dice que no, responde SOLO con el token [PEDIR_AYUDA].';
+  } else if (_oxidoColorAgotado){
+    _out.parcial = true;
+    _out.instruccion = 'El óxido para piso en color "' + _oxidoColorAgotado + '" está agotado por ahora, pero SÍ tenemos óxido para piso disponible en estos otros colores. Aclara con honestidad que ese color está agotado y ofrece estas opciones de colores disponibles.';
+  } else if (_dropped){
+    _out.parcial = true;
+    _out.instruccion = 'OJO: NINGUN producto combina todo lo que pidio el cliente; para poder mostrarte algo tuve que IGNORAR la palabra "' + _dropped + '". Estos resultados son de la categoria correcta pero NO son "' + _dropped + '". PROHIBIDO presentarlos como si lo fueran: muestralos aclarando con honestidad que no tenemos esa variante/linea y preguntale si alguno le sirve. Si te dice que no, responde SOLO con el token [PEDIR_AYUDA].';
+  } else if (_unicaPalabra){
+    // Reducir la consulta a UNA palabra es la coincidencia mas debil que devuelve este motor.
+    // Antes salia SIN marca y el bot la cotizaba con total seguridad: asi ofrecio BOMBAS
+    // SUMERGIBLES a quien pidio resina para empalmar cable.
+    _out.parcial = true;
+    _out.instruccion = 'OJO: no encontre nada que combine todo lo que pidio el cliente; estos resultados salen de buscar SOLO la palabra "' + _unicaPalabra + '", ignorando el resto de la consulta. Es la coincidencia mas debil posible. PROHIBIDO presentarlos como si fueran lo que pidio: preguntale con honestidad si alguno le sirve ANTES de cotizar. Si te dice que no, responde SOLO con el token [PEDIR_AYUDA].';
+  }
+  const _queryDept = (typeof _detectedDept !== 'undefined' && _detectedDept) || detectProductDepartment(p_busqueda);
+  const _qAttrs = extractDepartmentAttributes(p_busqueda, _queryDept);
+  if (_qAttrs.color && unicos && unicos.length > 0) {
+    const _cStem = stemColor(_qAttrs.color);
+    const _hasColor = unicos.some(p => {
+      const nd = norm(p.descripcion);
+      return nd.includes(_qAttrs.color) || nd.includes(_cStem) || aliasDe(_cStem).some(a => nd.includes(a));
+    });
+    if (!_hasColor) {
+      _colorMismatch = true;
+      _colorBuscado = _qAttrs.color;
+    }
+  }
+  if (_colorMismatch && !_out.instruccion) {
+    _out.parcial = true;
+    _out.instruccion = 'OJO: el cliente pidió color "' + _colorBuscado + '", pero NO tenemos existencia en ese color. Los resultados son de la MISMA categoría pero en OTROS colores. PROHIBIDO presentarlos como si fueran ' + _colorBuscado + ': dile con honestidad que no lo tenemos en ' + _colorBuscado + ' y ofrécele estas variantes preguntándole si alguna le sirve. Si no, responde SOLO con el token [PEDIR_AYUDA].';
+  }
+  if (unicos && unicos.length > 0 && !_weak && !_out.aclarar && !_rescate) {
+    const _compKit = findComplementaryKit(unicos[0].descripcion, _detectedDept);
+    if (_compKit) {
+      _out.kit_sugerido = {
+        categoria: _compKit.categoria,
+        nombre: _compKit.nombre,
+        items_presupuesto: _compKit.items_presupuesto,
+        items: _compKit.items,
+        consejo: _compKit.consejo_tecnico,
+        sugerencia_upsell: `¿Deseas agregar el kit de instalación (${_compKit.items.map(i => i.nombre).join(', ')}) para llevarte todo lo necesario de una vez?`
+      };
+    }
   }
 }
-if (_colorMismatch && !_out.instruccion) {
-  _out.parcial = true;
-  _out.instruccion = 'OJO: el cliente pidió color "' + _colorBuscado + '", pero NO tenemos existencia en ese color. Los resultados son de la MISMA categoría pero en OTROS colores. PROHIBIDO presentarlos como si fueran ' + _colorBuscado + ': dile con honestidad que no lo tenemos en ' + _colorBuscado + ' y ofrécele estas variantes preguntándole si alguna le sirve. Si no, responde SOLO con el token [PEDIR_AYUDA].';
+if (_isPaintNoColor && (_pintaStockDisponibles.length > 0 || _paintNoColorMeta || unicos.length > 0)) {
+  const stockItems = _pintaStockDisponibles.length > 0 ? _pintaStockDisponibles : ( _paintNoColorMeta ? [] : unicos );
+  const resumen = stockItems.length > 0 ? _generarResumenPinturas(stockItems, tasa, RECARGO) : { grupos: [], texto: '', colores_disponibles: [] };
+  const _parts = [];
+  if (_paintNoColorMeta) {
+    if (_paintNoColorMeta.colorLabel) {
+      _parts.push(
+        'No tenemos pintura color *' + _paintNoColorMeta.colorLabel + '* disponible' +
+        (_paintNoColorMeta.scopeLabel ? ' en *' + _paintNoColorMeta.scopeLabel + '*' : ' en stock') +
+        ' por ahora.'
+      );
+    }
+    if (_paintNoColorMeta.otherColorOpts && _paintNoColorMeta.otherColorOpts.length > 0) {
+      const _fmtOpt = (p) => {
+        const usd = Number(p.precio_venta);
+        const bsTxt = tasa ? (nBs(usd * RECARGO * tasa) + ' Bs') : 'tasa BCV no disponible';
+        return '• *' + tc(p.descripcion) + '* — Divisas: ' + nUSD(usd) + '$ | Bs (BCV): ' + bsTxt;
+      };
+      _parts.push(
+        'Sí tenemos color *' + _paintNoColorMeta.colorLabel + '* en estas otras presentaciones/clases:\n' +
+        _paintNoColorMeta.otherColorOpts.map(_fmtOpt).join('\n')
+      );
+    }
+    if (_paintNoColorMeta.contextNote) {
+      _parts.push(_paintNoColorMeta.contextNote);
+    }
+  }
+  if (resumen.texto) _parts.push(resumen.texto);
+  const _otherCount = (_paintNoColorMeta && _paintNoColorMeta.otherColorOpts) ? _paintNoColorMeta.otherColorOpts.length : 0;
+
+  _out.consulta_generica_pintura = true;
+  _out.modo_resumen_pintura = true;
+  _out.productos = [];
+  _out.encontrados = Math.max(stockItems.length, _otherCount);
+  _out.resumen_pinturas = resumen.grupos;
+  _out.resumen_pinturas_texto = _parts.join('\n\n').trim();
+  _out.colores_disponibles = resumen.colores_disponibles;
+  delete _out.parcial;
+  _rescate = null;
+  _weak = false;
+  medMismatch = false;
+  medParcial = null;
+  _fuzzy = false;
+  _colorMismatch = false;
+  _oxidoColorAgotado = null;
+  _dropped = null;
+  _droppedEsMod = false;
+  _unicaPalabra = null;
+  const _catHint = !_paintCatalogBlock
+    ? ' Es OBLIGATORIO llamar también a enviar_catalogo_pintura (usa "divisas" por defecto o "bcv" si el cliente pidió bolívares) para enviarle el PDF con la carta de colores oficial, salvo que ya se lo hayas enviado en esta conversación.'
+    : '';
+  if (_paintNoColorMeta && _paintNoColorMeta.colorLabel) {
+    _out.instruccion = 'El cliente preguntó por el color "' + _paintNoColorMeta.colorLabel + '", que NO está disponible en esa clase/presentación. PROHIBIDO mostrar o cotizar tarjetas individuales de otros colores que no pidió. Aclara con honestidad que no tenemos ese color en esa clase/presentación, menciona las opciones exactas de ese color en otras clases/presentaciones (si aparecen en resumen_pinturas_texto) y presenta el resumen general de precios y colores disponibles de resumen_pinturas_texto.' + _catHint;
+  } else {
+    _out.instruccion = 'El cliente consultó por pintura de manera general (o paleta de colores / clases / marcas). PROHIBIDO mostrar productos individuales en específico o inventar tarjetas de producto. Presenta al cliente la información general de clases disponibles, marcas, presentaciones y precios de resumen_pinturas_texto (copiando los montos de Divisas y Bs tal cual), menciona los colores en stock y pregúntale con amabilidad qué color o tono busca para cotizárselo con exactitud.' + _catHint;
+  }
 }
-if (unicos && unicos.length > 0 && !_weak && !_out.aclarar && !_rescate) {
-  const _compKit = findComplementaryKit(unicos[0].descripcion, _detectedDept);
-  if (_compKit) {
-    _out.kit_sugerido = {
-      categoria: _compKit.categoria,
-      nombre: _compKit.nombre,
-      items_presupuesto: _compKit.items_presupuesto,
-      items: _compKit.items,
-      consejo: _compKit.consejo_tecnico,
-      sugerencia_upsell: `¿Deseas agregar el kit de instalación (${_compKit.items.map(i => i.nombre).join(', ')}) para llevarte todo lo necesario de una vez?`
-    };
+if (_isArenaQuery && unicos.length > 0) {
+  if (_hasRoja && _hasBlanca) {
+    _out.parcial = false;
+    _out.instruccion = 'IMPORTANTE: En El Serrucho NO vendemos arena roja. Ofrece las opciones disponibles de Arena Fina y Arena Gruesa explicando con amabilidad que no manejamos arena roja, pero que para arena blanca / construcción sí disponemos de estas presentaciones en metro y volteo.';
+    _rescate = null; _weak = false; medMismatch = false; medParcial = null; _fuzzy = false; _colorMismatch = false; _oxidoColorAgotado = null; _dropped = null; _droppedEsMod = false; _unicaPalabra = null;
+  } else if (_hasBlanca) {
+    _out.parcial = false;
+    _out.instruccion = 'Para arena blanca / lavada de construcción disponemos de Arena Fina y Arena Gruesa en presentaciones por metro y por volteo. Ofrécelas al cliente.';
+    _rescate = null; _weak = false; medMismatch = false; medParcial = null; _fuzzy = false; _colorMismatch = false; _oxidoColorAgotado = null; _dropped = null; _droppedEsMod = false; _unicaPalabra = null;
   }
 }
 Object.assign(_out, searchDecision(_out.aclarar ? 'vague' : _rescate ? 'semantic' : _weak ? 'weak' : medMismatch ? 'measure_mismatch' :
   medParcial ? 'multiple_measures' : _fuzzy ? 'approximate' : (_colorMismatch || _oxidoColorAgotado || _dropped) ? 'relaxed' :
-  _unicaPalabra ? 'single_word' : productos.length ? 'exact' : 'missing'));
-if (_isPaintNoColor && (_pintaStockDisponibles.length > 0 || unicos.length > 0)) {
-  const stockItems = _pintaStockDisponibles.length > 0 ? _pintaStockDisponibles : unicos;
-  const resumen = _generarResumenPinturas(stockItems, tasa, RECARGO);
-  _out.consulta_generica_pintura = true;
-  _out.modo_resumen_pintura = true;
-  _out.productos = [];
-  _out.encontrados = stockItems.length;
-  _out.resumen_pinturas = resumen.grupos;
-  _out.resumen_pinturas_texto = resumen.texto;
-  _out.colores_disponibles = resumen.colores_disponibles;
-  delete _out.parcial;
-  _dropped = null;
-  _droppedEsMod = false;
-  _fuzzy = false;
-  _unicaPalabra = null;
-  _weak = false;
-  Object.assign(_out, searchDecision('exact'));
-  _out.instruccion = 'El cliente consultó por pintura de manera general (o paleta de colores / clases / marcas). PROHIBIDO mostrar productos individuales en específico o inventar tarjetas de producto. Presenta al cliente la información general de clases disponibles, marcas, presentaciones y precios de resumen_pinturas_texto (copiando los montos de Divisas y Bs tal cual), menciona los colores en stock y pregúntale con amabilidad qué color o tono busca para cotizárselo con exactitud.';
-}
+  _unicaPalabra ? 'single_word' : (_out.modo_resumen_pintura || productos.length) ? 'exact' : 'missing'));
 // Si lo unico que no calza es un color/modificador, el calificador no debe vaciar el resultado.
 _out.atributo_ignorado = !!(_colorMismatch || _oxidoColorAgotado || (_dropped && _droppedEsMod));
 await qualifyProductCandidates({ axios, env: typeof $env !== 'undefined' ? $env : process.env,
@@ -2788,15 +3005,4 @@ await qualifyProductCandidates({ axios, env: typeof $env !== 'undefined' ? $env 
   eligible: !_out.aclarar && !_weak && !medMismatch && !medParcial &&
     !!(_rescate || _fuzzy || _colorMismatch || _oxidoColorAgotado || _dropped || _unicaPalabra) });
 delete _out.atributo_ignorado;
-if (_isArenaQuery && unicos.length > 0) {
-  if (_hasRoja && _hasBlanca) {
-    _out.parcial = false;
-    _out.instruccion = 'IMPORTANTE: En El Serrucho NO vendemos arena roja. Ofrece las opciones disponibles de Arena Fina y Arena Gruesa explicando con amabilidad que no manejamos arena roja, pero que para arena blanca / construcción sí disponemos de estas presentaciones en metro y volteo.';
-    Object.assign(_out, searchDecision('exact'));
-  } else if (_hasBlanca) {
-    _out.parcial = false;
-    _out.instruccion = 'Para arena blanca / lavada de construcción disponemos de Arena Fina y Arena Gruesa en presentaciones por metro y por volteo. Ofrécelas al cliente.';
-    Object.assign(_out, searchDecision('exact'));
-  }
-}
 return JSON.stringify(_out);

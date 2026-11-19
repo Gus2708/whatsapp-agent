@@ -123,7 +123,7 @@ const SIN = {
   'cris':'gris','griss':'gris','asul':'azul','asules':'azul',
   'blanvo':'blanco','vlanco':'blanco','vlancom':'blanco',
   'amariyo':'amarillo',
-  'cunete':'cuñete','cunetes':'cuñete','cuñetes':'cuñete','tobo de pintura':'cuñete','balde de pintura':'cuñete',
+  'cunete':'cuñete','cunetes':'cuñete','cuñetes':'cuñete','cuñe':'cuñete','cune':'cuñete','cuñes':'cuñete','cunes':'cuñete','tobo de pintura':'cuñete','balde de pintura':'cuñete',
   'cuartico':'1/4','cuartico de pintura':'1/4',
   'pintura de agua':'pintura caucho','pinturas de agua':'pintura caucho',
   'pintura al agua':'pintura caucho','pinturas al agua':'pintura caucho',
@@ -158,9 +158,10 @@ const ALIAS = {
   'nordica':     ['nordik','nordico'],
   'nordik':      ['nordik','nordico'],
   // Clases de pintura (A, B, C): en el catalogo conviven como "CLASE B", "TIPO B", "B GAL" (Floripaint), etc.
-  'claseb':     ['clase b','tipo b','b gal','mar deco','vinilevery'],
-  'clasea':     ['clase a','tipo a','a gal','sun deco'],
-  'clasec':     ['clase c','tipo c','c gal','rio deco'],
+  'cunete':     ['cunete','cuñete','4gl','4 gal','4 galones','5 galones','5gl'],
+  'claseb':     ['clase b','tipo b','b gal','b cunete','b cuñete','conc.b','mar deco','vinilevery'],
+  'clasea':     ['clase a','tipo a','a gal','a cunete','a cuñete','sun deco','deluxe a'],
+  'clasec':     ['clase c','tipo c','c gal','c cunete','c cuñete','rio deco','rio blanco','everama'],
   // Perfiles y acabados de láminas de techo
   'ondulada':       ['ondulada','ondulado','ondu','ond','canal redondo','canal redonda'],
   'ondulado':       ['ondulado','ondulada','ondu','ond','canal redondo','canal redonda'],
@@ -217,7 +218,7 @@ const ACCENTS = {
   'fregadero': 'lavaplato','herreria': 'herrería','carbon': 'carbón','cautin': 'cautín','exhibicion': 'exhibición','gavilan': 'gavilán',
   'hidraulico': 'hidráulico','lampara': 'lámpara','periferica': 'periférica','polimero': 'polímero','presion': 'presión',
   'reduccion': 'reducción','refrigeracion': 'refrigeración','silicon': 'silicón','sintetico': 'sintético','tuberia': 'tubería',
-  'plastico': 'plástico','lamina': 'lámina','bateria': 'batería','medicion': 'medición','fijacion': 'fijación'
+  'plastico': 'plástico','lamina': 'lámina','bateria': 'batería','medicion': 'medición','fijacion': 'fijación','cunete': 'cuñete'
 };
 // colores: neutraliza genero/numero a una raiz (blanco/blanca/blancos/blancas -> blanc)
 // asi "pintura blanca" coincide con "PINTURA ... BLANCO" en la BD.
@@ -233,11 +234,15 @@ const COLOR_STEM = {
   'pink':'rosad','pinc':'rosad',
   'lila':'lila','lilas':'lila',
   'marfil':'marfil','durazno':'durazno',
+  'ocre':'ocre','mostaza':'mostaza','caramelo':'caramelo','terracota':'terracota','vinotinto':'vinotinto',
+  'melon':'melon','melocoton':'melocoton','coral':'coral','salmon':'salmon',
+  'turquesa':'turquesa','aguamarina':'aguamarina','crema':'crema','greige':'greige',
+  'fucsia':'fucsia','magenta':'magenta','violeta':'violeta','orquidea':'orquidea','champana':'champana',
   'gris':'gris','grises':'gris','cris':'gris','griss':'gris',
   'verde':'verde','verdes':'verde',
   'azul':'azul','azules':'azul','asul':'azul','asules':'azul',
   'marron':'marron','marrones':'marron',
-  'naranja':'naranja','naranjas':'naranja','beige':'beige','beig':'beige','beis':'beige','veige':'beige','cafe':'cafe',
+  'naranja':'naranja','naranjas':'naranja','naramja':'naranja','beige':'beige','beig':'beige','beis':'beige','veige':'beige','cafe':'cafe',
   'celeste':'celeste','celestes':'celeste'
 };
 function stemColor(w){ return COLOR_STEM[w] || w; }
@@ -337,6 +342,17 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
   }
   s = s.replace(/\blamina\s+(de\s+)?lamina\s+zinc\b/gi, 'lamina zinc');
   s = s.replace(/\b(lamina\s+zinc|zinc)\s+lamina\b/gi, '$1');
+  if (!/\b(pinturas?|esmaltes?|satinad\w*|caucho|oleo|anticorrosiv\w*|sellafill|imperflex|impermeabilizante|oxido)\b/i.test(s) &&
+      !/\b(tubos?|pvc|conduit|aguas?|cables?|estuco|pasta|mastique|pega|primer|bituplast|asfalt\w*|cemento|soldadura|herreria|hierro|laminas?|techolit|acerolit|zinc|bloques?|cabillas?|angulos?|cerchas?|electrodos?|tomacorrientes?|interruptor\w*|apagador\w*|suiches?|breakers?|driza|mangueras?|bombillos?|brochas?|rodillos?|thinner|tiner|cera)\b/i.test(s)) {
+    const _hasPaintClass = /\bclase[abc]\b/i.test(s);
+    const _hasPaintBrand = /\b(floripaint|vinilevery|evercril|evermax|everama|inve?rcolor|kolor\s*flex|color\s+plus|mar\s+deco|sun\s+deco|rio\s+deco|seda\s+styl|caribe\s+paint)\b/i.test(s);
+    const _hasCunete = /\b(cu[nñ]ete|cunetes|cuñetes)\b/i.test(s);
+    const _hasGalonWithColor = /\b(galon|galones)\b/i.test(s) && /\b(blanco|blanca|negro|negra|rojo|roja|amarillo|amarilla|azul|verde|gris|marron|naranja|rosado|rosada|beige|lila|morado|morada|marfil|durazno|celeste|dorado|dorada|plateado|plateada|ocre|melon|melocoton|coral|salmon|turquesa|aguamarina|vinotinto|terracota|colores|color|paleta)\b/i.test(s);
+    const _hasPaintColorQuery = /\b(?:foto|fotos|imagen|imagenes|carta|paleta|catalogo|muestra|muestrario)\s+(?:de\s+)?(?:los\s+)?colores\b|\bcolores\s+(?:que\s+tienes?\s+|q\s+tienes?\s+)?disponibles\b/i.test(s);
+    if (_hasPaintClass || _hasPaintBrand || _hasCunete || _hasGalonWithColor || _hasPaintColorQuery) {
+      s = 'pintura ' + s;
+    }
+  }
   return s.replace(/\s+/g,' ').trim(); }
 // productos a granel (se venden por metro/kilo): su existencia es irreal, SIEMPRE disponibles
 function esGranel(desc){ const d=norm(desc); return /(^| )x ?(mtrs|mtr|mts|mt|metros|metro|kilos|kilo|kg|gr|ml)( |$)/.test(d) || / por metro( |$)/.test(d); }
@@ -715,14 +731,14 @@ async function buscarUno(nombre){
       const wantCuarto = /\b(1\/4|cuartico|cuarto)\b/.test(nbq);
       const wantGalon = /\b(galon|galones|x\s*galon|por\s*galon)\b/.test(nbq) && !wantCunete && !wantCuarto;
 
-      const _esA = d => /\bCLASE\s+A\b|\bTIPO\s+A\b|\bA\s+GAL\b|\bA\s+GALON\b|\bA\s+X\s+GALON\b|SUN\s+DECO|DELUXE\s+A|\bEVERY\b.*\bA\b|\bEVERCRIL\b.*\bA\b|\bEVERMAX\b.*\bA\b|PREMIUM.*FLORIPAINT/i.test(d) && !/\bCLASE\s+[BC]\b|\bTIPO\s+[BC]\b/i.test(d);
-      const _esB = d => /\bCLASE\s+B\b|\bTIPO\s+B\b|\bB\s+GAL\b|\bB\s+GALON\b|\bB\s+X\s+GALON\b|MAR\s+DECO|VINILEVERY|KOLOR\s*FLEX.*(?:\bB\b|CONC\.B)|INVERCOLOR.*TIPO\s*B|INVECOLOR.*TIPO\s*B|\bEVERY\b.*\bB\b/i.test(d) && !/\bCLASE\s+[AC]\b|\bTIPO\s+[AC]\b/i.test(d);
-      const _esC = d => /\bCLASE\s+C\b|\bTIPO\s+C\b|\bC\s+GAL\b|\bC\s+GALON\b|\bC\s+X\s+GALON\b|RIO\s+DECO|RIO\s+BLANCO|COLOR\s+PLUS.*TIPO\s*C|EVERAMA|EVERY.*C300|EVERY.*C-300|\bEVERY\b.*\bC\b/i.test(d) && !/\bCLASE\s+[AB]\b|\bTIPO\s+[AB]\b/i.test(d);
+      const _esA = d => /\bCLASE\s+A\b|\bTIPO\s+A\b|\bA\s+GAL\b|\bA\s+GALON\b|\bA\s+X\s+GALON\b|\bA\s+CU[NÑ]ETE\b|SUN\s+DECO|DELUXE\s+A|\bEVERY\b.*\bA\b|\bEVERCRIL\b.*\bA\b|\bEVERMAX\b.*\bA\b|PREMIU[MN].*FLORIPAINT/i.test(d) && !/\bCLASE\s+[BC]\b|\bTIPO\s+[BC]\b/i.test(d);
+      const _esB = d => /\bCLASE\s+B\b|\bTIPO\s+B\b|\bB\s+GAL\b|\bB\s+GALON\b|\bB\s+X\s+GALON\b|\bB\s+CU[NÑ]ETE\b|(?:^|\s|[A-Z])B\s+GAL\s+FLORIPAINT|FLORIPAINT.*\bCLASE\s+B\b|\bB\s+CUNETE\s+FLORIPAINT\b|MAR\s+DECO|VINILEVERY|KOLOR\s*FLEX.*(?:\bB\b|CONC\.B)|INVE?RCOLOR.*TIPO\s*B|\bEVERY\b.*\bB\b/i.test(d) && !/\bCLASE\s+[AC]\b|\bTIPO\s+[AC]\b/i.test(d);
+      const _esC = d => /\bCLASE\s+C\b|\bTIPO\s+C\b|\bC\s+GAL\b|\bC\s+GALON\b|\bC\s+X\s+GALON\b|\bC\s+CU[NÑ]ETE\b|\bC\s+CUNETE\s+FLORIPAINT\b|RIO\s+DECO|RIO\s+BLANCO|COLOR\s+PLUS.*TIPO\s*C|EVERAMA|EVERY.*C-?300|\bEVERY\b.*\bC\b|KOLOR\s*FLEX.*\bC\b/i.test(d) && !/\bCLASE\s+[AB]\b|\bTIPO\s+[AB]\b/i.test(d);
       const _esAceite = d => /ACEITE|ESMALTE|2\s*EN\s*1|3\s*EN\s*1|EVERY\s+PLUS\s+E-|EL\s+PRO\s+30-|PRO\s+GOLD/i.test(d);
       const _esSatin = d => /SATINAD|SEDA\s+STYL|BRILLO\s+SEDA|BRILLO\s+DE\s+SEDA|STYLE\s+BRILLO/i.test(d);
       const _esImp = d => /IMPERMEABIL|SELLAFILL|IMPERFLEX|LOXON\s+PISCINA/i.test(d);
       const _esSpray = d => /AEROSOL|AEREOSOL|SPRAY/i.test(d);
-      const _esCunete = d => /CUÑETE|CUÑETES|4GL|4GAL|4\s+GALONES|5\s+GALONES|5GL/i.test(d);
+      const _esCunete = d => /CU[NÑ]ETES?|4\s*GL|4\s*GAL(?:ONES)?|\b4G\b|5\s*GL|5\s*GAL(?:ONES)?|16\s*L|20\s*L|TOBO|BALDE/i.test(d);
       const _esCuarto = d => /\b1\/4\b/i.test(d);
       const _esGalon = d => /GALON|GAL\b|POR\s+GALON|X\s+GALON/i.test(d) && !_esCunete(d) && !_esCuarto(d);
 
@@ -730,41 +746,85 @@ async function buscarUno(nombre){
         { r: 'gris', re: /\b(gris|grises|cris|griss|plomo|concreto|cemento)\b/i },
         { r: 'blanc', re: /\b(blanco|blanca|blancos|blancas|blanvo|vlanco|vlancom|hueso|ostra|nieve|almendra)\b/i },
         { r: 'negr', re: /\b(negro|negra|negros|negras)\b/i },
-        { r: 'roj', re: /\b(rojo|roja|rojos|rojas|colonial|teja|bermellon|escarlata|terracota|ladrillo|vinotinto)\b/i },
-        { r: 'amarill', re: /\b(amarillo|amarilla|amarillos|amarillas|amariyo|girasol|tractor|mostaza|ocre|caramelo)\b/i },
-        { r: 'azul', re: /\b(azul|azules|asul|asules|glacial|marino|cielo|rey|turquesa|milano|bahia|profundo)\b/i },
-        { r: 'verde', re: /\b(verde|verdes|manzana|menta|pistacho|primavera|prado|morichal|esmeralda|oliva|jade)\b/i },
-        { r: 'marfil', re: /\b(marfil|beige|crema|arena)\b/i },
-        { r: 'morad', re: /\b(morado|morada|morados|moradas|violeta|lila|fucsia|magenta|orquidea)\b/i },
-        { r: 'rosad', re: /\b(rosado|rosada|rosados|rosadas|rosa|coral|salmon|durazno|melon|melocoton)\b/i },
-        { r: 'dorad', re: /\b(dorado|dorada|oro)\b/i },
-        { r: 'platead', re: /\b(plateado|plateada|plata|aluminio|cromo)\b/i }
+        { r: 'terracota', re: /\b(terracota|ladrillo)\b/i },
+        { r: 'vinotinto', re: /\bvinotinto\b/i },
+        { r: 'roj', re: /\b(rojo|roja|rojos|rojas|colonial|teja|bermellon|escarlata|carnesi)\b/i },
+        { r: 'ocre', re: /\bocre\b/i },
+        { r: 'mostaza', re: /\bmostaza\b/i },
+        { r: 'amarill', re: /\b(amarillo|amarilla|amarillos|amarillas|amariyo|girasol|tractor|caramelo)\b/i },
+        { r: 'turquesa', re: /\bturquesa\b/i },
+        { r: 'aguamarina', re: /\b(aguamarina|agua\s*marina)\b/i },
+        { r: 'celeste', re: /\bceleste\b/i },
+        { r: 'azul', re: /\b(azul|azules|asul|asules|glacial|marino|cielo|rey|milano|bahia|profundo|capri|hispano|medieval|mediterraneo)\b/i },
+        { r: 'verde', re: /\b(verde|verdes|manzana|menta|pistacho|primaver\w*|prado|morichal|esmeralda|oliva|jade|pino|alegria)\b/i },
+        { r: 'beige', re: /\b(beige|beig|beis|veige)\b/i },
+        { r: 'greige', re: /\bgreige\b/i },
+        { r: 'crema', re: /\bcrema\b/i },
+        { r: 'marfil', re: /\b(marfil|champana|champaña|arena)\b/i },
+        { r: 'lila', re: /\blila\b/i },
+        { r: 'violeta', re: /\bvioleta\b/i },
+        { r: 'fucsia', re: /\bfucsia\b/i },
+        { r: 'magenta', re: /\bmagenta\b/i },
+        { r: 'orquidea', re: /\borquidea\w*\b/i },
+        { r: 'morad', re: /\b(morado|morada|morados|moradas|malva|mora)\b/i },
+        { r: 'durazno', re: /\bdurazno\b/i },
+        { r: 'melon', re: /\bmelon\b/i },
+        { r: 'melocoton', re: /\bmelocoton\b/i },
+        { r: 'coral', re: /\bcoral\b/i },
+        { r: 'salmon', re: /\bsalmon\b/i },
+        { r: 'rosad', re: /\b(rosado|rosada|rosados|rosadas|rosa|pink|pinc)\b/i },
+        { r: 'naranja', re: /\b(naranja|naranjas|naramja|mandarina)\b/i },
+        { r: 'marron', re: /\b(marron|marrones|cafe|tabaco|caoba|chocolate)\b/i },
+        { r: 'dorad', re: /\b(dorado|dorada|dorados|doradas|oro)\b/i },
+        { r: 'platead', re: /\b(plateado|plateada|plata|aluminio|cromo|cromado|niquel)\b/i }
       ];
-      let qColor = null;
-      for (const cp of _colorP) { if (cp.re.test(nbq)) { qColor = cp.r; break; } }
+      const qColors = _colorP.filter(cp => cp.re.test(nbq)).map(cp => cp.r);
+      const qColor = qColors[0] || null;
 
       const _matchColorDesc = (desc, cr) => {
         const nd = norm(desc);
-        if (cr === 'gris') return /gris|plomo|concreto|cemento/.test(nd);
+        if (cr === 'gris') return /\b(gris|plomo|concreto|cemento)\b/.test(nd);
         if (cr === 'blanc') return /blanc|hueso|ostra|nieve|almendra/.test(nd);
         if (cr === 'negr') return /negr/.test(nd);
-        if (cr === 'roj') return /roj|colonial|teja|bermellon|escarlata|terracota|ladrillo|vinotinto/.test(nd);
-        if (cr === 'amarill') return /amarill|girasol|tractor|mostaza|ocre|caramelo/.test(nd);
-        if (cr === 'azul') return /azul|glacial|marino|cielo|rey|turquesa|milano|bahia|profundo/.test(nd);
-        if (cr === 'verde') return /verde|manzana|menta|pistacho|primavera|prado|esmeralda|oliva|jade/.test(nd);
-        if (cr === 'marfil') return /marfil|beige|crema|arena/.test(nd);
-        if (cr === 'morad') return /morad|violeta|lila|fucsia|magenta|orquidea/.test(nd);
-        if (cr === 'rosad') return /rosad|rosa|coral|salmon|durazno|melon|melocoton/.test(nd);
-        if (cr === 'dorad') return /dorad|oro/.test(nd);
-        if (cr === 'platead') return /platead|plata|aluminio|cromo/.test(nd);
+        if (cr === 'terracota') return /terracota|ladrillo/.test(nd);
+        if (cr === 'vinotinto') return /vinotinto/.test(nd);
+        if (cr === 'roj') return /roj|colonial|teja|bermellon|escarlata|carnesi/.test(nd);
+        if (cr === 'ocre') return /\bocre\b/.test(nd);
+        if (cr === 'mostaza') return /\bmostaza\b/.test(nd);
+        if (cr === 'amarill') return /amarill|girasol|tractor|caramelo/.test(nd);
+        if (cr === 'turquesa') return /turquesa/.test(nd);
+        if (cr === 'aguamarina') return /aguamarina|agua\s*marina/.test(nd);
+        if (cr === 'celeste') return /celeste/.test(nd);
+        if (cr === 'azul') return /azul|glacial|marino|cielo|rey|milano|bahia|profundo|capri|hispano|medieval|mediterraneo/.test(nd);
+        if (cr === 'verde') return /verde|manzana|menta|pistacho|primaver|prado|morichal|esmeralda|oliva|jade|pino|alegria/.test(nd);
+        if (cr === 'beige') return /beige/.test(nd);
+        if (cr === 'greige') return /greige/.test(nd);
+        if (cr === 'crema') return /crema/.test(nd);
+        if (cr === 'marfil') return /marfil|champana|arena/.test(nd);
+        if (cr === 'lila') return /\blila\b/.test(nd);
+        if (cr === 'violeta') return /violeta/.test(nd);
+        if (cr === 'fucsia') return /fucsia/.test(nd);
+        if (cr === 'magenta') return /magenta/.test(nd);
+        if (cr === 'orquidea') return /orquidea/.test(nd);
+        if (cr === 'morad') return /morad|malva|mora/.test(nd);
+        if (cr === 'durazno') return /\bdurazno\b/.test(nd);
+        if (cr === 'melon') return /\bmelon\b/.test(nd);
+        if (cr === 'melocoton') return /melocoton/.test(nd);
+        if (cr === 'coral') return /\bcoral\b/.test(nd);
+        if (cr === 'salmon') return /\bsalmon\b/.test(nd);
+        if (cr === 'rosad') return /rosad|\brosa\b/.test(nd);
+        if (cr === 'naranja') return /naranja|naramja|mandarina/.test(nd);
+        if (cr === 'marron') return /marron|cafe|tabaco|caoba|chocolate/.test(nd);
+        if (cr === 'dorad') return /dorad|\boro\b/.test(nd);
+        if (cr === 'platead') return /platead|plata|aluminio|cromo|niquel/.test(nd);
         return nd.includes(cr);
       };
 
       let pf = cand.filter(p => !/\b(alicate|funda|llave\s+arresto|guantes?|limpiador|medidor|lampara|cabezal|tubo)\b/i.test(p.descripcion));
       if (pf.length === 0) pf = cand;
 
-      if (qColor) {
-        const fc = pf.filter(p => _matchColorDesc(p.descripcion, qColor));
+      if (qColors.length > 0) {
+        const fc = pf.filter(p => qColors.some(c => _matchColorDesc(p.descripcion, c)));
         if (fc.length > 0) pf = fc;
       }
 

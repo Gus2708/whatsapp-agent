@@ -163,3 +163,71 @@ test('Color specific paint query: tienen pintura blanca?', async () => {
   assert.strictEqual(res.productos.every(p => /Blanc/i.test(p.nombre)), true);
   assert.strictEqual(res.productos.every(p => p.disponible === true), true);
 });
+
+const MILENA_PAINT_ROWS = [
+  ...require('./fixtures/catalog.json'),
+  { codigo_interno: 'FLO-BC-01', descripcion: 'PINTURA CAUCHO BLANCO B CUNETE FLORIPAINT', precio_venta: 35.5, existencia: 6 },
+  { codigo_interno: 'FLO-BC-02', descripcion: 'PINTURA CAUCHO GRIS B CUNETE FLORIPAINT', precio_venta: 35.5, existencia: 4 },
+  { codigo_interno: 'FLO-DC-01', descripcion: 'PINTURA CAUCHO DURAZNO C GAL FLORIPAINT', precio_venta: 10.5, existencia: 3 },
+  { codigo_interno: 'IMP-AG-01', descripcion: 'PINTURA CAUCHO BLANCO A GALON IMPACTO', precio_venta: 22, existencia: 5 },
+  { codigo_interno: 'IMP-AC-01', descripcion: 'PINTURA CAUCHO BLANCO A CUNETE IMPACTO', precio_venta: 75, existencia: 2 }
+];
+
+async function buscarMilena(query) {
+  const { result } = await buscarLive(query, { rows: MILENA_PAINT_ROWS });
+  return result;
+}
+
+test('Milena incident: Me puede decir q pintura tiene clase B en cuñete returns summary + catalog prompt', async () => {
+  const res = await buscarMilena('Me puede decir q pintura tiene clase B en cuñete');
+  assert.strictEqual(res.modo_resumen_pintura, true);
+  assert.strictEqual(res.productos.length, 0);
+  assert.strictEqual(res.action, 'show_results');
+  assert.strictEqual(res.match_status, 'exact');
+  assert.match(res.resumen_pinturas_texto, /Clase B/i);
+  assert.match(res.resumen_pinturas_texto, /Cuñete/i);
+  assert.match(res.resumen_pinturas_texto, /35\.50\$/);
+  assert.match(res.instruccion, /enviar_catalogo_pintura/);
+});
+
+test('Milena incident: Me podría pasar la foto de los colores q tienes disponibles en cuñete triggers color summary + PDF', async () => {
+  const res = await buscarMilena('Me podría pasar la foto de los colores q tienes disponibles en cuñete');
+  assert.strictEqual(res.modo_resumen_pintura, true);
+  assert.strictEqual(res.productos.length, 0);
+  assert.strictEqual(res.action, 'show_results');
+  assert.strictEqual(res.match_status, 'exact');
+  assert.match(res.resumen_pinturas_texto, /Cuñete/i);
+  assert.match(res.instruccion, /enviar_catalogo_pintura/);
+});
+
+test('Milena incident: Y durazno por cuñe clase B tiene también never returns unrequested colors', async () => {
+  const res = await buscarMilena('Y durazno por cuñe clase B tiene también');
+  assert.strictEqual(res.modo_resumen_pintura, true);
+  assert.strictEqual(res.productos.length, 0);
+  assert.strictEqual(res.action, 'show_results');
+  assert.strictEqual(res.match_status, 'exact');
+  assert.match(res.resumen_pinturas_texto, /No tenemos pintura color \*Durazno\* disponible en \*Clase B\*/i);
+  assert.match(res.resumen_pinturas_texto, /Pintura Caucho Durazno C GAL Floripaint/i);
+  assert.match(res.instruccion, /enviar_catalogo_pintura/);
+});
+
+test('Milena incident: pintura durazno clase B shows exact color options + summary without unrequested product cards', async () => {
+  const res = await buscarMilena('pintura durazno clase B');
+  assert.strictEqual(res.modo_resumen_pintura, true);
+  assert.strictEqual(res.productos.length, 0);
+  assert.strictEqual(res.action, 'show_results');
+  assert.strictEqual(res.match_status, 'exact');
+  assert.match(res.resumen_pinturas_texto, /Durazno/i);
+  assert.match(res.resumen_pinturas_texto, /Pintura Caucho Durazno C GAL Floripaint/i);
+  assert.match(res.resumen_pinturas_texto, /Clase B/i);
+});
+
+test('Milena incident: Y tiene en clase A también pintura returns Class A summary + catalog prompt', async () => {
+  const res = await buscarMilena('Y tiene en clase A también pintura');
+  assert.strictEqual(res.modo_resumen_pintura, true);
+  assert.strictEqual(res.productos.length, 0);
+  assert.strictEqual(res.action, 'show_results');
+  assert.strictEqual(res.match_status, 'exact');
+  assert.match(res.resumen_pinturas_texto, /Clase A/i);
+  assert.match(res.instruccion, /enviar_catalogo_pintura/);
+});

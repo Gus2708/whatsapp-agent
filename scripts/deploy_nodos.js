@@ -27,6 +27,7 @@ const deWorkflow = nodo => {
 const MAPA = [
   { nodo: 'buscar_productos_tool', campo: 'jsCode', valor: leer('live_buscar.js') },
   { nodo: 'hacer_presupuesto_tool', campo: 'jsCode', valor: leer('live_presupuesto.js') },
+  { nodo: 'enviar_catalogo_pintura_tool', campo: 'jsCode', valor: deWorkflow('enviar_catalogo_pintura_tool') },
   // El Sanitize vivo es el que arma lib/workflow-overlay (baseline + searchGuard de
   // lib/conversation-context) y queda en n8n_workflow.json via scripts/build_workflow.js.
   // OJO: scratch_live/live_sanitize.js NO es lo que corre en n8n (difiere del nodo vivo).
