@@ -319,6 +319,11 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
     s = s.replace(/\bsol[oa]s?\b/g, ' ');
     s = s.replace(/\b(?:pero\s+)?sin\s+(?:el\s+)?lavamanos?\b/g, ' ');
   }
+  if (/\bpinturas?\b/.test(s) && /\bpisos?\b/.test(s) && !/\b(?:aceite|esmalte|caucho|epoxic\w*|trafico|satinad\w*)\b/.test(s)) {
+    s = s.replace(/\bpinturas?\s+en\s+polvo\b/g, 'oxido');
+    s = s.replace(/\bpinturas?\b/g, 'oxido');
+  }
+  s = s.replace(/\bsera\s+(?:para|de)\s+pisos?\b/g, 'cera para piso');
   // SIN se aplica con LIMITE DE PALABRA, no como subcadena. Con split/join naive, una clave
   // que aparece DENTRO de otra palabra la destroza: "media"->"1/2" convertia "mediano" en
   // "1/2no", "zinc"->"lamina zinc" convertia "zincada" en "lamina zincada", y "riel" rompia
@@ -636,7 +641,8 @@ async function buscarUno(nombre){
   const granelIntent = /\b(por|al|x|cada|el)\s*(metro|metros|mt|mts)\b/.test(norm(nombre));
   const rolloIntent = /\b(rollos?)\b/.test(norm(nombre)); // "rollo de cable" -> rollo completo, no por metro
   const GRANEL_OR = 'or=(descripcion.ilike.*x mt*,descripcion.ilike.*x metro*,descripcion.ilike.*por metro*)';
-  const isPaintQuery = qTokens.includes('pintura') || /\b(pinturas?|esmalte|esmaltes|satinad\w*|caucho|oleo|anticorrosiv\w*|sellafill|imperflex|impermeabilizante|spray|aerosol)\b/.test(norm(nombre));
+  const _esOxidoPisoQuery = qTokens.includes('oxido') && qTokens.includes('piso');
+  const isPaintQuery = !_esOxidoPisoQuery && (qTokens.includes('pintura') || /\b(pinturas?|esmalte|esmaltes|satinad\w*|caucho|oleo|anticorrosiv\w*|sellafill|imperflex|impermeabilizante|spray|aerosol)\b/.test(norm(nombre)));
   const textLargasSql = isPaintQuery ? textLargas.filter(w => !['exterior','exteriores','interior','interiores','fachada','intemperie','clase','tipo','calidad'].includes(w)) : textLargas;
   let cand=[];
   // si hay categoria de texto, trae amplio por categoria y filtra medida en JS
@@ -693,7 +699,7 @@ async function buscarUno(nombre){
   // Regla negocio PINTURA
   {
     const nbq = norm(nombre);
-    const isPaint = /\b(pinturas?|esmalte|esmaltes|satinad\w*|caucho|oleo|anticorrosiv\w*|sellafill|imperflex|impermeabilizante|spray|aerosol)\b/.test(nbq) || qTokens.includes('pintura');
+    const isPaint = !_esOxidoPisoQuery && (/\b(pinturas?|esmalte|esmaltes|satinad\w*|caucho|oleo|anticorrosiv\w*|sellafill|imperflex|impermeabilizante|spray|aerosol)\b/.test(nbq) || qTokens.includes('pintura'));
     if (isPaint) {
       const isExterior = /\b(exterior|exteriores|afuera|fachadas?|intemperie|sol\s+y\s+agua|sol\s+y\s+lluvia)\b/.test(nbq);
       const isInterior = /\b(interior|interiores|adentro|salas?|cuartos?|habitaci\w*)\b/.test(nbq);

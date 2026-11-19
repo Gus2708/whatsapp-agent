@@ -412,6 +412,11 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
     s = s.replace(/\bsol[oa]s?\b/g, ' ');
     s = s.replace(/\b(?:pero\s+)?sin\s+(?:el\s+)?lavamanos?\b/g, ' ');
   }
+  if (/\bpinturas?\b/.test(s) && /\bpisos?\b/.test(s) && !/\b(?:aceite|esmalte|caucho|epoxic\w*|trafico|satinad\w*)\b/.test(s)) {
+    s = s.replace(/\bpinturas?\s+en\s+polvo\b/g, 'oxido');
+    s = s.replace(/\bpinturas?\b/g, 'oxido');
+  }
+  s = s.replace(/\bsera\s+(?:para|de)\s+pisos?\b/g, 'cera para piso');
   // SIN se aplica con LIMITE DE PALABRA, no como subcadena. Con split/join naive, una clave
   // que aparece DENTRO de otra palabra la destroza: "media"->"1/2" convertia "mediano" en
   // "1/2no", "zinc"->"lamina zinc" convertia "zincada" en "lamina zincada", y "riel" rompia
@@ -1644,7 +1649,8 @@ async function relajarDropOne(toks){
 }
 let res = [];
 let _fuzzy = false;
-const isPaintQuery = qTokens.includes('pintura') || /\b(pinturas?|esmalte|esmaltes|satinad\w*|caucho|oleo|anticorrosiv\w*|sellafill|imperflex|impermeabilizante)\b/.test(norm(_pb)) || (/\b(spray|aerosol)\b/.test(norm(_pb)) && /\b(pintur|color|esmalte)\b/.test(norm(_pb)));
+const _esOxidoPisoQuery = qTokens.includes('oxido') && qTokens.includes('piso');
+const isPaintQuery = !_esOxidoPisoQuery && (qTokens.includes('pintura') || /\b(pinturas?|esmalte|esmaltes|satinad\w*|caucho|oleo|anticorrosiv\w*|sellafill|imperflex|impermeabilizante)\b/.test(norm(_pb)) || (/\b(spray|aerosol)\b/.test(norm(_pb)) && /\b(pintur|color|esmalte)\b/.test(norm(_pb))));
 const textLargasSql = isPaintQuery ? textLargas.filter(w => !['exterior','exteriores','interior','interiores','fachada','intemperie','clase','clases','tipo','tipos','calidad','calidades','paleta','carta','catalogo','muestra','muestras','color','colores','tono','tonos','disponible','disponibles','precio','precios','marca','marcas'].includes(w)) : textLargas;
 if (granelIntent && textLargasSql.length>0) res = casanDeVerdad(await ilike(textLargasSql, 60, GRANEL_OR), textLargasSql);
 if (res.length===0 && textLargasSql.length>0) {
@@ -2050,6 +2056,28 @@ for(const p of res){ if(!seen.has(p.codigo_interno)){ seen.add(p.codigo_interno)
   }
 }
 
+// Regla negocio OXIDO P/PISO: si pidio oxido/pintura para piso en un color especifico
+// y ese color esta agotado, traer los colores de OXIDO P/PISO disponibles en stock.
+let _oxidoColorAgotado = null;
+if (qTokens.includes('oxido') && qTokens.includes('piso')) {
+  const _oxidoSolo = unicos.filter(p => /\boxido\b/i.test(norm(p.descripcion)) && /\bpiso\b/i.test(norm(p.descripcion)));
+  if (_oxidoSolo.length > 0) {
+    unicos.length = 0;
+    for (const x of _oxidoSolo) unicos.push(x);
+  }
+  const _hayStockOx = unicos.some(p => Number(p.existencia) > 0);
+  if (!_hayStockOx) {
+    const _allOx = casanDeVerdad(await ilike(['oxido', 'piso'], 60), ['oxido', 'piso']);
+    const _enStock = _allOx.filter(p => Number(p.existencia) > 0);
+    if (_enStock.length > 0) {
+      unicos.length = 0;
+      for (const x of _enStock) unicos.push(x);
+      const _rawColor = (norm(_pb).match(/\b(negro|negra|blanco|blanca|gris|azul|rojo|roja|verde|amarillo|amarilla|beige|marfil)\b/) || [])[1];
+      _oxidoColorAgotado = _rawColor || _dropped || 'ese color';
+    }
+  }
+}
+
 // Regla negocio PINTURA: clases (A, B, C), marcas, acabados (caucho, aceite/esmalte, satinada, impermeabilizante, spray), uso (exterior, interior), color y presentación (cuñete, galón, 1/4)
 let _isPaintNoColor = false;
 let _coloresPinturaStock = [];
@@ -2310,7 +2338,7 @@ function _generarResumenPinturas(items, tasa, recargo) {
 
 {
   const nbq = norm(_pb);
-  const isPaint = /\b(pinturas?|esmalte|esmaltes|satinad\w*|caucho|oleo|anticorrosiv\w*|sellafill|imperflex|impermeabilizante)\b/.test(nbq) || (/\b(spray|aerosol)\b/.test(nbq) && /\b(pintur|color|esmalte)\b/.test(nbq)) || qTokens.includes('pintura');
+  const isPaint = !_esOxidoPisoQuery && (/\b(pinturas?|esmalte|esmaltes|satinad\w*|caucho|oleo|anticorrosiv\w*|sellafill|imperflex|impermeabilizante)\b/.test(nbq) || (/\b(spray|aerosol)\b/.test(nbq) && /\b(pintur|color|esmalte)\b/.test(nbq)) || qTokens.includes('pintura'));
   if (isPaint) {
     const isExterior = /\b(exterior|exteriores|afuera|fachadas?|intemperie|sol\s+y\s+agua|sol\s+y\s+lluvia)\b/.test(nbq);
     const isInterior = /\b(interior|interiores|adentro|salas?|cuartos?|habitaci\w*)\b/.test(nbq);
@@ -2686,6 +2714,9 @@ if (_rescate){
 } else if (_fuzzy){
   _out.parcial = true;
   _out.instruccion = 'Resultados APROXIMADOS: la consulta no coincidio exacto con el catalogo (posible error de escritura). Preguntale al cliente si se refiere a alguno de estos productos ANTES de darlo por confirmado; si te dice que no, responde SOLO con el token [PEDIR_AYUDA].';
+} else if (_oxidoColorAgotado){
+  _out.parcial = true;
+  _out.instruccion = 'El óxido para piso en color "' + _oxidoColorAgotado + '" está agotado por ahora, pero SÍ tenemos óxido para piso disponible en estos otros colores. Aclara con honestidad que ese color está agotado y ofrece estas opciones de colores disponibles.';
 } else if (_dropped){
   _out.parcial = true;
   _out.instruccion = 'OJO: NINGUN producto combina todo lo que pidio el cliente; para poder mostrarte algo tuve que IGNORAR la palabra "' + _dropped + '". Estos resultados son de la categoria correcta pero NO son "' + _dropped + '". PROHIBIDO presentarlos como si lo fueran: muestralos aclarando con honestidad que no tenemos esa variante/linea y preguntale si alguno le sirve. Si te dice que no, responde SOLO con el token [PEDIR_AYUDA].';
@@ -2729,7 +2760,7 @@ if (unicos && unicos.length > 0 && !_weak && !_out.aclarar && !_rescate) {
   }
 }
 Object.assign(_out, searchDecision(_out.aclarar ? 'vague' : _rescate ? 'semantic' : _weak ? 'weak' : medMismatch ? 'measure_mismatch' :
-  medParcial ? 'multiple_measures' : _fuzzy ? 'approximate' : _colorMismatch ? 'relaxed' : _dropped ? 'relaxed' :
+  medParcial ? 'multiple_measures' : _fuzzy ? 'approximate' : (_colorMismatch || _oxidoColorAgotado || _dropped) ? 'relaxed' :
   _unicaPalabra ? 'single_word' : productos.length ? 'exact' : 'missing'));
 if (_isPaintNoColor && (_pintaStockDisponibles.length > 0 || unicos.length > 0)) {
   const stockItems = _pintaStockDisponibles.length > 0 ? _pintaStockDisponibles : unicos;
@@ -2751,11 +2782,11 @@ if (_isPaintNoColor && (_pintaStockDisponibles.length > 0 || unicos.length > 0))
   _out.instruccion = 'El cliente consultó por pintura de manera general (o paleta de colores / clases / marcas). PROHIBIDO mostrar productos individuales en específico o inventar tarjetas de producto. Presenta al cliente la información general de clases disponibles, marcas, presentaciones y precios de resumen_pinturas_texto (copiando los montos de Divisas y Bs tal cual), menciona los colores en stock y pregúntale con amabilidad qué color o tono busca para cotizárselo con exactitud.';
 }
 // Si lo unico que no calza es un color/modificador, el calificador no debe vaciar el resultado.
-_out.atributo_ignorado = !!(_colorMismatch || (_dropped && _droppedEsMod));
+_out.atributo_ignorado = !!(_colorMismatch || _oxidoColorAgotado || (_dropped && _droppedEsMod));
 await qualifyProductCandidates({ axios, env: typeof $env !== 'undefined' ? $env : process.env,
   query: p_busqueda, candidates: unicos, output: _out,
   eligible: !_out.aclarar && !_weak && !medMismatch && !medParcial &&
-    !!(_rescate || _fuzzy || _colorMismatch || _dropped || _unicaPalabra) });
+    !!(_rescate || _fuzzy || _colorMismatch || _oxidoColorAgotado || _dropped || _unicaPalabra) });
 delete _out.atributo_ignorado;
 if (_isArenaQuery && unicos.length > 0) {
   if (_hasRoja && _hasBlanca) {
