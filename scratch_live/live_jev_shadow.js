@@ -340,7 +340,7 @@ const metadata = await classifyShadow({ message: latest,
   transport: async request => {
     try {
       const response = await client().post(request.url, request.body, {
-        headers: request.headers, signal: request.signal,
+        headers: request.headers, timeout: request.timeout, signal: request.signal,
         maxRedirects: 0, maxContentLength: 16000, maxBodyLength: 16000,
         responseType: 'text', transformResponse: [value => value], validateStatus: () => true,
       });

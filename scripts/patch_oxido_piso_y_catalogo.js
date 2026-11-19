@@ -295,7 +295,7 @@ module.exports = { patchBuscarCode, patchPresupuestoCode, patchAgentSystemMessag
 
 if (require.main === module) {
   (async () => {
-    patchJsonFile('workflows/production-baseline.json', { includeCatalogAndAgent: false });
+    patchJsonFile('workflows/production-baseline.json', { includeCatalogAndAgent: true });
     patchJsonFile('n8n_workflow.json', { includeCatalogAndAgent: true });
     if (!process.argv.includes('--files-only')) {
       await patchLiveWorkflow(MAIN_WF_ID);
