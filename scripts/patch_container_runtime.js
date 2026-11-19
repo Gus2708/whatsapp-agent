@@ -78,8 +78,19 @@ const axiosFiles = findUnder(
   'node_modules/axios/dist/node/axios.cjs'
 );
 const targetAxios = "this.name = 'AxiosError';";
-const safeAxios = "try { this.name = 'AxiosError'; } catch (_) { try { Object.defineProperty(this, 'name', { value: 'AxiosError', configurable: true }); } catch (_) {} }";
-for (const f of axiosFiles) patchFile(f, targetAxios, safeAxios, 'axios.cjs');
+const oldAxiosPatch = "try { this.name = 'AxiosError'; } catch (_) { try { Object.defineProperty(this, 'name', { value: 'AxiosError', configurable: true }); } catch (_) {} }";
+const safeAxios = "try { this.name = 'AxiosError'; } catch (_) { try { Object.defineProperty(this, 'name', { value: 'AxiosError', writable: true, configurable: true }); } catch (_) {} }";
+const targetAxiosFrom = "axiosError.name = error.name;";
+const safeAxiosFrom = "try { axiosError.name = error.name; } catch (_) {}";
+for (const f of axiosFiles) {
+  const c = fs.readFileSync(f, 'utf8');
+  if (c.includes(oldAxiosPatch)) {
+    patchFile(f, oldAxiosPatch, safeAxios, 'axios.cjs (upgrade writable)');
+  } else {
+    patchFile(f, targetAxios, safeAxios, 'axios.cjs');
+  }
+  patchFile(f, targetAxiosFrom, safeAxiosFrom, 'axios.cjs (AxiosError.from)');
+}
 
 if (found === 0) {
   console.error(

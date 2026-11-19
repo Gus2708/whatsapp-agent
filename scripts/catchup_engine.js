@@ -148,10 +148,11 @@ async function checkHealth() {
     if (res.ok) {
       const data = await res.json();
       const check = validateWahaSession(data);
-      if (check.valid && data.status === 'WORKING') {
+      const gowsReady = data?.engine?.gows ? data.engine.gows.connected === true : true;
+      if (check.valid && data.status === 'WORKING' && gowsReady) {
         wahaOk = true;
       } else {
-        log(`WAHA no está en WORKING (estado=${data?.status}, valid=${check.valid})`);
+        log(`WAHA no está listo (estado=${data?.status}, gowsConnected=${gowsReady}, valid=${check.valid})`);
       }
     } else {
       log(`WAHA respondió HTTP ${res.status}`);
@@ -258,41 +259,63 @@ async function fetchCandidatesData(maxAgeHours) {
   }
 
   let wahaChats = [];
-  try {
-    const res = await fetch(`${WAHA_BASE}/api/default/chats/overview?limit=100`, {
-      headers: { 'X-Api-Key': WAHA_API_KEY },
-      signal: AbortSignal.timeout(12000)
-    });
-    if (res.ok) wahaChats = await res.json();
-  } catch (e) {
-    log(`Aviso consultando WAHA overview: ${e.message}`);
+  let overviewOk = false;
+  const OVERVIEW_ATTEMPTS = 3;
+  for (let attempt = 1; attempt <= OVERVIEW_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(`${WAHA_BASE}/api/default/chats/overview?limit=100`, {
+        headers: { 'X-Api-Key': WAHA_API_KEY },
+        signal: AbortSignal.timeout(25000)
+      });
+      if (res.ok) {
+        const parsed = await res.json();
+        if (Array.isArray(parsed)) {
+          wahaChats = parsed;
+          overviewOk = true;
+          if (wahaChats.length > 0) break;
+        }
+      } else {
+        log(`Aviso consultando WAHA overview (intento ${attempt}/${OVERVIEW_ATTEMPTS}): HTTP ${res.status}`);
+      }
+    } catch (e) {
+      log(`Aviso consultando WAHA overview (intento ${attempt}/${OVERVIEW_ATTEMPTS}): ${e.message}`);
+    }
+    if (attempt < OVERVIEW_ATTEMPTS) {
+      await new Promise(r => setTimeout(r, 5000));
+    }
   }
 
-  // Fallback si overview falla, da timeout o viene vacío
-  if (!Array.isArray(wahaChats) || wahaChats.length === 0) {
+  // Fallback si overview falla, da timeout o viene vacío (en lotes de 5 para no saturar WAHA)
+  if (!overviewOk || wahaChats.length === 0) {
     try {
       const res = await fetch(`${WAHA_BASE}/api/default/chats?limit=40&sortBy=conversationTimestamp&sortOrder=desc`, {
         headers: { 'X-Api-Key': WAHA_API_KEY },
-        signal: AbortSignal.timeout(8000)
+        signal: AbortSignal.timeout(15000)
       });
       if (res.ok) {
         const rawChats = await res.json();
         if (Array.isArray(rawChats)) {
-          const enriched = await Promise.all(rawChats.map(async (c) => {
-            if (!c || !c.id || c.id.includes('broadcast') || c.id.includes('status')) return null;
-            try {
-              const mRes = await fetch(`${WAHA_BASE}/api/default/chats/${encodeURIComponent(c.id)}/messages?limit=1`, {
-                headers: { 'X-Api-Key': WAHA_API_KEY },
-                signal: AbortSignal.timeout(4000)
-              });
-              const msgs = mRes.ok ? await mRes.json() : null;
-              const last = Array.isArray(msgs) && msgs.length > 0 ? msgs[0] : null;
-              return { id: c.id, lastMessage: last };
-            } catch (err) {
-              return { id: c.id, lastMessage: null };
-            }
-          }));
-          wahaChats = enriched.filter(Boolean);
+          const validChats = rawChats.filter(c => c && c.id && !c.id.includes('broadcast') && !c.id.includes('status'));
+          const enriched = [];
+          const FALLBACK_BATCH = 5;
+          for (let i = 0; i < validChats.length; i += FALLBACK_BATCH) {
+            const batch = validChats.slice(i, i + FALLBACK_BATCH);
+            const batchResults = await Promise.all(batch.map(async (c) => {
+              try {
+                const mRes = await fetch(`${WAHA_BASE}/api/default/chats/${encodeURIComponent(c.id)}/messages?limit=1`, {
+                  headers: { 'X-Api-Key': WAHA_API_KEY },
+                  signal: AbortSignal.timeout(8000)
+                });
+                const msgs = mRes.ok ? await mRes.json() : null;
+                const last = Array.isArray(msgs) && msgs.length > 0 ? msgs[0] : null;
+                return { id: c.id, lastMessage: last };
+              } catch (err) {
+                return { id: c.id, lastMessage: null };
+              }
+            }));
+            enriched.push(...batchResults);
+          }
+          wahaChats = enriched;
         }
       }
     } catch (e) {
