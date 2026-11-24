@@ -15,7 +15,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const PNPM_ROOT = '/usr/local/lib/node_modules/n8n/node_modules/.pnpm';
+const PNPM_ROOT = process.env.PATCH_PNPM_ROOT || '/usr/local/lib/node_modules/n8n/node_modules/.pnpm';
 
 // Resolve dependency paths by globbing the pnpm store instead of pinning hashed
 // directory names: those hashes change on every dependency bump and turned this
@@ -39,6 +39,10 @@ let changed = 0;
 function patchFile(file, target, replacement, label) {
   found += 1;
   const content = fs.readFileSync(file, 'utf8');
+  if (content.includes(replacement)) {
+    console.log(`[skip] ${label}: already patched -> ${file}`);
+    return;
+  }
   if (!content.includes(target)) {
     console.log(`[skip] ${label}: already patched or target absent -> ${file}`);
     return;

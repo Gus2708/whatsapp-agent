@@ -203,7 +203,11 @@ test('all scope routes only valid inbound private senders while preserving canar
     ['outbound', {}, '15557654321@c.us', true, 'pass'],
     ['unknown direction', {}, '15557654321@c.us', undefined, 'pass'],
     ['group sender', {}, '15557654321@g.us', false, 'pass'],
-    ['LID sender', {}, '15557654321@lid', false, 'pass'],
+    ['LID sender', {}, '15557654321@lid', false, 'respond'],
+    ['long LID sender (15 digits)', {}, '110299222950137@lid', false, 'respond'],
+    ['zero-leading LID sender', {}, '010299222950137@lid', false, 'pass'],
+    ['too short LID sender', {}, '1234567@lid', false, 'pass'],
+    ['malformed LID sender', {}, '15557654321@lid/other', false, 'pass'],
     ['missing sender', {}, undefined, false, 'pass'],
     ['zero-leading sender', {}, '05557654321@c.us', false, 'pass'],
     ['too short sender', {}, '1234567@c.us', false, 'pass'],
@@ -259,4 +263,73 @@ test('shadow deadline aborts axios with frozen Promise prototypes and no AbortCo
   assert.equal(aborted, 1);
   assert.equal(item.json.jev_shadow.status, 'timeout');
   assert.equal(item.json.output, original.output);
+});
+
+test('shadow node reads _rafaga_previa from Debounce Ráfaga, preserves axios errors, and honors $env store config', async () => {
+  const code = fs.readFileSync('scratch_live/live_jev_shadow.js', 'utf8');
+  const run = new AsyncFunction('$input', '$', '$env', 'require', 'AbortController', code);
+
+  // 1) Burst from Debounce Ráfaga combines _rafaga_previa + body so trailing "hola" cannot fast-route
+  const seenMessages = [];
+  const $burst = name => ({ first: () => ({ json: name === 'Debounce Ráfaga'
+    ? { body: { payload: { body: 'hola', _rafaga_previa: 'tienen cemento?\n', from: '110299222950137@lid', fromMe: false } } }
+    : { body: { payload: { body: 'hola', from: '110299222950137@lid', fromMe: false } } } }) });
+  const answersGeneral = Object.fromEntries(Object.entries(jevQuestions()).map(([name, q]) => {
+    const choice = name === 'intent' ? 'general' : name === 'continuation' ? 'new' : Object.keys(q.criteria)[0];
+    return [name, { type: 'choice', choice, confidence: 0.99,
+      probabilities: Object.fromEntries(Object.keys(q.criteria).map(k => [k, k === choice ? 1 : 0])) }];
+  }));
+  const [burstOut] = await run({ first: () => ({ json: { conversation_context: { action: 'pass', query: 'tienen cemento?\nhola' } } }) },
+    $burst, { JEV_MODE: 'shadow', JEV_ROUTING_ENABLED: 'true', JEV_ROUTING_SCOPE: 'all', TYPESAFE_API_KEY: 'fake' },
+    () => ({ post: async (_u, body) => { seenMessages.push(body.state.message); return { status: 200, data: { model: body.model, answers: answersGeneral, usage: { input_tokens: 1, output_tokens: 1 } } }; } }), undefined);
+  assert.equal(seenMessages[0], 'tienen cemento? hola');
+  assert.equal(burstOut.json.conversation_context.action, 'pass');
+
+  // 2) Axios timeout and network errors classify as timeout / transport_error instead of http_error 500
+  const [timeoutOut] = await run({ first: () => ({ json: { conversation_context: { action: 'pass', query: 'hola' } } }) },
+    $burst, { JEV_MODE: 'shadow', TYPESAFE_API_KEY: 'fake' },
+    () => ({ post: async () => { throw Object.assign(new Error('timeout of 1500ms exceeded'), { code: 'ECONNABORTED' }); } }), undefined);
+  assert.equal(timeoutOut.json.jev_shadow.status, 'timeout');
+
+  const [errOut] = await run({ first: () => ({ json: { conversation_context: { action: 'pass', query: 'hola' } } }) },
+    $burst, { JEV_MODE: 'shadow', TYPESAFE_API_KEY: 'fake' },
+    () => ({ post: async () => { throw new Error('ECONNREFUSED'); } }), undefined);
+  assert.equal(errOut.json.jev_shadow.status, 'transport_error');
+
+  // 3) $env.STORE_HOURS takes precedence over fallback in fastRouter
+  const $hours = () => ({ first: () => ({ json: { body: { payload: { body: '¿A qué hora abren?', from: '110299222950137@lid', fromMe: false } } } }) });
+  const answersStore = Object.fromEntries(Object.entries(jevQuestions()).map(([name, q]) => {
+    const choice = name === 'intent' ? 'store_info' : name === 'continuation' ? 'new' : Object.keys(q.criteria)[0];
+    return [name, { type: 'choice', choice, confidence: 0.99,
+      probabilities: Object.fromEntries(Object.keys(q.criteria).map(k => [k, k === choice ? 1 : 0])) }];
+  }));
+  const [hoursOut] = await run({ first: () => ({ json: { conversation_context: { action: 'pass', query: '¿A qué hora abren?' } } }) },
+    $hours, { JEV_MODE: 'shadow', JEV_ROUTING_ENABLED: 'true', JEV_ROUTING_SCOPE: 'all', TYPESAFE_API_KEY: 'fake', STORE_HOURS: 'Lun-Vie 9AM-5PM' },
+    () => ({ post: async (_u, body) => ({ status: 200, data: { model: body.model, answers: answersStore, usage: { input_tokens: 1, output_tokens: 1 } } }) }), undefined);
+  assert.equal(hoursOut.json.conversation_context.action, 'respond');
+  assert.match(hoursOut.json.conversation_context.reply, /Lun-Vie 9AM-5PM/);
+  assert.doesNotMatch(hoursOut.json.conversation_context.reply, /1:00 PM a 2:00 PM/);
+
+  // 4) Non-enumerable n8n $env Proxy still resolves STORE_* and BOT_NAME without falling back to defaults
+  const backingEnv = {
+    JEV_MODE: 'shadow',
+    JEV_ROUTING_ENABLED: 'true',
+    JEV_ROUTING_SCOPE: 'all',
+    TYPESAFE_API_KEY: 'fake',
+    STORE_NAME: 'Ferreteria Proxy Test',
+    BOT_NAME: 'BotProxy',
+    STORE_CITY: 'Coro',
+    STORE_HOURS: 'Sabados 9AM-1PM',
+  };
+  const proxyEnv = new Proxy({}, { get: (_, k) => backingEnv[k], ownKeys: () => [] });
+  const [proxyHoursOut] = await run({ first: () => ({ json: { conversation_context: { action: 'pass', query: '¿A qué hora abren?' } } }) },
+    $hours, proxyEnv, () => ({ post: async (_u, body) => ({ status: 200, data: { model: body.model, answers: answersStore, usage: { input_tokens: 1, output_tokens: 1 } } }) }), undefined);
+  assert.equal(proxyHoursOut.json.conversation_context.action, 'respond');
+  assert.match(proxyHoursOut.json.conversation_context.reply, /Sabados 9AM-1PM/);
+
+  const $hi = () => ({ first: () => ({ json: { body: { payload: { body: 'Hola', from: '110299222950137@lid', fromMe: false } } } }) });
+  const [proxyHiOut] = await run({ first: () => ({ json: { conversation_context: { action: 'pass', query: 'Hola' } } }) },
+    $hi, proxyEnv, () => ({ post: async (_u, body) => ({ status: 200, data: { model: body.model, answers: answersGeneral, usage: { input_tokens: 1, output_tokens: 1 } } }) }), undefined);
+  assert.equal(proxyHiOut.json.conversation_context.action, 'respond');
+  assert.match(proxyHiOut.json.conversation_context.reply, /BotProxy.*Ferreteria Proxy Test.*Coro/);
 });

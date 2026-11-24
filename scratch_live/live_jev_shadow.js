@@ -180,14 +180,17 @@ async function classifyShadow({ message, previous, env = {}, transport, now = Da
 }
 
 function getStoreData() {
-  const env = (typeof process !== 'undefined' && process.env) || (typeof $env !== 'undefined' && $env) || {};
+  const getEnv = (key) => {
+    try { if (typeof $env !== 'undefined' && $env && $env[key]) return $env[key]; } catch (_) {}
+    return (typeof process !== 'undefined' && process && process.env && process.env[key]) || '';
+  };
   return {
-    name: env.STORE_NAME || 'Ferretería El Serrucho 🪚',
-    location: env.STORE_LOCATION || 'Estamos ubicados en Mene Mauroa, Estado Falcón, Venezuela.',
-    pickup_and_delivery: env.STORE_DELIVERY_POLICY || 'Puedes retirar compras generales en la tienda física. Todo lo que es hierros (tubos, láminas, cerchas, cabillas, etc.) y cemento está en nuestro galpón aparte en La Compañía; allí se retiran y de allí salen los envíos. Contamos con transporte de materiales a $10 en el centro de Mene Mauroa (fuera del Mene debe preguntar). En cualquier caso, antes de pagar el envío el cliente siempre debe hablar con un empleado.',
-    hours: env.STORE_HOURS || 'Atendemos de lunes a sábado de 8:00 AM a 6:00 PM (con descanso para almuerzo de 1:00 PM a 2:00 PM). Domingos y feriados permanecemos cerrados.',
-    payments: env.STORE_PAYMENTS || 'Aceptamos pagos en dólares en efectivo (USD), bolívares en efectivo, Pago Móvil y transferencia bancaria a la tasa oficial del Banco Central de Venezuela (BCV). También aceptamos Zelle para compras a partir de $20.00 USD. Para concretar el pago, un empleado te atiende enseguida o puedes pasar por la tienda física.',
-    returns: env.STORE_RETURNS || 'Aceptamos cambios y devoluciones hasta 7 días continuos desde la fecha de compra, presentando el producto sellado en su empaque original y la factura de compra.'
+    name: getEnv('STORE_NAME') || 'Ferretería El Serrucho 🪚',
+    location: getEnv('STORE_LOCATION') || 'Estamos ubicados en Mene Mauroa, Estado Falcón, Venezuela.',
+    pickup_and_delivery: getEnv('STORE_DELIVERY_POLICY') || 'Puedes retirar compras generales en la tienda física. Todo lo que es hierros (tubos, láminas, cerchas, cabillas, etc.) y cemento está en nuestro galpón aparte en La Compañía; allí se retiran y de allí salen los envíos. Contamos con transporte de materiales a $10 en el centro de Mene Mauroa (fuera del Mene debe preguntar). En cualquier caso, antes de pagar el envío el cliente siempre debe hablar con un empleado.',
+    hours: getEnv('STORE_HOURS') || 'Atendemos de lunes a sábado de 8:00 AM a 6:00 PM (con descanso para almuerzo de 1:00 PM a 2:00 PM). Domingos y feriados permanecemos cerrados.',
+    payments: getEnv('STORE_PAYMENTS') || 'Aceptamos pagos en dólares en efectivo (USD), bolívares en efectivo, Pago Móvil y transferencia bancaria a la tasa oficial del Banco Central de Venezuela (BCV). También aceptamos Zelle para compras a partir de $20.00 USD. Para concretar el pago, un empleado te atiende enseguida o puedes pasar por la tienda física.',
+    returns: getEnv('STORE_RETURNS') || 'Aceptamos cambios y devoluciones hasta 7 días continuos desde la fecha de compra, presentando el producto sellado en su empaque original y la factura de compra.'
   };
 }
 
@@ -275,10 +278,13 @@ function fastRouter({ message, jev, context, options = {} } = {}) {
     const closing = /^(?:gracias|muchas gracias|mil gracias|listo gracias|chao|adios|hasta luego|hasta pronto)$/.test(text);
     const greeting = /^(?:hola(?: buenas(?: tardes| noches)?)?|buenos dias|buen dia|buenas tardes|buenas noches|saludos)$/.test(text);
     if (!closing && !greeting) return pass;
-    const env = (typeof process !== 'undefined' && process.env) || (typeof $env !== 'undefined' && $env) || {};
-    const storeName = env.STORE_NAME || 'Ferretería El Serrucho';
-    const botName = env.BOT_NAME || 'Perucho';
-    const storeCity = env.STORE_CITY || 'Mene Mauroa';
+    const getEnv = (key) => {
+      try { if (typeof $env !== 'undefined' && $env && $env[key]) return $env[key]; } catch (_) {}
+      return (typeof process !== 'undefined' && process && process.env && process.env[key]) || '';
+    };
+    const storeName = getEnv('STORE_NAME') || 'Ferretería El Serrucho';
+    const botName = getEnv('BOT_NAME') || 'Perucho';
+    const storeCity = getEnv('STORE_CITY') || 'Mene Mauroa';
     const citySuffix = storeCity ? ` en ${storeCity}` : '';
     return { fast_path: true, action: 'respond',
       reply: (closing
@@ -312,12 +318,14 @@ for (const key of ['JEV_MODE', 'JEV_ROUTING_ENABLED', 'JEV_ROUTING_SCOPE', 'JEV_
   'JEV_MIN_CONFIDENCE', 'JEV_INPUT_USD_PER_MILLION']) {
   try { config[key] = $env[key]; } catch (_) {}
 }
-let latest = '';
 let inboundPayload;
-try {
-  inboundPayload = $('Transcribir Nota de Voz').first().json.body.payload;
-  latest = inboundPayload.body || '';
-} catch (_) {}
+try { inboundPayload = $('Debounce Ráfaga').first().json.body?.payload; } catch (_) {}
+if (!inboundPayload) {
+  try { inboundPayload = $('Transcribir Nota de Voz').first().json.body?.payload; } catch (_) {}
+}
+const latest = inboundPayload
+  ? (String(inboundPayload._rafaga_previa || '') + String(inboundPayload.body || ''))
+  : String(original.conversation_context?.query || '');
 let axios;
 const client = () => axios || (axios = require('axios'));
 const metadata = await classifyShadow({ message: latest,
@@ -338,24 +346,21 @@ const metadata = await classifyShadow({ message: latest,
     } };
   },
   transport: async request => {
-    try {
-      const response = await client().post(request.url, request.body, {
-        headers: request.headers, timeout: request.timeout, signal: request.signal,
-        maxRedirects: 0, maxContentLength: 16000, maxBodyLength: 16000,
-        responseType: 'text', transformResponse: [value => value], validateStatus: () => true,
-      });
-      return { status: response.status, body: response.data };
-    } catch (e) {
-      return { status: 500, body: String(e.message) };
-    }
+    const response = await client().post(request.url, request.body, {
+      headers: request.headers, timeout: request.timeout, signal: request.signal,
+      maxRedirects: 0, maxContentLength: 16000, maxBodyLength: 16000,
+      responseType: 'text', transformResponse: [value => value], validateStatus: () => true,
+    });
+    return { status: response.status, body: response.data };
   },
 });
 let updatedContext = original.conversation_context;
 const canaryPhone = config.JEV_CANARY_PHONE;
 const canarySender = typeof canaryPhone === 'string' && /^\+?[1-9]\d{7,14}$/.test(canaryPhone)
   ? canaryPhone.replace(/^\+/, '') + '@c.us' : null;
-const inboundPrivateSender = inboundPayload?.fromMe === false &&
-  typeof inboundPayload.from === 'string' && /^([1-9]\d{7,14})@c\.us$/.test(inboundPayload.from);
+const isPrivateCus = typeof inboundPayload?.from === 'string' && /^([1-9]\d{7,14})@c\.us$/.test(inboundPayload.from);
+const isPrivateLid = typeof inboundPayload?.from === 'string' && /^([1-9]\d{7,19})@lid$/.test(inboundPayload.from);
+const inboundPrivateSender = inboundPayload?.fromMe === false && (isPrivateCus || isPrivateLid);
 const scopeAllowsSender = config.JEV_ROUTING_SCOPE === 'all' ||
   (config.JEV_ROUTING_SCOPE === 'canary' && canarySender && inboundPayload?.from === canarySender);
 if (config.JEV_MODE === 'shadow' && config.JEV_ROUTING_ENABLED === 'true' &&
