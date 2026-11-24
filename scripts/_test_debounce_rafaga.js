@@ -155,7 +155,43 @@ const CASOS = [
   else if (lento.espero > 60000) falla(`con Supabase lento espero ${lento.espero}ms; el techo deberia cortarlo`);
   else console.log(`✓ Supabase lento: responde a los ${lento.espero}ms (techo respetado)`);
 
+  // Media en vuelo: foto previa sin texto termina Vision a los 18s -> espera y la une.
+  const mediaTarde = (transcurrido) => [
+    { message_id: 'm2', procesado_at: ts(14), texto: 'esos ganchitos', tipo: 'texto' },
+    { message_id: 'm1', procesado_at: ts(10), texto: transcurrido >= 18000 ? '[Imagen del cliente]: Ganchos adhesivos' : null, tipo: 'image' },
+  ];
+  const rMedia = await correr({ msgId: 'm2', filas: mediaTarde, ultimoBot: ts(5) });
+  if (!rMedia.paso || rMedia.previa !== '[Imagen del cliente]: Ganchos adhesivos\n' || rMedia.espero < 18000 || rMedia.espero >= 25000) {
+    falla(`media en vuelo: paso=${rMedia.paso} espero=${rMedia.espero}ms previa=${JSON.stringify(rMedia.previa)}`);
+  } else {
+    console.log(`✓ media en vuelo: esperó hasta ${rMedia.espero}ms y unió imagen al contexto`);
+  }
+
+  // Media colgada: foto previa nunca recibe texto -> corta en TECHO_MS y responde igual.
+  const mediaColgada = [
+    { message_id: 'm2', procesado_at: ts(14), texto: 'esos ganchitos', tipo: 'texto' },
+    { message_id: 'm1', procesado_at: ts(10), texto: null, tipo: 'image' },
+  ];
+  const rColgada = await correr({ msgId: 'm2', filas: mediaColgada, ultimoBot: ts(5) });
+  if (!rColgada.paso || rColgada.previa !== undefined || rColgada.espero < 44000 || rColgada.espero > 48000) {
+    falla(`media colgada: paso=${rColgada.paso} espero=${rColgada.espero}ms previa=${JSON.stringify(rColgada.previa)}`);
+  } else {
+    console.log(`✓ media colgada: cortó en techo (${rColgada.espero}ms) y respondió igual`);
+  }
+
+  // Media vieja (antes de ultimoBot): no extiende la espera más allá de QUIET_MS.
+  const mediaVieja = [
+    { message_id: 'm2', procesado_at: ts(14), texto: 'hola', tipo: 'texto' },
+    { message_id: 'm0', procesado_at: ts(2), texto: null, tipo: 'image' },
+  ];
+  const rVieja = await correr({ msgId: 'm2', filas: mediaVieja, ultimoBot: ts(5) });
+  if (!rVieja.paso || rVieja.previa !== undefined || rVieja.espero < 14000 || rVieja.espero > 16000) {
+    falla(`media vieja: paso=${rVieja.paso} espero=${rVieja.espero}ms previa=${JSON.stringify(rVieja.previa)}`);
+  } else {
+    console.log(`✓ media anterior a ultimoBot: no extiende espera (${rVieja.espero}ms)`);
+  }
+
   console.log('');
-  console.log(fallos ? `${fallos} FALLO(S)` : `Todo OK (${CASOS.length} casos + 4 afirmaciones de tiempo)`);
+  console.log(fallos ? `${fallos} FALLO(S)` : `Todo OK (${CASOS.length} casos + 7 afirmaciones de tiempo/media)`);
   process.exit(fallos ? 1 : 0);
 })();

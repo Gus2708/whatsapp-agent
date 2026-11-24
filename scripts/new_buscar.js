@@ -1389,7 +1389,7 @@ const IGNORED = new Set([
   'de', 'y', 'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'o', 'que', 'es', 'son', 'me', 'te', 'se', 'le', 'les', 'lo', 'mi', 'tu', 'su', 'ya', 'si', 'no', 'en', 'pero', 'aunque', 'entonces',
   'bs', 'bolivares', 'bolivar', 'dolar', 'dolares', 'divisas', 'usd',
   'importa', 'marca', 'marcas', 'modelo', 'modelos', 'solo', 'sola', 'mismo', 'misma', 'igual', 'cualquier', 'cualquiera', 'tambien', 'ambos', 'ambas',
-  'este', 'esta', 'estos', 'estas', 'ese', 'esa', 'eso', 'esos', 'esas', 'aqui', 'aca', 'alla', 'ahi', 'hoy', 'ahora', 'pues', 'ud', 'uds', 'usted', 'ustedes',
+  'este', 'esta', 'estos', 'estas', 'ese', 'esa', 'eso', 'esos', 'esas', 'aqui', 'aca', 'alla', 'ahi', 'alli', 'hoy', 'ahora', 'pues', 'ud', 'uds', 'usted', 'ustedes',
   'casualidad', 'calidad', 'calidades',
   // Saludos y muletillas. Sin esto, un simple "como esta todo" cotizaba 4 productos: el
   // token "todo" casa con "Disco P/lijad TODO" y "SueldaTODO", asi que la consulta parecia
@@ -1406,7 +1406,7 @@ const IGNORED = new Set([
   'instalar', 'instalacion', 'instalarlo', 'instalarla', 'instalarle', 'montar', 'colocar',
   'puede', 'puedes', 'puedo', 'pueden', 'podria', 'podrias',
   'dijeron', 'dijo', 'dice', 'dicen', 'dime', 'digame', 'decir', 'habia', 'habian', 'llego', 'llegaron', 'llegado', 'pregunta', 'pregunte', 'preguntar', 'preguntarle', 'preguntarles',
-  'regala', 'regalas', 'regalame', 'pasame', 'pasa', 'pasas', 'pasan', 'pasar', 'pasarme', 'mandame', 'manda', 'mandas', 'mandar', 'envia', 'enviame', 'enviar', 'mostrar', 'muestrame', 'ensename', 'ensenar', 'dar', 'darme',
+  'regala', 'regalas', 'regalame', 'pasame', 'pasa', 'pasas', 'pasan', 'pasar', 'pasarme', 'mandame', 'manda', 'mandas', 'mandar', 'mande', 'envia', 'enviame', 'enviar', 'envie', 'mostrar', 'muestrame', 'ensename', 'ensenar', 'dar', 'darme', 'senale', 'senalo', 'senalado',
   'foto', 'fotos', 'fotico', 'foticos', 'imagen', 'imagenes',
   'cuanto', 'cuesta', 'cuestan', 'vale', 'valen', 'sale', 'salen', 'precio', 'precios', 'presio', 'presios', 'costo', 'como', 'cual', 'cuales', 'cuando', 'quien',
   'color', 'ml', 'pulgada', 'pulgadas', 'pulg', 'pies', 'pie', 'sea', 'sean', 'tenga', 'tengan', 'sirva', 'sirvan',
@@ -1481,7 +1481,7 @@ function singularToken(w){
   return singular(w);
 }
 // tokenizador (mismo pipeline para consulta, aprendizaje y negativa)
-function tokensDe(t){ return normMedida(t).split(' ').filter(w => (w.length>=2 || /\d/.test(w)) && !IGNORED.has(w)).map(w => /\d/.test(w) ? w : singularToken(stemColor(w))); }
+function tokensDe(t){ return normMedida(t).replace(/([a-z]{2,})\/(?=[a-z]{2,})/g, '$1 ').split(' ').filter(w => (w.length>=2 || /\d/.test(w)) && !IGNORED.has(w)).map(w => /\d/.test(w) ? w : singularToken(stemColor(w))); }
 
 // DICCIONARIO DEL CATALOGO: vocabulario generado por el LLM leyendo los 7.5k productos
 // (tabla catalogo_vocabulario, ver scripts/generar_vocabulario.js). Traduce como habla
@@ -1665,6 +1665,84 @@ async function relajarDropOne(toks){
   }
   return { rows: [], dropped: null };
 }
+// Detecta alternativas explicitas unidas por y/e/o/u/ o "/" sobre un mismo producto base
+// (ej. "cemento catatumbo y csc", "bomba pedrollo o griven", "cemento catatumbo, csc y argos").
+// Nunca suelta la cabeza (toks[0]) ni activa cuando no hay base compartida ("cemento y cabilla").
+function extraerAlternativasCoordinadas(rawQuery, toks){
+  if (!Array.isArray(toks) || toks.length < 3) return null;
+  const _raw = String(rawQuery || '').replace(/,/g, ' zcomaz ');
+  const rawNorm = normMedida(expandir(_raw))
+    .replace(/\bzcomaz\b/g, ',')
+    .replace(/([a-z]{2,})\/(?=[a-z]{2,})/g, '$1 / ');
+  if (!/(?:^|\s)(?:y|e|o|u|\/)(?:\s|$)/.test(rawNorm)) return null;
+  const COORDS = new Set(['y', 'e', 'o', 'u', '/']);
+  const tokSet = new Set(toks);
+  const headTok = toks[0];
+  const words = rawNorm.split(/\s+/).filter(Boolean);
+  const toTok = (w) => {
+    if (!w || w === ',' || COORDS.has(w) || IGNORED.has(w) || /\d/.test(w)) return null;
+    const t = singularToken(stemColor(w));
+    return (t.length >= 3 && tokSet.has(t)) ? t : null;
+  };
+  const alts = [];
+  const addAlt = (t) => { if (t && t !== headTok && !alts.includes(t)) alts.push(t); };
+  for (let k = 0; k < words.length; k++) {
+    if (!COORDS.has(words[k])) continue;
+    let leftTok = null, leftIdx = -1;
+    for (let j = k - 1, skipped = 0; j >= 0 && skipped <= 2; j--) {
+      const w = words[j];
+      if (COORDS.has(w) || w === ',') break;
+      if (IGNORED.has(w)) { skipped++; continue; }
+      leftTok = toTok(w);
+      leftIdx = j;
+      break;
+    }
+    if (!leftTok || leftTok === headTok) continue;
+    const prefixToks = new Set([headTok]);
+    for (let p = 0; p < leftIdx; p++) {
+      const pt = toTok(words[p]);
+      if (pt) prefixToks.add(pt);
+    }
+    let rightTok = null;
+    for (let j = k + 1, skipped = 0; j < words.length && skipped <= 2; j++) {
+      const w = words[j];
+      if (COORDS.has(w) || w === ',') break;
+      if (IGNORED.has(w)) { skipped++; continue; }
+      const cand = toTok(w);
+      if (cand && prefixToks.has(cand)) { skipped++; continue; } // ej. "cemento gris catatumbo y cemento gris csc"
+      rightTok = cand;
+      break;
+    }
+    if (!rightTok || leftTok === rightTok || rightTok === headTok) continue;
+    // Extiende a listas con coma antes del coordinador ("cemento catatumbo, csc y argos")
+    const prefixAlts = [];
+    let cur = leftIdx - 1;
+    while (cur >= 1 && words[cur] === ',') {
+      let prevTok = null, prevIdx = -1;
+      for (let j = cur - 1, skipped = 0; j >= 0 && skipped <= 2; j--) {
+        const w = words[j];
+        if (COORDS.has(w) || w === ',') break;
+        if (IGNORED.has(w)) { skipped++; continue; }
+        prevTok = toTok(w);
+        prevIdx = j;
+        break;
+      }
+      if (!prevTok || prevTok === headTok) break;
+      prefixAlts.unshift(prevTok);
+      cur = prevIdx - 1;
+    }
+    for (const p of prefixAlts) addAlt(p);
+    addAlt(leftTok);
+    addAlt(rightTok);
+  }
+  if (alts.length < 2 || alts.length > 4) return null;
+  const altSet = new Set(alts);
+  const base = toks.filter(t => !altSet.has(t));
+  const _COLOR_ROOTS = new Set(Object.values(COLOR_STEM));
+  const _esMod = w => MODIFIERS.has(w) || COLOR_STEM[w] || _COLOR_ROOTS.has(w) || stemColor(w) !== w;
+  if (base.length === 0 || base.every(_esMod)) return null;
+  return { base, alts };
+}
 let res = [];
 let _fuzzy = false;
 const _esOxidoPisoQuery = qTokens.includes('oxido') && qTokens.includes('piso');
@@ -1680,6 +1758,36 @@ if (res.length===0 && textLargasSql.length>0) {
 let _dropped = null; // palabra que la relajacion tuvo que ignorar (hay que confesarlo)
 let _droppedEsMod = false; // la palabra ignorada era un modificador/color (variante), no el producto
 let _unicaPalabra = null; // si hubo que reducir la consulta a UNA sola palabra, cual fue
+let _altBranches = null; // [{ alt, rows }] cuando el cliente pidio 2+ alternativas coordinadas
+if (res.length===0){
+  const _coord = extraerAlternativasCoordinadas(_pb, textLargasSql.length > 0 ? textLargasSql : textLargas);
+  if (_coord) {
+    const _hitBranches = [];
+    const _missingAlts = [];
+    const _seenAlt = new Set();
+    const _COLOR_ROOTS_ALT = new Set(Object.values(COLOR_STEM));
+    const _esModAlt = w => MODIFIERS.has(w) || COLOR_STEM[w] || _COLOR_ROOTS_ALT.has(w) || stemColor(w) !== w;
+    for (const _alt of _coord.alts) {
+      const _branchToks = [..._coord.base, _alt];
+      const _r = casanDeVerdad(await ilike(_branchToks, 60), _branchToks);
+      if (_r.length > 0) {
+        _hitBranches.push({ alt: _alt, rows: _r });
+        for (const _p of _r) {
+          if (!_seenAlt.has(_p.codigo_interno)) { _seenAlt.add(_p.codigo_interno); res.push(_p); }
+        }
+      } else {
+        _missingAlts.push(_alt);
+      }
+    }
+    if (_hitBranches.length > 0) {
+      _altBranches = _hitBranches;
+      if (_missingAlts.length > 0) {
+        _dropped = _missingAlts.join(' / ');
+        _droppedEsMod = _missingAlts.every(_esModAlt);
+      }
+    }
+  }
+}
 if (res.length===0){
   const _rel = await relajarDropOne(textLargasSql.length > 0 ? textLargasSql : textLargas);
   if (_rel.rows.length>0){ res = _rel.rows; _dropped = _rel.dropped; _droppedEsMod = _rel.droppedEsModificador === true; }
@@ -1707,7 +1815,7 @@ if (_vocDifiere && textLargasVoc.length>0){
     }
   }
 }
-if (res.length===0 && largas.length>0) res = await ilike(largas, 30);
+if (res.length===0 && largas.length>0) res = casanDeVerdad(await ilike(largas, 30), largas);
 if (res.length===0 && largas.length>1){
   const _sub = largas.slice(0, 2);
   const _r = casanDeVerdad(await ilike(_sub, 30), _sub);
@@ -1731,7 +1839,7 @@ if (res.length===0){
   // Si algun dia se vuelve a tocar, hay que medirlo igual: la longitud es el campeon actual.
   const _solo = textLargas.filter(w => !MODIFIERS.has(w) && !IGNORED.has(w)).sort((a,b)=>b.length-a.length);
   for (const _w of _solo){
-    res = await ilike([_w], 30);
+    res = casanDeVerdad(await ilike([_w], 30), [_w]);
     // Responder con 1 de N palabras es la coincidencia mas debil del motor y hay que
     // confesarlo: SIN esta marca el bot cotizaba con total seguridad las BOMBAS que salieron
     // de buscar solo "sumergible" a quien pidio resina para empalmar cable.
@@ -1975,7 +2083,7 @@ if (res.length===0){
 // "tapa para el bano" -> "Tapa P/toma 270". Aqui la capa vectorial SI aporta (con los
 // embeddings v2 devuelve TAPA DE INODORO a 0.601), y es ~80x mas barata que preguntarle
 // a Luna, asi que se intenta primero. Solo se adopta si DISCREPA de lo lexico.
-if (!_rescate && res.length > 0){
+if (!_rescate && !_altBranches && res.length > 0){
   // Senal de secuestro: al primer resultado le FALTA alguna palabra de la consulta.
   // "tapa para el bano" -> "Tapa P/toma 270" comparte "tapa" pero no "bano". Mirar solo
   // el sustantivo principal no bastaba, porque en ese caso tambien coincide.
@@ -2042,8 +2150,29 @@ if (!_rescate && res.length > 0 &&
 const unicos=[]; const seen=new Set();
 for(const p of res){ if(!seen.has(p.codigo_interno)){ seen.add(p.codigo_interno); unicos.push(p); } }
 
-// Regla negocio CEMENTO: generico = solo gris; otros tipos solo si los piden
-{ const nbq = norm(_pb); if (qTokens.includes('cemento')) { let tipo='gris'; if(nbq.includes('blanco')) tipo='blanco'; else if(nbq.includes('asfalt')||nbq.includes('plastic')||nbq.includes('bituplast')||nbq.includes('edil')) tipo='plastico'; else if(nbq.includes('contacto')||nbq.includes('pega')) tipo='contacto'; const matchTipo=(d)=>{ d=norm(d); if(tipo==='blanco') return d.includes('blanco'); if(tipo==='plastico') return d.includes('plastico')||d.includes('bituplast')||d.includes('edil')||d.includes('asfalt'); if(tipo==='contacto') return d.includes('contacto')||d.includes('pega'); return d.includes('cemento gris'); }; const filt = unicos.filter(p => matchTipo(p.descripcion)); if (filt.length>0){ unicos.length=0; for(const x of filt) unicos.push(x); } } }
+// Regla negocio CEMENTO: generico = solo gris; otros tipos solo si los piden (acepta varios si pide ej. "cemento blanco y gris")
+{
+  const nbq = norm(_pb);
+  if (qTokens.includes('cemento')) {
+    const tipos = [];
+    if (nbq.includes('gris')) tipos.push('gris');
+    if (nbq.includes('blanco') || nbq.includes('blanca')) tipos.push('blanco');
+    if (nbq.includes('asfalt') || nbq.includes('plastic') || nbq.includes('bituplast') || nbq.includes('edil')) tipos.push('plastico');
+    if (nbq.includes('contacto') || nbq.includes('pega')) tipos.push('contacto');
+    if (tipos.length === 0) tipos.push('gris');
+    const matchTipo = (d) => {
+      d = norm(d);
+      return tipos.some(tipo => {
+        if (tipo === 'blanco') return d.includes('blanco');
+        if (tipo === 'plastico') return d.includes('plastico') || d.includes('bituplast') || d.includes('edil') || d.includes('asfalt');
+        if (tipo === 'contacto') return d.includes('contacto') || d.includes('pega');
+        return d.includes('cemento gris');
+      });
+    };
+    const filt = unicos.filter(p => matchTipo(p.descripcion));
+    if (filt.length > 0) { unicos.length = 0; for (const x of filt) unicos.push(x); }
+  }
+}
 
 // Regla negocio CABILLA: generico = solo ESTRIADA (12mm=1/2, 10mm=3/8 son las principales). Redonda/Cuadrada/Lisa solo si las piden.
 { const nbq = norm(_pb); if (qTokens.includes('cabilla')) { const wantCuadrada=nbq.includes('cuadrada'); const wantRedonda=nbq.includes('redonda'); const wantLisa=nbq.includes('lisa'); let filt=null; if(wantCuadrada||wantRedonda||wantLisa){ filt = unicos.filter(p => { const d=norm(p.descripcion); if(wantCuadrada) return d.includes('cuadrada'); if(wantRedonda) return d.includes('redonda'); if(wantLisa) return d.includes('lisa'); return true; }); } else { const est = unicos.filter(p => norm(p.descripcion).includes('estriada')); if (medLargas.length>0){ const estM = est.filter(p=>{ const nd=normMedida(p.descripcion); return medLargas.every(m=>medPresent(m,nd)); }); filt = (estM.length>0) ? est : null; } else { filt = est; } } if (filt && filt.length>0){ unicos.length=0; for(const x of filt) unicos.push(x); } } }
@@ -2821,6 +2950,40 @@ unicos.sort((a,b)=>{
   if (aStock !== bStock) return aStock ? -1 : 1;
   return (vMap[b.codigo_interno]||0)-(vMap[a.codigo_interno]||0);
 });
+
+// Si la consulta pidio 2+ alternativas coordinadas (ej. "cemento catatumbo y csc"),
+// intercalar los mejores resultados de cada rama (ramas con stock primero) para que
+// el tope de 4 productos de formatearProductos no oculte una alternativa tras otra.
+if (_altBranches && _altBranches.length >= 2 && unicos.length > 1) {
+  const _branchLists = _altBranches
+    .map(b => {
+      const _codes = new Set(b.rows.map(r => r.codigo_interno));
+      const _items = unicos.filter(u => _codes.has(u.codigo_interno));
+      const _hasStock = _items.some(u => esGranel(u.descripcion) || Number(u.existencia) > 0);
+      return { items: _items, hasStock: _hasStock };
+    })
+    .filter(b => b.items.length > 0);
+  if (_branchLists.length >= 2) {
+    _branchLists.sort((a, b) => Number(b.hasStock) - Number(a.hasStock));
+    const _interleaved = [];
+    const _seenI = new Set();
+    const _maxLen = Math.max(..._branchLists.map(b => b.items.length));
+    for (let _idx = 0; _idx < _maxLen; _idx++) {
+      for (const _bl of _branchLists) {
+        const _item = _bl.items[_idx];
+        if (_item && !_seenI.has(_item.codigo_interno)) {
+          _seenI.add(_item.codigo_interno);
+          _interleaved.push(_item);
+        }
+      }
+    }
+    for (const _u of unicos) {
+      if (!_seenI.has(_u.codigo_interno)) { _seenI.add(_u.codigo_interno); _interleaved.push(_u); }
+    }
+    unicos.length = 0;
+    for (const _x of _interleaved) unicos.push(_x);
+  }
+}
 
 // Diversify top results across classes and brands when a color was requested without class
 if (! _isPaintNoColor && unicos.length > 1 && (isPaintQuery || qTokens.includes('pintura'))) {

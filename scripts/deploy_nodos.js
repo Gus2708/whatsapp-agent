@@ -16,9 +16,9 @@ const DRY = process.argv.includes('--dry');
 
 const lf = s => s.replace(/\r\n/g, '\n');
 const leer = f => lf(fs.readFileSync(path.join(ROOT, 'scratch_live', f), 'utf8'));
+const wfCanonico = JSON.parse(fs.readFileSync(path.join(ROOT, 'n8n_workflow.json'), 'utf8'));
 const deWorkflow = nodo => {
-  const wf = JSON.parse(fs.readFileSync(path.join(ROOT, 'n8n_workflow.json'), 'utf8'));
-  const n = wf.nodes.filter(x => x.name === nodo);
+  const n = wfCanonico.nodes.filter(x => x.name === nodo);
   if (n.length !== 1) throw new Error(`n8n_workflow.json: se esperaba exactamente un nodo "${nodo}"`);
   return lf(String(n[0].parameters.jsCode || ''));
 };
@@ -37,8 +37,12 @@ const MAPA = [
   // siesta fija de 7 s y nadie lo comparaba con lo vivo. Desde aqui --dry avisa si se desvia.
   { nodo: 'Debounce Ráfaga', campo: 'jsCode', valor: deWorkflow('Debounce Ráfaga') },
   { nodo: 'Detectar Handoff Empleado', campo: 'jsCode', valor: deWorkflow('Detectar Handoff Empleado') },
+  { nodo: 'Prepare Conversation Context', campo: 'jsCode', valor: leer('live_conversation_context.js') },
   { nodo: 'Jev Shadow Decision', campo: 'jsCode', valor: leer('live_jev_shadow.js') },
 ];
+
+const SYNC_CONEXIONES = ['Filtro Anti-Duplicado', 'Transcribir Nota de Voz', 'Debounce Ráfaga'];
+const SYNC_POSICIONES = ['Transcribir Nota de Voz', 'Debounce Ráfaga'];
 
 (async () => {
   const wf = await (await fetch(`${BASE}/workflows/${ID}`, { headers: H })).json();
@@ -55,8 +59,31 @@ const MAPA = [
     cambios++;
   }
 
+  for (const src of SYNC_CONEXIONES) {
+    const esperada = wfCanonico.connections[src];
+    const actual = wf.connections?.[src];
+    if (JSON.stringify(actual) === JSON.stringify(esperada)) {
+      console.log(`· Conexión ${src}: ya está al día`);
+      continue;
+    }
+    const target = esperada?.main?.[0]?.[0]?.node || '?';
+    console.log(`✓ Conexión ${src}: -> ${target}`);
+    wf.connections[src] = structuredClone(esperada);
+    cambios++;
+  }
+
+  for (const nombre of SYNC_POSICIONES) {
+    const cn = wfCanonico.nodes.find(x => x.name === nombre);
+    const n = wf.nodes.find(x => x.name === nombre);
+    if (!cn || !n) continue;
+    if (JSON.stringify(n.position) === JSON.stringify(cn.position)) continue;
+    console.log(`✓ Posición ${nombre}: ${JSON.stringify(n.position)} -> ${JSON.stringify(cn.position)}`);
+    n.position = [...cn.position];
+    cambios++;
+  }
+
   if (!cambios) { console.log('\nSin cambios que desplegar.'); return; }
-  if (DRY) { console.log(`\n--dry: ${cambios} nodo(s) cambiarían; no se tocó n8n.`); return; }
+  if (DRY) { console.log(`\n--dry: ${cambios} cambio(s) se aplicarían; no se tocó n8n.`); return; }
 
   // GUARD: nunca desplegar sin que los tests pasen. Esta sesión ya vio un archivo con un
   // `else` huérfano y regex con las barras comidas llegar hasta aquí; lo cazó `npm test`,
@@ -91,5 +118,10 @@ const MAPA = [
   });
   console.log('\nPUT status:', put.status);
   if (!put.ok) { console.log(await put.text()); process.exit(1); }
-  console.log(`OK — ${cambios} nodo(s) desplegados a n8n.`);
+  const upd = await put.json();
+  if (upd.active !== true) {
+    console.error(`ERROR: el workflow ${ID} quedó inactivo tras PUT (active=${upd.active}).`);
+    process.exit(1);
+  }
+  console.log(`OK — ${cambios} cambio(s) desplegados a n8n (active=${upd.active}).`);
 })().catch(e => { console.error('ERROR', e.message, e.cause || '', e.stack); process.exit(1); });

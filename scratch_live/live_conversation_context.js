@@ -63,7 +63,10 @@ function resolveConversation(message, previous, session, now) {
 // END CONVERSATION FUNCTIONS
 const input = $input.first().json;
 let body = {}, payload = {};
-try { body = $('Transcribir Nota de Voz').first().json.body || {}; payload = body.payload || {}; } catch (_) {}
+try { body = $('Debounce Ráfaga').first().json.body || {}; payload = body.payload || {}; } catch (_) {}
+if (!payload.body && !payload._rafaga_previa) {
+  try { body = $('Transcribir Nota de Voz').first().json.body || {}; payload = body.payload || {}; } catch (_) {}
+}
 const message = String(payload._rafaga_previa || '') + String(payload.body || '');
 let enabled = false;
 try { enabled = $env.CONVERSATION_STATE_ENABLED === 'true'; } catch (_) {}
