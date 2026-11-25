@@ -329,6 +329,13 @@ function expandir(t){ let s=norm(t); s=s.replace(/\bcal\b(?!\s*\d)/g,'cal prepar
     s = s.replace(/\bpinturas?\b/g, 'oxido');
   }
   s = s.replace(/\bsera\s+(?:para|de)\s+pisos?\b/g, 'cera para piso');
+  // "cuarto" como habitacion ("para mi cuarto", "para el cuarto", "pintar un cuarto", "dos cuartos")
+  // NO es presentacion 1/4; proteger antes de que SIN convierta cuarto->1/4.
+  // OJO: nunca tocar "tres cuartos" (3/4) ni "de cuarto"/"un cuarto" de producto.
+  s = s
+    .replace(/\b((?:para|pintar|en)\s+(?:mi|tu|su|el|los|este|ese)\s+)cuartos?\b/gi, '$1interior')
+    .replace(/\b(pintar\s+(?:un\s+|unos\s+|dos\s+|los\s+)?)cuartos?\b/gi, '$1interior')
+    .replace(/\b(dos|varios|los|unos|mis|sus)\s+cuartos\b/gi, '$1 interior');
   // SIN se aplica con LIMITE DE PALABRA, no como subcadena. Con split/join naive, una clave
   // que aparece DENTRO de otra palabra la destroza: "media"->"1/2" convertia "mediano" en
   // "1/2no", "zinc"->"lamina zinc" convertia "zincada" en "lamina zincada", y "riel" rompia
@@ -658,7 +665,7 @@ async function buscarUno(nombre){
   const rolloIntent = /\b(rollos?)\b/.test(norm(nombre)); // "rollo de cable" -> rollo completo, no por metro
   const GRANEL_OR = 'or=(descripcion.ilike.*x mt*,descripcion.ilike.*x metro*,descripcion.ilike.*por metro*)';
   const _esOxidoPisoQuery = qTokens.includes('oxido') && qTokens.includes('piso');
-  const isPaintQuery = !_esOxidoPisoQuery && (qTokens.includes('pintura') || /\b(pinturas?|esmalte|esmaltes|satinad\w*|caucho|oleo|anticorrosiv\w*|sellafill|imperflex|impermeabilizante|spray|aerosol)\b/.test(norm(nombre)));
+  const isPaintQuery = !_esOxidoPisoQuery && (qTokens.includes('pintura') || /\b(pinturas?|esmalte|esmaltes|satinad\w*|caucho|oleo|anticorrosiv\w*|antialcalin\w*|fondos?\s+(?:anticorrosiv\w*|herreria|el\s+pro|every|rojo|roja|gris|blanco|blanca|negro|negra)|barniz|barnices|barinz|laca|lacas|sellador|selladores|thinner|tiner|solvente|removedor|pasta\s+profesional|sellafill|imperflex|impermeabilizante|spray|aerosol)\b/.test(norm(nombre)));
   const textLargasSql = isPaintQuery ? textLargas.filter(w => !['exterior','exteriores','interior','interiores','fachada','intemperie','clase','tipo','calidad'].includes(w)) : textLargas;
   let cand=[];
   // si hay categoria de texto, trae amplio por categoria y filtra medida en JS
@@ -715,26 +722,43 @@ async function buscarUno(nombre){
   // Regla negocio PINTURA
   {
     const nbq = norm(nombre);
-    const isPaint = !_esOxidoPisoQuery && (/\b(pinturas?|esmalte|esmaltes|satinad\w*|caucho|oleo|anticorrosiv\w*|sellafill|imperflex|impermeabilizante|spray|aerosol)\b/.test(nbq) || qTokens.includes('pintura'));
+    const isPaint = !_esOxidoPisoQuery && (/\b(pinturas?|esmalte|esmaltes|satinad\w*|caucho|oleo|anticorrosiv\w*|antialcalin\w*|fondos?\s+(?:anticorrosiv\w*|herreria|el\s+pro|every|rojo|roja|gris|blanco|blanca|negro|negra)|barniz|barnices|barinz|laca|lacas|sellador|selladores|thinner|tiner|solvente|removedor|pasta\s+profesional|sellafill|imperflex|impermeabilizante|spray|aerosol)\b/.test(nbq) || qTokens.includes('pintura'));
     if (isPaint) {
       const isExterior = /\b(exterior|exteriores|afuera|fachadas?|intemperie|sol\s+y\s+agua|sol\s+y\s+lluvia)\b/.test(nbq);
-      const isInterior = /\b(interior|interiores|adentro|salas?|cuartos?|habitaci\w*)\b/.test(nbq);
+      const isCuartoRoom = /\b(?:para|pintar|en)\s+(?:mi|tu|su|el|los|este|ese)\s+cuartos?\b|\bpintar\s+(?:un\s+|unos\s+|dos\s+|los\s+)?cuartos?\b|\b(?:dos|varios|los|unos|mis|sus)\s+cuartos\b/.test(nbq);
+      const isInterior = /\b(interior|interiores|adentro|salas?|habitaci\w*)\b/.test(nbq) || isCuartoRoom;
       const wantClaseA = /\b(clase\s*a|tipo\s*a|primera\s*calidad|de\s*primera|la\s*mejor)\b/.test(nbq);
       const wantClaseB = /\b(clase\s*b|tipo\s*b|segunda\s*calidad|de\s*segunda|intermedia)\b/.test(nbq);
       const wantClaseC = /\b(clase\s*c|tipo\s*c|tercera\s*calidad|de\s*tercera|economica|barata|para\s*techo|cielo\s*raso)\b/.test(nbq);
+      const wantFondo = /\b(fondo|fondos|anticorrosiv\w*|antialcalin\w*|primer)\b/.test(nbq);
       const wantAceite = /\b(aceite|esmalte|sintetic\w*|2\s*en\s*1|3\s*en\s*1|para\s*hierro|para\s*metal|para\s*rejas?|para\s*porton)\b/.test(nbq);
       const wantCaucho = /\b(caucho|de\s*agua|en\s*agua|emulsionada)\b/.test(nbq);
       const wantSatinada = /\b(satinad\w*|brillo\s*de?\s*seda|seda\s*styl)\b/.test(nbq);
       const wantImpermeabilizante = /\b(impermeabiliz\w*|sellafill|imperflex|para\s*goteras?|filtraci\w*)\b/.test(nbq);
       const wantSpray = /\b(spray|aerosol|en\s*lata)\b/.test(nbq);
+      const wantBarniz = /\b(barniz|barnices|barinz)\b/.test(nbq);
+      const wantLaca = /\b(laca|lacas)\b/.test(nbq);
+      const wantSellador = /\b(sellador|selladores)\b/.test(nbq);
+      const wantThinner = /\b(thinner|tiner|solvente)\b/.test(nbq);
+      const wantRemovedor = /\bremovedor\b/.test(nbq);
+      const wantPastaProf = /\bpasta\s+profesional\b/.test(nbq);
+      const wantWoodOrSpecialty = wantBarniz || wantLaca || wantSellador || wantThinner || wantRemovedor || wantPastaProf;
+      const isSpecialtyCoating = wantFondo || wantAceite || wantSpray || wantImpermeabilizante || wantWoodOrSpecialty;
       const wantCunete = /\b(cu[nñ]etes?|4\s*gl|4\s*gal\w*|5\s*gl|5\s*gal\w*|tobo|balde)\b/.test(nbq);
-      const wantCuarto = /\b(1\/4|cuartico|cuarto)\b/.test(nbq);
+      const wantCuarto = /\b(1\/4|cuartico)\b/.test(nbq) || (!isCuartoRoom && /\bcuarto\b/.test(nbq));
       const wantGalon = /\b(galon|galones|x\s*galon|por\s*galon)\b/.test(nbq) && !wantCunete && !wantCuarto;
 
       const _esA = d => /\bCLASE\s+A\b|\bTIPO\s+A\b|\bA\s+GAL\b|\bA\s+GALON\b|\bA\s+X\s+GALON\b|\bA\s+CU[NÑ]ETE\b|SUN\s+DECO|DELUXE\s+A|\bEVERY\b.*\bA\b|\bEVERCRIL\b.*\bA\b|\bEVERMAX\b.*\bA\b|PREMIU[MN].*FLORIPAINT/i.test(d) && !/\bCLASE\s+[BC]\b|\bTIPO\s+[BC]\b/i.test(d);
       const _esB = d => /\bCLASE\s+B\b|\bTIPO\s+B\b|\bB\s+GAL\b|\bB\s+GALON\b|\bB\s+X\s+GALON\b|\bB\s+CU[NÑ]ETE\b|(?:^|\s|[A-Z])B\s+GAL\s+FLORIPAINT|FLORIPAINT.*\bCLASE\s+B\b|\bB\s+CUNETE\s+FLORIPAINT\b|MAR\s+DECO|VINILEVERY|KOLOR\s*FLEX.*(?:\bB\b|CONC\.B)|INVE?RCOLOR.*TIPO\s*B|\bEVERY\b.*\bB\b/i.test(d) && !/\bCLASE\s+[AC]\b|\bTIPO\s+[AC]\b/i.test(d);
       const _esC = d => /\bCLASE\s+C\b|\bTIPO\s+C\b|\bC\s+GAL\b|\bC\s+GALON\b|\bC\s+X\s+GALON\b|\bC\s+CU[NÑ]ETE\b|\bC\s+CUNETE\s+FLORIPAINT\b|RIO\s+DECO|RIO\s+BLANCO|COLOR\s+PLUS.*TIPO\s*C|EVERAMA|EVERY.*C-?300|\bEVERY\b.*\bC\b|KOLOR\s*FLEX.*\bC\b/i.test(d) && !/\bCLASE\s+[AB]\b|\bTIPO\s+[AB]\b/i.test(d);
-      const _esAceite = d => /ACEITE|ESMALTE|2\s*EN\s*1|3\s*EN\s*1|EVERY\s+PLUS\s+E-|EL\s+PRO\s+30-|PRO\s+GOLD/i.test(d);
+      const _esFondo = d => /\b(FONDO|ANTICORROSIV\w*|PRIMER|ANTIALCALIN\w*)\b/i.test(d) || /\bEL\s+PRO\s+30-1\d\d\b/i.test(d);
+      const _esAceite = d => !_esFondo(d) && (/ACEITE|ESMALTE|2\s*EN\s*1|3\s*EN\s*1|EVERY\s+PLUS\s+E-|PRO\s+GOLD/i.test(d) || /\bEL\s+PRO\s+30-(?!1\d\d)\d+\b/i.test(d));
+      const _esBarniz = d => /\b(BARNIZ|BARINZ)\b/i.test(d);
+      const _esLaca = d => /\bLACA\b/i.test(d);
+      const _esSellador = d => /\bSELLADOR\b/i.test(d);
+      const _esThinner = d => /\b(THINNER|TINER|SOLVENTE)\b/i.test(d);
+      const _esRemovedor = d => /\bREMOVEDOR\b/i.test(d);
+      const _esPastaProf = d => /\bPASTA\s+PROFESIONAL\b/i.test(d);
       const _esSatin = d => /SATINAD|SEDA\s+STYL|BRILLO\s+SEDA|BRILLO\s+DE\s+SEDA|STYLE\s+BRILLO/i.test(d);
       const _esImp = d => /IMPERMEABIL|SELLAFILL|IMPERFLEX|LOXON\s+PISCINA/i.test(d);
       const _esSpray = d => /AEROSOL|AEREOSOL|SPRAY/i.test(d);
@@ -839,19 +863,40 @@ async function buscarUno(nombre){
         if (fc.length > 0) pf = fc;
       }
 
-      if (isExterior && !wantClaseB && !wantClaseC) {
+      if (isExterior && !wantClaseB && !wantClaseC && !isSpecialtyCoating) {
         const fe = pf.filter(p => _esA(p.descripcion) || _esAceite(p.descripcion) || _esImp(p.descripcion));
         if (fe.length > 0) pf = fe;
-      } else if (isInterior && !wantAceite && !wantSpray) {
-        const fi = pf.filter(p => !_esAceite(p.descripcion) && !_esSpray(p.descripcion));
+      } else if (isInterior && !isSpecialtyCoating) {
+        const fi = pf.filter(p => !_esAceite(p.descripcion) && !_esSpray(p.descripcion) && !_esFondo(p.descripcion));
         if (fi.length > 0) pf = fi;
       }
 
-      if (wantAceite) {
-        const fo = pf.filter(p => _esAceite(p.descripcion));
+      if (wantFondo) {
+        const ff = pf.filter(p => _esFondo(p.descripcion) && (wantSpray ? _esSpray(p.descripcion) : !_esSpray(p.descripcion)));
+        if (ff.length > 0) pf = ff;
+      } else if (wantAceite) {
+        const fo = pf.filter(p => _esAceite(p.descripcion) && (wantSpray ? _esSpray(p.descripcion) : !_esSpray(p.descripcion)));
         if (fo.length > 0) pf = fo;
+      } else if (wantBarniz) {
+        const fb2 = pf.filter(p => _esBarniz(p.descripcion));
+        if (fb2.length > 0) pf = fb2;
+      } else if (wantLaca) {
+        const fl2 = pf.filter(p => _esLaca(p.descripcion));
+        if (fl2.length > 0) pf = fl2;
+      } else if (wantSellador) {
+        const fs2 = pf.filter(p => _esSellador(p.descripcion));
+        if (fs2.length > 0) pf = fs2;
+      } else if (wantThinner) {
+        const ft2 = pf.filter(p => _esThinner(p.descripcion));
+        if (ft2.length > 0) pf = ft2;
+      } else if (wantRemovedor) {
+        const fr2 = pf.filter(p => _esRemovedor(p.descripcion));
+        if (fr2.length > 0) pf = fr2;
+      } else if (wantPastaProf) {
+        const fp2 = pf.filter(p => _esPastaProf(p.descripcion));
+        if (fp2.length > 0) pf = fp2;
       } else if (wantCaucho) {
-        const fc = pf.filter(p => !_esAceite(p.descripcion) && !_esSpray(p.descripcion));
+        const fc = pf.filter(p => !_esAceite(p.descripcion) && !_esSpray(p.descripcion) && !_esFondo(p.descripcion) && !_esImp(p.descripcion));
         if (fc.length > 0) pf = fc;
       } else if (wantSatinada) {
         const fs = pf.filter(p => _esSatin(p.descripcion));

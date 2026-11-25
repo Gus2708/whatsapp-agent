@@ -70,3 +70,12 @@ for (const [file, names] of Object.entries({
   for (const name of names) assert.ok(read('scratch_live/' + file).includes(conversation[name].toString().replace(/\r\n/g, '\n')),
     `conversation.${name} source drifted in ${file}`);
 }
+
+const baseline = JSON.parse(read('workflows/production-baseline.json'));
+const catalogNode = baseline.nodes.find(n => n.name === 'enviar_catalogo_pintura_tool');
+assert.ok(catalogNode && catalogNode.parameters && catalogNode.parameters.jsCode,
+  'enviar_catalogo_pintura_tool missing from workflows/production-baseline.json');
+assert.ok(
+  catalogNode.parameters.jsCode.replace(/\r\n/g, '\n').includes(L.shouldAllowFloripaintCatalog.toString().replace(/\r\n/g, '\n')),
+  'lib.shouldAllowFloripaintCatalog source not found verbatim in enviar_catalogo_pintura_tool'
+);
