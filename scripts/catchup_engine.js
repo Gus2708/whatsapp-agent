@@ -17,6 +17,7 @@ const {
   evaluateCandidates,
   reconcileCandidateWithChatHistory,
   getProcessedStateForAliases,
+  getSessionForAliases,
   parseEnv,
   normalizeToPhoneJid,
   resolveAliases
@@ -364,7 +365,26 @@ async function fetchCandidatesData(maxAgeHours) {
     }));
   }
 
-  return { supabaseMsgs, wahaChats, sessionsMap, botMsgsMap, aliasMap };
+  const pendingHelpSet = new Set();
+  try {
+    const helpUrl = `${SUPABASE_URL}/rest/v1/solicitudes_ayuda?status=eq.pendiente&select=telefono`;
+    const hRes = await fetch(helpUrl, { headers: sbHeaders, signal: AbortSignal.timeout(8000) });
+    if (hRes.ok) {
+      const hRows = await hRes.json();
+      if (Array.isArray(hRows)) {
+        for (const row of hRows) {
+          if (!row || !row.telefono) continue;
+          for (const a of resolveAliases(row.telefono, aliasMap)) {
+            pendingHelpSet.add(a);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    log(`Aviso consultando solicitudes_ayuda pendientes: ${e.message}`);
+  }
+
+  return { supabaseMsgs, wahaChats, sessionsMap, botMsgsMap, aliasMap, pendingHelpSet };
 }
 
 /**
@@ -428,6 +448,7 @@ async function main() {
       sessionsMap: data.sessionsMap,
       botMsgsMap: data.botMsgsMap,
       aliasMap: data.aliasMap,
+      pendingHelpSet: data.pendingHelpSet,
       maxAgeHours: MAX_AGE_HOURS,
       cooldownMs: RECENT_COOLDOWN_MS,
       processedState: state.processed,
@@ -444,16 +465,21 @@ async function main() {
       }
 
       const masked = maskChatId(item.chatId);
-      const chatMessages = await fetchChatMessages(item.chatId, item.aliases || []);
+      const aliases = item.aliases || [item.chatId];
+      const session = getSessionForAliases(aliases, data.sessionsMap);
+      const hasPendingHelp = aliases.some(a => data.pendingHelpSet && data.pendingHelpSet.has(a));
+      const chatMessages = await fetchChatMessages(item.chatId, aliases);
       const reconciliation = reconcileCandidateWithChatHistory({
         candidate: item,
         messages: chatMessages,
         maxAgeHours: MAX_AGE_HOURS,
-        nowMs: Date.now()
+        nowMs: Date.now(),
+        session,
+        hasPendingHelp
       });
 
-      if (reconciliation.action === 'skip_answered') {
-        log(`Omitido ${masked}: ya existe una respuesta saliente posterior al mensaje del cliente.`);
+      if (reconciliation.action && reconciliation.action.startsWith('skip_')) {
+        log(`Omitido ${masked}: ${reconciliation.action}.`);
         if (!dryRun) {
           state.processed[item.chatId] = {
             injectedAt: Date.now(),

@@ -8,6 +8,41 @@ const { validateJid, validateCatchupPayload } = require('../schemas/recovery_sch
 
 const DEFAULT_MANUAL_TTL_MS = 30 * 60 * 1000;
 
+const COURTESY_EMOJI_TEST_RE = /[\u{1F44D}\u{1F44C}\u{1F64F}\u2764\u2665\u{1F60A}\u{1F601}\u{1F603}\u{1F642}\u{1F64C}\u{1F91D}\u2705\u2714\u{1F4AA}\u{1F389}\u{1F44F}\u2728\u{1F970}\u{1F618}\u{1F495}\u{1FAF6}]/u;
+const COURTESY_EMOJI_STRIP_RE = /[\u{1F44D}\u{1F44C}\u{1F64F}\u2764\u2665\u{1F60A}\u{1F601}\u{1F603}\u{1F642}\u{1F64C}\u{1F91D}\u2705\u2714\u{1F4AA}\u{1F389}\u{1F44F}\u2728\u{1F970}\u{1F618}\u{1F495}\u{1FAF6}\u{1F3FB}-\u{1F3FF}\uFE0F\u200D]/gu;
+const NON_CLOSING_WORD_RE = /\b(?:hola|buenas|buenos|precio|cuanto|tienen|tienes|hay|busco|necesito|quiero|pago|zelle|envio|delivery|presupuesto|cotiz[a-z]*|foto|catalogo)\b/;
+const VOCATIVE_RE = /\b(?:mi amor|mi corazon|corazon|amigo|amiga|hermano|hermana|pana|senor|senora|jefe|campeon|estimado|estimada|maestro|chamo|chama|bello|bella|lindo|linda|por favor|porfa)\b/g;
+const CLOSING_PHRASE = '(?:muchisimas gracias|muchas gracias|mil gracias|graciass*|gracia|del esta bien|esta bien|ta bien|todo bien|muy bien|super bien|bien|de acuerdo|de nada|a la orden|a su orden|dios te bendiga|dios le bendiga|dios los bendiga|feliz fin de semana|feliz dia|feliz tarde|feliz noche|hasta luego|nos vemos|voy para alla|alla voy|ya voy|ya paso|paso mas tarde|paso luego|paso ahorita|dale pues|dele pues|si va|siva|ok|okay|okey|oki|okis|vale|listo|perfecto|excelente|genial|chevere|bueno|buenisimo|entendido|comprendido|claro|seguro|si|dale|dele|del|amen|bendiciones|igual|igualmente|chao|chau|bye|adios|esperare)';
+const CLOSING_ACK_RE = new RegExp(`^(?:${CLOSING_PHRASE})(?:\\s+(?:${CLOSING_PHRASE}))*$`);
+
+/**
+ * Detects short closing acknowledgements ("Gracias", "Ok", "Dele", courtesy emojis)
+ * that do not start a new commercial inquiry.
+ */
+function isClosingAcknowledgement(text) {
+  if (typeof text !== 'string') return false;
+  if (!text.trim() || /[?¿\d]/.test(text)) return false;
+
+  const nfd = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  if (!nfd || nfd.length > 80) return false;
+
+  if (COURTESY_EMOJI_TEST_RE.test(nfd)) {
+    const withoutCourtesy = nfd
+      .replace(COURTESY_EMOJI_STRIP_RE, '')
+      .replace(/[\s.,!¡;:'"()\-_/*~]+/g, '');
+    if (withoutCourtesy === '') return true;
+  }
+
+  const cleaned = nfd.replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!cleaned) return false;
+  if (NON_CLOSING_WORD_RE.test(cleaned)) return false;
+
+  const withoutVocatives = cleaned.replace(VOCATIVE_RE, ' ').replace(/\s+/g, ' ').trim();
+  if (!withoutVocatives) return false;
+
+  return CLOSING_ACK_RE.test(withoutVocatives);
+}
+
 function maskChatId(chatId) {
   if (typeof chatId !== 'string') return '';
   return chatId.replace(/\d(?=\d{3})/g, '*');
@@ -166,15 +201,38 @@ function reconcileCandidateWithChatHistory({
   maxAgeHours = 48,
   nowMs = Date.now(),
   burstWindowSec = 1800,
-  marginSec = 5
+  marginSec = 5,
+  session = null,
+  hasPendingHelp = false,
+  manualTtlMs = DEFAULT_MANUAL_TTL_MS
 }) {
+  if (hasPendingHelp === true) {
+    return { action: 'skip_pending_help' };
+  }
+
+  let manualSinceSec = 0;
+  if (session && session.manual_since) {
+    const ms = new Date(session.manual_since).getTime();
+    if (Number.isFinite(ms) && ms > 0) {
+      manualSinceSec = Math.floor(ms / 1000);
+    }
+  }
+  const manualTtlSec = Math.floor((Number(manualTtlMs) > 0 ? Number(manualTtlMs) : DEFAULT_MANUAL_TTL_MS) / 1000);
+
+  const candidateBotSec = Math.floor((Number(candidate?.botTimeMs) || 0) / 1000);
+  const candidateTsSec = normalizeTimestampSec(candidate?.timestamp);
+
   if (!Array.isArray(messages) || messages.length === 0) {
+    if (manualSinceSec > 0 && candidateTsSec > 0 && candidateTsSec <= manualSinceSec + manualTtlSec) {
+      return { action: 'skip_manual_window' };
+    }
+    if ((candidateBotSec > 0 || manualSinceSec > 0) && isClosingAcknowledgement(candidate?.text)) {
+      return { action: 'skip_closing_ack' };
+    }
     return { action: 'keep', candidate };
   }
 
   const minAllowedSec = Math.floor(nowMs / 1000) - (maxAgeHours * 3600);
-  const candidateBotSec = Math.floor((Number(candidate?.botTimeMs) || 0) / 1000);
-  const candidateTsSec = normalizeTimestampSec(candidate?.timestamp);
 
   let latestOutgoingSec = 0;
   let latestAnyIncomingSec = 0;
@@ -197,6 +255,7 @@ function reconcileCandidateWithChatHistory({
   const lastReplySec = Math.max(latestOutgoingSec, candidateBotSec);
   const isInputDesc = validTsSeq.length >= 2 && validTsSeq[0] > validTsSeq[validTsSeq.length - 1];
 
+  let droppedDuringManual = false;
   const unanswered = [];
   for (let idx = 0; idx < messages.length; idx++) {
     const m = messages[idx];
@@ -204,6 +263,10 @@ function reconcileCandidateWithChatHistory({
     const ts = normalizeTimestampSec(m.timestamp);
     if (ts <= 0 || ts < minAllowedSec) continue;
     if (ts <= lastReplySec + marginSec) continue;
+    if (manualSinceSec > 0 && ts <= manualSinceSec + manualTtlSec) {
+      droppedDuringManual = true;
+      continue;
+    }
     const text = extractMessageText(m);
     if (!text) continue;
     const rawId = typeof m.id === 'string'
@@ -217,6 +280,9 @@ function reconcileCandidateWithChatHistory({
   }
 
   if (unanswered.length === 0) {
+    if (droppedDuringManual) {
+      return { action: 'skip_manual_window' };
+    }
     if (candidateTsSec <= lastReplySec + marginSec) {
       return { action: 'skip_answered' };
     }
@@ -247,11 +313,16 @@ function reconcileCandidateWithChatHistory({
     texts.push(m.text);
   }
 
+  const burstText = texts.join('\n');
+  if ((lastReplySec > 0 || manualSinceSec > 0) && isClosingAcknowledgement(burstText)) {
+    return { action: 'skip_closing_ack' };
+  }
+
   return {
     action: 'inject',
     candidate: {
       ...candidate,
-      text: texts.join('\n'),
+      text: burstText,
       timestamp: newestIncomingSec
     }
   };
@@ -268,6 +339,7 @@ function evaluateCandidates({
   sessionsMap = {},
   botMsgsMap = {},
   aliasMap = {},
+  pendingHelpSet = new Set(),
   maxAgeHours = 48,
   cooldownMs = 15 * 60 * 1000,
   processedState = {},
@@ -276,6 +348,7 @@ function evaluateCandidates({
   const minAllowedTimeMs = nowMs - (maxAgeHours * 3600 * 1000);
   const candidatesMap = new Map();
   const latestClientMsMap = new Map();
+  const helpSet = pendingHelpSet instanceof Set ? pendingHelpSet : new Set(pendingHelpSet || []);
 
   // Último mensaje SALIENTE (fromMe) por chat según WAHA. Si un empleado respondió
   // manualmente desde el teléfono de la tienda, el bot no lo registra en mensajes_bot,
@@ -297,6 +370,9 @@ function evaluateCandidates({
     if (!validateJid(rawChatId).valid) return;
 
     const aliases = resolveAliases(rawChatId, aliasMap);
+    for (const a of aliases) {
+      if (helpSet.has(a)) return;
+    }
     const session = getSessionForAliases(aliases, sessionsMap);
     if (isHumanHandover(session, { nowMs })) return;
 
@@ -311,6 +387,8 @@ function evaluateCandidates({
     for (const a of aliases) {
       botTimeMs = Math.max(botTimeMs, humanReplyMap.get(a) || 0);
     }
+
+    if (botTimeMs > 0 && isClosingAcknowledgement(cleanText)) return;
 
     if (isUnanswered({ clientTimeMs, botTimeMs })) {
       // Clave canónica unificada: preferir teléfono @c.us si existe en alias, o rawChatId
@@ -405,11 +483,13 @@ function parseEnv(envContent) {
 module.exports = {
   maskChatId,
   isHumanHandover,
+  isClosingAcknowledgement,
   isUnanswered,
   buildCatchupPayload,
   evaluateCandidates,
   reconcileCandidateWithChatHistory,
   getProcessedStateForAliases,
+  getSessionForAliases,
   parseEnv,
   normalizeToPhoneJid,
   resolveAliases

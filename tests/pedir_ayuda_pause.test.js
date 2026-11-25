@@ -137,6 +137,80 @@ test('Set Chat Manual marks both @c.us and @lid aliases as manual', async () => 
   assert.ok(posted.every((p) => p.estado === 'manual'));
 });
 
+test('Check Chat Session keeps manual for delayed closing ack within 24h while preserving manual_since, and reactivates on real inquiry', async () => {
+  const manualSince = new Date(Date.now() - 70 * 60 * 1000).toISOString(); // 70 min ago (>30m, <24h)
+  const sessions = [
+    { telefono: '584246453059@c.us', estado: 'manual', manual_since: manualSince, msg_count: 2, window_start: manualSince },
+    { telefono: '205398674002084@lid', estado: 'manual', manual_since: manualSince, msg_count: 1, window_start: manualSince },
+  ];
+  const axiosMock = {
+    get: async (url) => {
+      if (url.includes('/api/default/lids/pn/584246453059%40c.us')) {
+        return { data: { lid: '205398674002084@lid', pn: '584246453059@c.us' } };
+      }
+      if (url.includes('/rest/v1/chat_sessions')) {
+        return { data: sessions };
+      }
+      return { data: [] };
+    },
+    post: async (url, body) => {
+      if (url.includes('/rest/v1/chat_sessions')) {
+        const idx = sessions.findIndex((s) => s.telefono === body.telefono);
+        if (idx >= 0) sessions[idx] = { ...sessions[idx], ...body };
+        else sessions.push(body);
+      }
+      return { data: [body] };
+    },
+  };
+
+  // 1) Delayed closing acknowledgement ("Gracias") 70 min after human reply -> stays manual, manual_since preserved
+  const ackRes = await runN8nCode(CODE_CHECK_CHAT_SESSION, {
+    axiosMock,
+    payload: { id: 'msg_ack', from: '584246453059@c.us', body: 'Gracias' },
+  });
+  assert.equal(ackRes[0].json.estado, 'manual');
+  assert.equal(sessions.find((s) => s.telefono === '584246453059@c.us').manual_since, manualSince);
+
+  // 2) Real new inquiry 75 min after human reply -> reactivates automatico and clears manual_since across aliases
+  const inquiryRes = await runN8nCode(CODE_CHECK_CHAT_SESSION, {
+    axiosMock,
+    payload: { id: 'msg_inq', from: '584246453059@c.us', body: 'Buenas tardes, tienen cemento?' },
+  });
+  assert.equal(inquiryRes[0].json.estado, 'automatico');
+  assert.equal(sessions.find((s) => s.telefono === '584246453059@c.us').estado, 'automatico');
+  assert.equal(sessions.find((s) => s.telefono === '584246453059@c.us').manual_since, null);
+  assert.equal(sessions.find((s) => s.telefono === '205398674002084@lid').estado, 'automatico');
+  assert.equal(sessions.find((s) => s.telefono === '205398674002084@lid').manual_since, null);
+});
+
+test('Check Chat Session reactivates automatico for media message with empty body after 30m', async () => {
+  const manualSince = new Date(Date.now() - 45 * 60 * 1000).toISOString();
+  const sessions = [
+    { telefono: '584246453059@c.us', estado: 'manual', manual_since: manualSince, msg_count: 1, window_start: manualSince },
+  ];
+  const axiosMock = {
+    get: async (url) => {
+      if (url.includes('/rest/v1/chat_sessions')) return { data: sessions };
+      return { data: [] };
+    },
+    post: async (url, body) => {
+      if (url.includes('/rest/v1/chat_sessions')) {
+        const idx = sessions.findIndex((s) => s.telefono === body.telefono);
+        if (idx >= 0) sessions[idx] = { ...sessions[idx], ...body };
+        else sessions.push(body);
+      }
+      return { data: [body] };
+    },
+  };
+
+  const mediaRes = await runN8nCode(CODE_CHECK_CHAT_SESSION, {
+    axiosMock,
+    payload: { id: 'msg_media', from: '584246453059@c.us', body: '', hasMedia: true },
+  });
+  assert.equal(mediaRes[0].json.estado, 'automatico');
+  assert.equal(sessions[0].manual_since, null);
+});
+
 test('workflow files accept pedir-ayuda pause + alias patches cleanly and idempotently', () => {
   for (const rel of ['workflows/production-baseline.json', 'n8n_workflow.json']) {
     const wf = JSON.parse(fs.readFileSync(path.join(__dirname, '..', rel), 'utf8'));

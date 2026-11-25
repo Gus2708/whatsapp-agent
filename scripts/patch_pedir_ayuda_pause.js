@@ -35,15 +35,42 @@ const inList = (arr) => arr.map(encodeURIComponent).join(',');`;
 const CODE_CHECK_CHAT_SESSION = `// Check Chat Session via Supabase REST (reemplaza el nodo Postgres roto).
 // Upsert por telefono con rate-limit por ventana de 60s. Devuelve {estado, msg_count, telefono}.
 // Reactivación automática: si un humano tomó el chat o quedó una ayuda pendiente >30 min
-// sin respuesta al cliente, el bot vuelve a responder solo.
+// sin respuesta al cliente, el bot vuelve a responder solo (suprimiendo cierres de cortesía hasta 24h).
 const axios = require('axios');
 const SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';
 const ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };
 const REACTIVAR_MS = 30 * 60 * 1000; // 30 min sin respuesta al cliente -> el bot retoma
+const CIERRE_HUMANO_MS = 24 * 60 * 60 * 1000; // 24h de supresión para agradecimientos/cierres tras atención humana
+const COURTESY_EMOJI_TEST_RE = /[\\u{1F44D}\\u{1F44C}\\u{1F64F}\\u2764\\u2665\\u{1F60A}\\u{1F601}\\u{1F603}\\u{1F642}\\u{1F64C}\\u{1F91D}\\u2705\\u2714\\u{1F4AA}\\u{1F389}\\u{1F44F}\\u2728\\u{1F970}\\u{1F618}\\u{1F495}\\u{1FAF6}]/u;
+const COURTESY_EMOJI_STRIP_RE = /[\\u{1F44D}\\u{1F44C}\\u{1F64F}\\u2764\\u2665\\u{1F60A}\\u{1F601}\\u{1F603}\\u{1F642}\\u{1F64C}\\u{1F91D}\\u2705\\u2714\\u{1F4AA}\\u{1F389}\\u{1F44F}\\u2728\\u{1F970}\\u{1F618}\\u{1F495}\\u{1FAF6}\\u{1F3FB}-\\u{1F3FF}\\uFE0F\\u200D]/gu;
+const NON_CLOSING_WORD_RE = /\\b(?:hola|buenas|buenos|precio|cuanto|tienen|tienes|hay|busco|necesito|quiero|pago|zelle|envio|delivery|presupuesto|cotiz[a-z]*|foto|catalogo)\\b/;
+const VOCATIVE_RE = /\\b(?:mi amor|mi corazon|corazon|amigo|amiga|hermano|hermana|pana|senor|senora|jefe|campeon|estimado|estimada|maestro|chamo|chama|bello|bella|lindo|linda|por favor|porfa)\\b/g;
+const CLOSING_PHRASE = '(?:muchisimas gracias|muchas gracias|mil gracias|graciass*|gracia|del esta bien|esta bien|ta bien|todo bien|muy bien|super bien|bien|de acuerdo|de nada|a la orden|a su orden|dios te bendiga|dios le bendiga|dios los bendiga|feliz fin de semana|feliz dia|feliz tarde|feliz noche|hasta luego|nos vemos|voy para alla|alla voy|ya voy|ya paso|paso mas tarde|paso luego|paso ahorita|dale pues|dele pues|si va|siva|ok|okay|okey|oki|okis|vale|listo|perfecto|excelente|genial|chevere|bueno|buenisimo|entendido|comprendido|claro|seguro|si|dale|dele|del|amen|bendiciones|igual|igualmente|chao|chau|bye|adios|esperare)';
+const CLOSING_ACK_RE = new RegExp('^(?:' + CLOSING_PHRASE + ')(?:\\\\s+(?:' + CLOSING_PHRASE + '))*$');
+function isClosingAck(text) {
+  if (typeof text !== 'string') return false;
+  if (!text.trim() || /[?¿\\d]/.test(text)) return false;
+  const nfd = text.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim();
+  if (!nfd || nfd.length > 80) return false;
+  if (COURTESY_EMOJI_TEST_RE.test(nfd)) {
+    const withoutCourtesy = nfd.replace(COURTESY_EMOJI_STRIP_RE, '').replace(/[\\s.,!¡;:'"()\\-_/*~]+/g, '');
+    if (withoutCourtesy === '') return true;
+  }
+  const cleaned = nfd.replace(/[^a-z0-9]+/g, ' ').replace(/\\s+/g, ' ').trim();
+  if (!cleaned || NON_CLOSING_WORD_RE.test(cleaned)) return false;
+  const withoutVocatives = cleaned.replace(VOCATIVE_RE, ' ').replace(/\\s+/g, ' ').trim();
+  if (!withoutVocatives) return false;
+  return CLOSING_ACK_RE.test(withoutVocatives);
+}
 ${RESOLVE_ALIASES_SNIPPET}
-let telefono = null;
-try { telefono = $('Webhook Trigger').first().json.body.payload.from; } catch (e) {}
+let payload = null, telefono = null, bodyText = '', hasMedia = false;
+try {
+  payload = $('Webhook Trigger').first().json.body.payload;
+  telefono = payload && payload.from;
+  bodyText = (payload && (payload.body || payload.caption)) || '';
+  hasMedia = Boolean(payload && payload.hasMedia);
+} catch (e) {}
 let estado = 'automatico', msg_count = 1;
 let no_atender = false;
 try {
@@ -62,6 +89,9 @@ try {
       if (row.estado === 'manual') {
         const ms = row.manual_since ? new Date(row.manual_since).getTime() : 0;
         if (ms && (now - ms <= REACTIVAR_MS)) {
+          estado = 'manual';
+          activeManualSince = row.manual_since;
+        } else if (ms && (now - ms <= CIERRE_HUMANO_MS) && !hasMedia && isClosingAck(bodyText)) {
           estado = 'manual';
           activeManualSince = row.manual_since;
         } else {

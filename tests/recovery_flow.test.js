@@ -14,6 +14,7 @@ const {
 const {
   maskChatId,
   isHumanHandover,
+  isClosingAcknowledgement,
   isUnanswered,
   buildCatchupPayload,
   evaluateCandidates,
@@ -157,6 +158,35 @@ describe('Catchup Domain Logic', () => {
     const parsed = parseEnv(raw);
     assert.equal(parsed.WAHA_API_KEY, 'xyz123');
     assert.equal(parsed.N8N_BASE_URL, 'http://localhost:5678');
+  });
+
+  test('isClosingAcknowledgement matches courtesy closings and rejects real inquiries', () => {
+    const closings = [
+      'Gracias',
+      'Muchas gracias amigo',
+      'Dele mi corazón',
+      'Del está bien',
+      'Ok. Esperaré \nGracias',
+      'Ok gracias 🙏',
+      '👍',
+      'Perfecto nos vemos',
+    ];
+    for (const msg of closings) {
+      assert.equal(isClosingAcknowledgement(msg), true, `Expected closing ack: ${JSON.stringify(msg)}`);
+    }
+
+    const inquiries = [
+      'Hola',
+      'Buenas tardes',
+      'Gracias, cuánto cuesta el cemento?',
+      'X la puerta de cuarto',
+      'Me da datos de zelle para cancelar y retirar personalmente',
+      'buenos días hay venden removedor de pintura',
+      'Ok, precio del tubo 2x1',
+    ];
+    for (const msg of inquiries) {
+      assert.equal(isClosingAcknowledgement(msg), false, `Expected non-closing inquiry: ${JSON.stringify(msg)}`);
+    }
   });
 });
 
@@ -537,6 +567,100 @@ describe('Chat History Pre-Flight Reconciliation (Stale Message Prevention)', ()
     assert.match(engineSrc, /\/api\/default\/chats\/overview\?limit=100/);
     assert.match(engineSrc, /\/messages\?limit=20&downloadMedia=false/);
     assert.ok(typeof getProcessedStateForAliases === 'function');
+  });
+
+  test('skips message sent during manual_since + 30m window even after 30m elapse, while still injecting a newer post-window message', () => {
+    const manualSinceMs = NOW - 60 * 60 * 1000; // 60 min ago (window expired 30m ago)
+    const duringWindowSec = Math.floor((manualSinceMs + 5 * 60 * 1000) / 1000);
+    const afterWindowSec = Math.floor((NOW - 5 * 60 * 1000) / 1000);
+
+    const session = { estado: 'manual', manual_since: new Date(manualSinceMs).toISOString() };
+    const candidate = {
+      chatId: '584246453059@c.us',
+      text: 'Del está bien',
+      timestamp: duringWindowSec,
+      botTimeMs: 0
+    };
+
+    const skippedRes = reconcileCandidateWithChatHistory({
+      candidate,
+      messages: [{ id: 'm1', fromMe: false, timestamp: duringWindowSec, body: 'Del está bien' }],
+      session,
+      nowMs: NOW
+    });
+    assert.equal(skippedRes.action, 'skip_manual_window');
+
+    const skippedEmptyRes = reconcileCandidateWithChatHistory({
+      candidate,
+      messages: [],
+      session,
+      nowMs: NOW
+    });
+    assert.equal(skippedEmptyRes.action, 'skip_manual_window');
+
+    const newInquiryRes = reconcileCandidateWithChatHistory({
+      candidate,
+      messages: [
+        { id: 'm2', fromMe: false, timestamp: afterWindowSec, body: 'Buenas tardes tienen cemento?' },
+        { id: 'm1', fromMe: false, timestamp: duringWindowSec, body: 'Del está bien' }
+      ],
+      session,
+      nowMs: NOW
+    });
+    assert.equal(newInquiryRes.action, 'inject');
+    assert.equal(newInquiryRes.candidate.text, 'Buenas tardes tienen cemento?');
+    assert.equal(newInquiryRes.candidate.timestamp, afterWindowSec);
+  });
+
+  test('skips pure closing acknowledgements after prior bot/human reply while still injecting new inquiries', () => {
+    const botReplyMs = NOW - 70 * 60 * 1000;
+    const ackSec = Math.floor((NOW - 5 * 60 * 1000) / 1000);
+    const inquirySec = Math.floor((NOW - 2 * 60 * 1000) / 1000);
+
+    const supabaseMsgs = [
+      { chat_id: '584246453059@c.us', texto: 'Gracias', procesado_at: new Date(ackSec * 1000).toISOString() }
+    ];
+    const botMsgsMap = {
+      '584246453059@c.us': { created_at: new Date(botReplyMs).toISOString() }
+    };
+    assert.equal(evaluateCandidates({ supabaseMsgs, botMsgsMap, nowMs: NOW }).length, 0);
+
+    const reconAck = reconcileCandidateWithChatHistory({
+      candidate: { chatId: '584246453059@c.us', text: 'Gracias', timestamp: ackSec, botTimeMs: botReplyMs },
+      messages: [
+        { id: 'in_ack', fromMe: false, timestamp: ackSec, body: 'Gracias' },
+        { id: 'out_1', fromMe: true, timestamp: Math.floor(botReplyMs / 1000), body: 'No tenemos disponible en este momento' }
+      ],
+      nowMs: NOW
+    });
+    assert.equal(reconAck.action, 'skip_closing_ack');
+
+    const reconInquiry = reconcileCandidateWithChatHistory({
+      candidate: { chatId: '584246453059@c.us', text: 'Tienen cemento?', timestamp: inquirySec, botTimeMs: botReplyMs },
+      messages: [
+        { id: 'in_new', fromMe: false, timestamp: inquirySec, body: 'Tienen cemento?' },
+        { id: 'out_1', fromMe: true, timestamp: Math.floor(botReplyMs / 1000), body: 'No tenemos disponible en este momento' }
+      ],
+      nowMs: NOW
+    });
+    assert.equal(reconInquiry.action, 'inject');
+    assert.equal(reconInquiry.candidate.text, 'Tienen cemento?');
+  });
+
+  test('skips chats with pendingHelpSet or hasPendingHelp', () => {
+    const supabaseMsgs = [
+      { chat_id: '584146576339@c.us', texto: 'Ok gracias', procesado_at: new Date(NOW - 120000).toISOString() }
+    ];
+    const pendingHelpSet = new Set(['584146576339@c.us']);
+    assert.equal(evaluateCandidates({ supabaseMsgs, pendingHelpSet, nowMs: NOW }).length, 0);
+
+    const recon = reconcileCandidateWithChatHistory({
+      candidate: { chatId: '584146576339@c.us', text: 'Ok gracias', timestamp: Math.floor((NOW - 120000) / 1000) },
+      messages: [{ id: 'm1', fromMe: false, timestamp: Math.floor((NOW - 120000) / 1000), body: 'Ok gracias' }],
+      hasPendingHelp: true,
+      nowMs: NOW
+    });
+    assert.equal(recon.action, 'skip_pending_help');
   });
 });
 
