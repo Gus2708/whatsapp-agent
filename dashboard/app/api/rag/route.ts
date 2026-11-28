@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
 import { RagResult } from '@/lib/types';
+import { authorizeRagRequest, resolveServerSupabaseKey } from '@/lib/rag-auth';
 
 // Leer variables de entorno desde process.env (Vercel) o desde .env local
 const getEnvVar = (key: string, defaultValue: string = ''): string => {
@@ -32,11 +34,6 @@ const getEnvVar = (key: string, defaultValue: string = ''): string => {
 
   return defaultValue;
 };
-
-const SUPABASE_URL = getEnvVar('SUPABASE_URL');
-const SUPABASE_ANON_KEY = getEnvVar('SUPABASE_ANON_KEY');
-const OPENROUTER_API_KEY = getEnvVar('OPENROUTER_API_KEY', '');
-const OPENAI_API_KEY = getEnvVar('OPENAI_API_KEY', '');
 
 const axiosAdapter = {
   async get(url: string, cfg: any) {
@@ -77,6 +74,41 @@ const getLiveBuscarCode = (): string | null => {
 
 export async function POST(req: NextRequest) {
   const t0 = Date.now();
+
+  const supabaseUrl = getEnvVar('SUPABASE_URL') || getEnvVar('NEXT_PUBLIC_SUPABASE_URL');
+  const supabaseAnonKey = getEnvVar('SUPABASE_ANON_KEY') || getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  const ragApiSecret = getEnvVar('RAG_API_SECRET');
+
+  // Gate EVERY request BEFORE reading or using any service-role key.
+  const authResult = await authorizeRagRequest(req.headers, {
+    ragApiSecret,
+    verifyUser: async (token: string) => {
+      if (!supabaseUrl || !supabaseAnonKey) {
+        return { userId: null, error: 'Supabase Auth no configurado' };
+      }
+      const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { data, error } = await authClient.auth.getUser(token);
+      return { userId: data?.user?.id ?? null, error: error?.message ?? null };
+    },
+  });
+
+  if (!authResult.authorized) {
+    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+  }
+
+  const supabaseServiceRoleKey = getEnvVar('SUPABASE_SERVICE_ROLE_KEY');
+  const supabaseServiceKey = getEnvVar('SUPABASE_SERVICE_KEY');
+  const openRouterApiKey = getEnvVar('OPENROUTER_API_KEY', '');
+  const openAiApiKey = getEnvVar('OPENAI_API_KEY', '');
+
+  resolveServerSupabaseKey({
+    SUPABASE_SERVICE_ROLE_KEY: supabaseServiceRoleKey,
+    SUPABASE_SERVICE_KEY: supabaseServiceKey,
+    SUPABASE_ANON_KEY: supabaseAnonKey,
+  });
+
   try {
     const { query } = await req.json();
     const q = String(query || '').trim();
@@ -93,10 +125,12 @@ export async function POST(req: NextRequest) {
       const fn = new AsyncFunction('query', 'axios', '$env', code);
 
       const fakeEnv = {
-        SUPABASE_URL,
-        SUPABASE_ANON_KEY,
-        OPENROUTER_API_KEY,
-        OPENAI_API_KEY,
+        SUPABASE_URL: supabaseUrl,
+        SUPABASE_SERVICE_ROLE_KEY: supabaseServiceRoleKey,
+        SUPABASE_SERVICE_KEY: supabaseServiceKey,
+        SUPABASE_ANON_KEY: supabaseAnonKey,
+        OPENROUTER_API_KEY: openRouterApiKey,
+        OPENAI_API_KEY: openAiApiKey,
       };
 
       const resultStr = await fn({ p_busqueda: q }, axiosAdapter, fakeEnv);

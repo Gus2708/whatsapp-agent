@@ -5,6 +5,9 @@ import { RagResult, OrbState } from '@/lib/types';
 import { CrosshairCard } from '@/components/hud/CrosshairCard';
 import { ThinkingOrb } from '@/components/orbs/ThinkingOrb';
 import { useSound } from '@/components/audio/SoundProvider';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { supabase } from '@/lib/supabase';
+import { getDemoRagResult } from '@/lib/rag-auth';
 import {
   Database,
   Send,
@@ -36,6 +39,7 @@ export const RagStudio: React.FC = () => {
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { playClick, playPacket, playSuccess } = useSound();
+  const { session, isDemoMode } = useAuth();
 
   const sampleQueries = [
     { text: 'Tornillo drywall 1/2 x 100u', layer: 1, desc: 'Capa 1: AST' },
@@ -116,12 +120,29 @@ export const RagStudio: React.FC = () => {
     setHistoryItems((prev) => [initialItem, ...prev]);
 
     try {
-      const res = await fetch('/api/rag', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: cleanQuery }),
-      });
-      const data: RagResult = await res.json();
+      let data: RagResult;
+      if (isDemoMode) {
+        data = getDemoRagResult(cleanQuery);
+      } else {
+        let accessToken = session?.access_token || '';
+        if (!accessToken) {
+          const { data: sessionData } = await supabase.auth.getSession();
+          accessToken = sessionData.session?.access_token || '';
+        }
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (accessToken) {
+          headers.Authorization = `Bearer ${accessToken}`;
+        }
+        const res = await fetch('/api/rag', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ query: cleanQuery }),
+        });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        data = await res.json();
+      }
       const targetLayer = data.hitLayer;
 
       await sleep(120);
