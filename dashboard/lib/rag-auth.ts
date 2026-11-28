@@ -78,20 +78,27 @@ export interface VerifyUserResult {
   error?: string | null;
 }
 
+export interface CheckActiveEmployeeResult {
+  active: boolean;
+  error?: string | null;
+}
+
 export interface AuthorizeRagOptions {
   ragApiSecret?: string;
   verifyUser: (token: string) => Promise<VerifyUserResult>;
+  checkActiveEmployee: (token: string, userId: string) => Promise<CheckActiveEmployeeResult>;
 }
 
 export type AuthorizeRagResult =
   | { authorized: true; method: 'supabase_jwt'; userId: string }
   | { authorized: true; method: 'api_key' }
-  | { authorized: false; status: 401; error: string };
+  | { authorized: false; status: 401 | 403; error: string };
 
 /**
  * Gates /api/rag BEFORE any service-key read.
  * Primary path: Authorization: Bearer <supabase-jwt> verified server-side via
- * supabase.auth.getUser(token) (using the anon key, never the service key).
+ * supabase.auth.getUser(token) AND rpc('is_active_employee') (both using the
+ * anon key + user token, never the service key).
  * Optional server-to-server path: x-rag-api-key matching server-only RAG_API_SECRET.
  */
 export async function authorizeRagRequest(
@@ -115,14 +122,29 @@ export async function authorizeRagRequest(
     return { authorized: false, status: 401, error: 'Autenticación requerida' };
   }
 
+  let userId: string;
   try {
     const verification = await options.verifyUser(token);
     if (!verification || verification.error || !verification.userId) {
       return { authorized: false, status: 401, error: 'Sesión inválida o expirada' };
     }
-    return { authorized: true, method: 'supabase_jwt', userId: verification.userId };
+    userId = verification.userId;
   } catch {
     return { authorized: false, status: 401, error: 'No se pudo verificar la sesión' };
+  }
+
+  if (typeof options.checkActiveEmployee !== 'function') {
+    return { authorized: false, status: 403, error: 'Acceso restringido a empleados activos' };
+  }
+
+  try {
+    const employee = await options.checkActiveEmployee(token, userId);
+    if (!employee || employee.error || employee.active !== true) {
+      return { authorized: false, status: 403, error: 'Acceso restringido a empleados activos' };
+    }
+    return { authorized: true, method: 'supabase_jwt', userId };
+  } catch {
+    return { authorized: false, status: 403, error: 'No se pudo verificar permisos de empleado' };
   }
 }
 

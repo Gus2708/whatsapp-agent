@@ -80,17 +80,27 @@ export async function POST(req: NextRequest) {
   const ragApiSecret = getEnvVar('RAG_API_SECRET');
 
   // Gate EVERY request BEFORE reading or using any service-role key.
+  const makeUserClient = (token: string) =>
+    createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
   const authResult = await authorizeRagRequest(req.headers, {
     ragApiSecret,
     verifyUser: async (token: string) => {
       if (!supabaseUrl || !supabaseAnonKey) {
         return { userId: null, error: 'Supabase Auth no configurado' };
       }
-      const authClient = createClient(supabaseUrl, supabaseAnonKey, {
-        auth: { persistSession: false, autoRefreshToken: false },
-      });
-      const { data, error } = await authClient.auth.getUser(token);
+      const { data, error } = await makeUserClient(token).auth.getUser(token);
       return { userId: data?.user?.id ?? null, error: error?.message ?? null };
+    },
+    checkActiveEmployee: async (token: string) => {
+      if (!supabaseUrl || !supabaseAnonKey) {
+        return { active: false, error: 'Supabase Auth no configurado' };
+      }
+      const { data, error } = await makeUserClient(token).rpc('is_active_employee');
+      return { active: data === true && !error, error: error?.message ?? null };
     },
   });
 

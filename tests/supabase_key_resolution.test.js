@@ -24,6 +24,7 @@ async function loadRagAuthModule() {
     .replace(/^export type [\s\S]*?;\r?\n/gm, '')
     .replace(/export async function (\w+)/g, 'async function $1')
     .replace(/export function (\w+)/g, 'function $1')
+    .replace(/let userId: string;/g, 'let userId;')
     // Strip parameter & return type annotations on function signatures in this module
     .replace(/resetSupabaseKeyWarningForTests\(\): void/g, 'resetSupabaseKeyWarningForTests()')
     .replace(
@@ -165,6 +166,7 @@ test('scratch_live/live_buscar.js prefers SUPABASE_SERVICE_ROLE_KEY / SUPABASE_S
 test('/api/rag auth: rejects missing token, demo-token, and invalid token with 401 before service key access', async () => {
   const { authorizeRagRequest } = await loadRagAuthModule();
   let verifyCalls = 0;
+  let employeeCalls = 0;
 
   // No token -> 401
   const noAuth = await authorizeRagRequest(
@@ -174,11 +176,16 @@ test('/api/rag auth: rejects missing token, demo-token, and invalid token with 4
         verifyCalls++;
         return { userId: 'should-not-run' };
       },
+      checkActiveEmployee: async () => {
+        employeeCalls++;
+        return { active: true };
+      },
     }
   );
   assert.equal(noAuth.authorized, false);
   assert.equal(noAuth.status, 401);
   assert.equal(verifyCalls, 0);
+  assert.equal(employeeCalls, 0);
 
   // Demo mode token -> 401 (never allowed to hit live DB with service key)
   const demoAuth = await authorizeRagRequest(
@@ -188,11 +195,16 @@ test('/api/rag auth: rejects missing token, demo-token, and invalid token with 4
         verifyCalls++;
         return { userId: 'should-not-run' };
       },
+      checkActiveEmployee: async () => {
+        employeeCalls++;
+        return { active: true };
+      },
     }
   );
   assert.equal(demoAuth.authorized, false);
   assert.equal(demoAuth.status, 401);
   assert.equal(verifyCalls, 0);
+  assert.equal(employeeCalls, 0);
 
   // Invalid JWT -> 401
   const invalidAuth = await authorizeRagRequest(
@@ -203,27 +215,37 @@ test('/api/rag auth: rejects missing token, demo-token, and invalid token with 4
         assert.equal(token, 'invalid.jwt.token');
         return { userId: null, error: 'JWT expired' };
       },
+      checkActiveEmployee: async () => {
+        employeeCalls++;
+        return { active: true };
+      },
     }
   );
   assert.equal(invalidAuth.authorized, false);
   assert.equal(invalidAuth.status, 401);
   assert.equal(verifyCalls, 1);
+  assert.equal(employeeCalls, 0);
 });
 
-test('/api/rag auth: allows valid Supabase JWT and optional server-to-server x-rag-api-key, and resolves service key', async () => {
+test('/api/rag auth: requires active employee (403 on inactive or rpc error), allows active JWT and optional x-rag-api-key, and resolves service key', async () => {
   const {
     authorizeRagRequest,
     resolveServerSupabaseKey,
     resetSupabaseKeyWarningForTests,
   } = await loadRagAuthModule();
 
-  // Valid Supabase JWT -> authorized (200 path)
+  // Valid Supabase JWT + active employee -> authorized (200 path)
   const validJwt = await authorizeRagRequest(
     { Authorization: 'Bearer real.supabase.jwt' },
     {
       verifyUser: async (token) => {
         assert.equal(token, 'real.supabase.jwt');
         return { userId: 'emp-123', error: null };
+      },
+      checkActiveEmployee: async (token, userId) => {
+        assert.equal(token, 'real.supabase.jwt');
+        assert.equal(userId, 'emp-123');
+        return { active: true, error: null };
       },
     }
   );
@@ -233,6 +255,28 @@ test('/api/rag auth: allows valid Supabase JWT and optional server-to-server x-r
     userId: 'emp-123',
   });
 
+  // Valid JWT + inactive employee -> 403
+  const inactiveJwt = await authorizeRagRequest(
+    { Authorization: 'Bearer inactive.supabase.jwt' },
+    {
+      verifyUser: async () => ({ userId: 'outsider-1', error: null }),
+      checkActiveEmployee: async () => ({ active: false, error: null }),
+    }
+  );
+  assert.equal(inactiveJwt.authorized, false);
+  assert.equal(inactiveJwt.status, 403);
+
+  // Valid JWT + RPC error -> 403
+  const rpcErrorJwt = await authorizeRagRequest(
+    { Authorization: 'Bearer err.supabase.jwt' },
+    {
+      verifyUser: async () => ({ userId: 'emp-123', error: null }),
+      checkActiveEmployee: async () => ({ active: false, error: 'rpc failed' }),
+    }
+  );
+  assert.equal(rpcErrorJwt.authorized, false);
+  assert.equal(rpcErrorJwt.status, 403);
+
   // Optional server-to-server x-rag-api-key: valid secret succeeds, wrong secret returns 401
   const validApiKey = await authorizeRagRequest(
     { 'x-rag-api-key': 'server-only-secret' },
@@ -240,6 +284,9 @@ test('/api/rag auth: allows valid Supabase JWT and optional server-to-server x-r
       ragApiSecret: 'server-only-secret',
       verifyUser: async () => {
         throw new Error('should not verify JWT when API key matched');
+      },
+      checkActiveEmployee: async () => {
+        throw new Error('should not check employee when API key matched');
       },
     }
   );
@@ -250,6 +297,7 @@ test('/api/rag auth: allows valid Supabase JWT and optional server-to-server x-r
     {
       ragApiSecret: 'server-only-secret',
       verifyUser: async () => ({ userId: null }),
+      checkActiveEmployee: async () => ({ active: false }),
     }
   );
   assert.equal(badApiKey.authorized, false);
@@ -294,7 +342,7 @@ test('/api/rag demo mode returns deterministic local result without network or s
   assert.doesNotMatch(ragStudioSource, /x-rag-api-key|RAG_API_SECRET|SUPABASE_SERVICE/, 'Browser component must never touch server secrets');
 });
 
-test('/api/rag route.ts POST handler: 401 without token / invalid token, 200 with valid JWT using service key (mocked, no network)', async () => {
+test('/api/rag route.ts POST handler: 401 without/invalid token, 403 on inactive/rpc-error, 200 for active employee using service key (mocked, no network)', async () => {
   const ragAuth = await loadRagAuthModule();
   const rawRoute = fs.readFileSync(path.join(ROOT, 'dashboard', 'app', 'api', 'rag', 'route.ts'), 'utf8');
 
@@ -307,23 +355,34 @@ test('/api/rag route.ts POST handler: 401 without token / invalid token, 200 wit
     .replace(/async post\(url: string, body: any, cfg: any\)/g, 'async post(url, body, cfg)')
     .replace(/const getLiveBuscarCode = \(\): string \| null =>/g, 'const getLiveBuscarCode = () =>')
     .replace(/export async function POST\(req: NextRequest\)/g, 'async function POST(req)')
+    .replace(/const makeUserClient = \(token: string\) =>/g, 'const makeUserClient = (token) =>')
     .replace(/verifyUser: async \(token: string\) =>/g, 'verifyUser: async (token) =>')
+    .replace(/checkActiveEmployee: async \(token: string\) =>/g, 'checkActiveEmployee: async (token) =>')
     .replace(/let hitLayer: 1 \| 2 \| 3 \| 4 \| 5 = 1;/g, 'let hitLayer = 1;')
     .replace(/const result: RagResult = \{/g, 'const result = {')
     .replace(/catch \(err: any\)/g, 'catch (err)');
 
   const authClientsCreated = [];
+  const rpcCalls = [];
   const fetchCalls = [];
-  const fakeCreateClient = (url, key) => {
-    authClientsCreated.push({ url, key });
+  const fakeCreateClient = (url, key, opts) => {
+    authClientsCreated.push({ url, key, opts });
+    const bearer = opts && opts.global && opts.global.headers && opts.global.headers.Authorization;
     return {
       auth: {
         async getUser(token) {
-          if (token === 'valid-employee-jwt') {
-            return { data: { user: { id: 'emp-42' } }, error: null };
+          if (['valid-employee-jwt', 'inactive-user-jwt', 'rpc-error-jwt'].includes(token)) {
+            return { data: { user: { id: 'user-' + token } }, error: null };
           }
           return { data: { user: null }, error: { message: 'invalid jwt' } };
         },
+      },
+      async rpc(fnName) {
+        rpcCalls.push({ fnName, key, bearer });
+        if (fnName !== 'is_active_employee') return { data: null, error: { message: 'unexpected rpc' } };
+        if (bearer === 'Bearer valid-employee-jwt') return { data: true, error: null };
+        if (bearer === 'Bearer inactive-user-jwt') return { data: false, error: null };
+        return { data: null, error: { message: 'rpc failed' } };
       },
     };
   };
@@ -396,13 +455,27 @@ test('/api/rag route.ts POST handler: 401 without token / invalid token, 200 wit
     assert.equal(rNoAuth.status, 401);
     assert.equal(fetchCalls.length, 0);
 
-    // 2) Invalid token -> 401, auth client used anon key, zero DB fetches
+    // 2) Invalid token -> 401, auth client used anon key, zero RPC/DB fetches
     const rBad = await POST(makeReq({ Authorization: 'Bearer bad-jwt' }, { query: 'cemento gris' }));
     assert.equal(rBad.status, 401);
     assert.equal(authClientsCreated[0].key, 'unit-anon-key');
+    assert.equal(rpcCalls.length, 0);
     assert.equal(fetchCalls.length, 0);
 
-    // 3) Valid token -> 200, DB queries sent SUPABASE_SERVICE_ROLE_KEY
+    // 3) Valid JWT but inactive employee -> 403, RPC called with user JWT + anon key, zero DB fetches
+    const rInactive = await POST(makeReq({ Authorization: 'Bearer inactive-user-jwt' }, { query: 'cemento gris' }));
+    assert.equal(rInactive.status, 403);
+    assert.equal(rpcCalls[0].fnName, 'is_active_employee');
+    assert.equal(rpcCalls[0].key, 'unit-anon-key');
+    assert.equal(rpcCalls[0].bearer, 'Bearer inactive-user-jwt');
+    assert.equal(fetchCalls.length, 0);
+
+    // 4) Valid JWT + RPC error -> 403, zero DB fetches
+    const rRpcErr = await POST(makeReq({ Authorization: 'Bearer rpc-error-jwt' }, { query: 'cemento gris' }));
+    assert.equal(rRpcErr.status, 403);
+    assert.equal(fetchCalls.length, 0);
+
+    // 5) Active employee token -> 200, DB queries sent SUPABASE_SERVICE_ROLE_KEY
     const rOk = await POST(makeReq({ Authorization: 'Bearer valid-employee-jwt' }, { query: 'cemento gris' }));
     assert.equal(rOk.status, 200);
     assert.equal(rOk.body.query, 'cemento gris');

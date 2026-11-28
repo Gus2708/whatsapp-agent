@@ -29,7 +29,7 @@ Ejecuta estas dos verificaciones rápidas antes de tocar `.env` o n8n para confi
 1. En **Vercel → Project Settings → Environment Variables**, agrega (solo **Server-side**, **NUNCA** con prefijo `NEXT_PUBLIC_`):
    - `SUPABASE_SERVICE_ROLE_KEY` = `<tu-service-role-key>` (para Production y Preview)
    - *(Opcional, solo si llamas `/api/rag` desde un servicio backend externo)* `RAG_API_SECRET` = `<secreto-aleatorio>`
-2. Verifica que `SUPABASE_URL` y `SUPABASE_ANON_KEY` (y sus variantes `NEXT_PUBLIC_*`) siguen configuradas para que `/api/rag` pueda validar el JWT del usuario con `supabase.auth.getUser(token)`.
+2. Verifica que `SUPABASE_URL` y `SUPABASE_ANON_KEY` (y sus variantes `NEXT_PUBLIC_*`) siguen configuradas para que `/api/rag` pueda validar el JWT del usuario con `supabase.auth.getUser(token)` y confirmar que es empleado activo mediante `rpc('is_active_employee')` (devuelve HTTP `403` si no es empleado activo).
 3. Redespliega el dashboard en Vercel después de guardar las variables.
 
 ---
