@@ -7,7 +7,8 @@ const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
 const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
 
 const SB = pick('SUPABASE_URL');
-const ANON = pick('SUPABASE_ANON_KEY');
+const { obtenerSupabaseKey } = require('./_lib_credenciales');
+const ANON = obtenerSupabaseKey();
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
 
 // Parser de argumentos: --busqueda "..." --sku "..." --canonico "..."

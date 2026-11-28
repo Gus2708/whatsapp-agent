@@ -13,7 +13,8 @@ const path = require('path');
 const env = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8');
 const pick = (k) => (env.match(new RegExp('^' + k + '=(.+)$', 'm')) || [])[1]?.trim().replace(/^"|"$/g, '');
 const SB = pick('SUPABASE_URL');
-const ANON = pick('SUPABASE_ANON_KEY');
+const { obtenerSupabaseKey } = require('./_lib_credenciales');
+const ANON = obtenerSupabaseKey();
 if (!SB || !ANON) throw new Error('Faltan SUPABASE_URL / SUPABASE_ANON_KEY en .env');
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON };
 

@@ -8,8 +8,10 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
 
-const { leerCredenciales, construirEnv } = require('./_lib_credenciales');
-const { SUPABASE_URL: SB, SUPABASE_ANON_KEY: ANON } = leerCredenciales();
+const { leerCredenciales, obtenerSupabaseKey, construirEnv } = require('./_lib_credenciales');
+const _sbCreds = leerCredenciales();
+const SB = _sbCreds.SUPABASE_URL;
+const ANON = obtenerSupabaseKey({ credenciales: _sbCreds });
 
 const body = fs.readFileSync(path.join(ROOT, 'scratch_live', 'live_buscar.js'), 'utf8');
 const axiosShim = {

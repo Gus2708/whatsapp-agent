@@ -8,7 +8,8 @@ const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || 
 // Marca la sesion del cliente como 'manual' para que el bot deje de responder (lo atiende un humano).
 const axios = require('axios');
 const SB = pick('SUPABASE_URL');
-const ANON = pick('SUPABASE_ANON_KEY');
+const { obtenerSupabaseKey } = require('./_lib_credenciales');
+const ANON = obtenerSupabaseKey();
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };
 let telefono = null;
 try { telefono = $('Webhook Trigger').first().json.body.payload.from; } catch (e) {}

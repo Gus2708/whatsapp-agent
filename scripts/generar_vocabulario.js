@@ -21,11 +21,11 @@ const L = require(path.join(ROOT, 'lib', 'catalog-search.js'));
 const norm = L.norm;
 const SIN_HARDCODE = L.SIN;
 
-const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
-const pick = k => (env.match(new RegExp('^' + k + '=(.+)$', 'm')) || [])[1].trim();
-const SB = pick('SUPABASE_URL') || pick('SUPABASE_URL');
-const ANON = pick('SUPABASE_ANON_KEY');
-const OR_KEY = pick('OPENROUTER_API_KEY');
+const { leerCredenciales, obtenerSupabaseKey } = require('./_lib_credenciales');
+const creds = leerCredenciales();
+const SB = creds.SUPABASE_URL;
+const ANON = obtenerSupabaseKey({ credenciales: creds });
+const OR_KEY = creds.OPENROUTER_API_KEY;
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
 
 const args = process.argv.slice(2);

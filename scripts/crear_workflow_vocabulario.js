@@ -19,8 +19,6 @@ const ROOT = path.join(__dirname, '..');
 const BASE = process.env.N8N_API_URL_LOCAL || 'http://localhost:5678/api/v1';
 const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
 const key = (env.match(/^N8N_API_KEY=(.+)$/m) || [])[1].trim();
-const ANON = (env.match(/^SUPABASE_ANON_KEY=(.+)$/m) || [])[1].trim();
-const SBURL = ((env.match(/^SUPABASE_URL=(.+)$/m) || [])[1] || pick('SUPABASE_URL')).trim();
 const H = { 'X-N8N-API-KEY': key, 'Content-Type': 'application/json', accept: 'application/json' };
 
 const NOMBRE = 'Sync Vocabulario Catálogo';
@@ -35,8 +33,11 @@ const CODIGO = `// Sync incremental del diccionario del catálogo.
 const axios = require('axios');
 const crypto = require('crypto');
 
-const SB = '${SBURL}';
-const ANON = '${ANON}';
+const SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || (typeof process !== 'undefined' && process.env && process.env.SUPABASE_URL) || '';
+const _SB_SVC = (typeof $env !== 'undefined' && ($env.SUPABASE_SERVICE_ROLE_KEY || $env.SUPABASE_SERVICE_KEY)) || (typeof process !== 'undefined' && process.env && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY)) || '';
+const _SB_ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || (typeof process !== 'undefined' && process.env && process.env.SUPABASE_ANON_KEY) || '';
+if (!_SB_SVC && _SB_ANON && typeof globalThis !== 'undefined' && !globalThis.__sbAnonFallbackWarned) { globalThis.__sbAnonFallbackWarned = true; if (typeof console !== 'undefined' && typeof console.warn === 'function') console.warn('[supabase-key] SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SERVICE_KEY not set; falling back to SUPABASE_ANON_KEY'); }
+const ANON = _SB_SVC || _SB_ANON;
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
 const OR_KEY = $env.OPENROUTER_API_KEY;
 const MODELO = 'openai/gpt-5.6-luna';

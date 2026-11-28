@@ -5,7 +5,8 @@ const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
 const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
 
 const https = require('https');
-const ANON = pick('SUPABASE_ANON_KEY');
+const { obtenerSupabaseKey } = require('./_lib_credenciales');
+const ANON = obtenerSupabaseKey();
 
 function sb(path) {
   return new Promise(resolve => {

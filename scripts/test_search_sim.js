@@ -1,13 +1,9 @@
-const fs = require('fs');
-const path = require('path');
-const envPath = path.join(__dirname, '..', '.env');
-const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
-const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
-
+const { leerCredenciales, obtenerSupabaseKey } = require('./_lib_credenciales');
 const https = require('https');
 
-const SB = pick('SUPABASE_URL');
-const ANON = pick('SUPABASE_ANON_KEY');
+const creds = leerCredenciales();
+const SB = creds.SUPABASE_URL;
+const ANON = obtenerSupabaseKey({ credenciales: creds });
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON };
 
 function nUSD(n){ const r = Math.round(Number(n)*100)/100; return Number.isInteger(r) ? String(r) : r.toFixed(2); }

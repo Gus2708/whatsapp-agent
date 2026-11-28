@@ -37,11 +37,13 @@ if (fs.existsSync(ENV_FILE)) {
   }
 }
 
+const { leerCredenciales, obtenerSupabaseKey } = require('./_lib_credenciales');
+const sbCreds = leerCredenciales();
 const WAHA_BASE = process.env.WAHA_BASE_URL || 'http://localhost:3000';
 const N8N_BASE = process.env.N8N_BASE_URL || 'http://localhost:5678';
 const WAHA_API_KEY = process.env.WAHA_API_KEY || '';
-const SUPABASE_URL = process.env.SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = sbCreds.SUPABASE_URL || process.env.SUPABASE_URL || '';
+const SUPABASE_KEY = obtenerSupabaseKey({ credenciales: sbCreds });
 const WEBHOOK_URL = `${N8N_BASE}/webhook/whatsapp/inbound`;
 
 const MAX_AGE_HOURS = 48;
@@ -247,7 +249,7 @@ async function fetchAliasMap() {
 }
 
 async function fetchCandidatesData(maxAgeHours) {
-  const sbHeaders = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
+  const sbHeaders = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
   const sinceIso = new Date(Date.now() - maxAgeHours * 3600 * 1000).toISOString();
 
   let supabaseMsgs = [];

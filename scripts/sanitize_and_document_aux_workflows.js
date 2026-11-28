@@ -10,11 +10,18 @@ const BASE = process.env.N8N_API_URL_LOCAL || 'http://127.0.0.1:5678/api/v1';
 const key = pick('N8N_API_KEY');
 const H = { 'X-N8N-API-KEY': key, 'Content-Type': 'application/json', accept: 'application/json', Connection: 'close' };
 
+const SB_KEY_SNIPPET =
+  "const _SB_SVC = (typeof $env !== 'undefined' && ($env.SUPABASE_SERVICE_ROLE_KEY || $env.SUPABASE_SERVICE_KEY)) || (typeof process !== 'undefined' && process.env && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY)) || '';\n" +
+  "const _SB_ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || (typeof process !== 'undefined' && process.env && process.env.SUPABASE_ANON_KEY) || '';\n" +
+  "if (!_SB_SVC && _SB_ANON && typeof globalThis !== 'undefined' && !globalThis.__sbAnonFallbackWarned) { globalThis.__sbAnonFallbackWarned = true; if (typeof console !== 'undefined' && typeof console.warn === 'function') console.warn('[supabase-key] SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SERVICE_KEY not set; falling back to SUPABASE_ANON_KEY'); }\n" +
+  "const ANON = _SB_SVC || _SB_ANON;";
+
 const cleanCode = (code) => {
   if (typeof code !== 'string') return code;
   let c = code;
-  c = c.replace(/const SB = '[^']+';/g, "const SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';");
-  c = c.replace(/const ANON = '[^']+';/g, "const ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';");
+  c = c.replace(/const SB = '[^']+';/g, "const SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || (typeof process !== 'undefined' && process.env && process.env.SUPABASE_URL) || '';");
+  c = c.replace(/const ANON = '[^']+';/g, SB_KEY_SNIPPET);
+  c = c.replace(/const ANON = \(typeof \$env !== 'undefined' && \$env\.SUPABASE_ANON_KEY\) \|\| process\.env\.SUPABASE_ANON_KEY \|\| '';/g, SB_KEY_SNIPPET);
   return c;
 };
 
@@ -22,11 +29,13 @@ const cleanCode = (code) => {
 const vocPath = path.join(ROOT, 'workflows', 'workflow_vocabulario.json');
 if (fs.existsSync(vocPath)) {
   const wfVoc = JSON.parse(fs.readFileSync(vocPath, 'utf8'));
-  wfVoc.nodes.forEach(n => {
+  const sanitizeNodes = (nodes) => (nodes || []).forEach(n => {
     if (n.parameters && n.parameters.jsCode) {
       n.parameters.jsCode = cleanCode(n.parameters.jsCode);
     }
   });
+  sanitizeNodes(wfVoc.nodes);
+  if (wfVoc.activeVersion) sanitizeNodes(wfVoc.activeVersion.nodes);
 
   const vocSticky = {
     parameters: {
@@ -61,7 +70,7 @@ if (fs.existsSync(vocPath)) {
 const ayudaPath = path.join(ROOT, 'workflows', 'workflow_reenviar_ayuda.json');
 if (fs.existsSync(ayudaPath)) {
   const wfAyuda = JSON.parse(fs.readFileSync(ayudaPath, 'utf8'));
-  wfAyuda.nodes.forEach(n => {
+  const sanitizeAyudaNodes = (nodes) => (nodes || []).forEach(n => {
     if (n.parameters && n.parameters.jsCode) {
       n.parameters.jsCode = cleanCode(n.parameters.jsCode);
     }
@@ -71,6 +80,8 @@ if (fs.existsSync(ayudaPath)) {
       });
     }
   });
+  sanitizeAyudaNodes(wfAyuda.nodes);
+  if (wfAyuda.activeVersion) sanitizeAyudaNodes(wfAyuda.activeVersion.nodes);
 
   const ayudaSticky = {
     parameters: {

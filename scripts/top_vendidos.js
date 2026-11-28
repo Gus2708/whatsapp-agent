@@ -1,14 +1,11 @@
-const fs = require('fs');
-const path = require('path');
-const envPath = path.join(__dirname, '..', '.env');
-const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
-const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
+const { leerCredenciales, obtenerSupabaseKey } = require('./_lib_credenciales');
 
 // Saca el ranking real de productos más vendidos (ventas_detalle) cruzado con
 // productos (stock + precio). Devuelve los top con existencia > 0.
 const https = require('https');
-const ANON = pick('SUPABASE_ANON_KEY');
-const HOST = 'rgniqjfooifchyctnbzu.supabase.co';
+const creds = leerCredenciales();
+const ANON = obtenerSupabaseKey({ credenciales: creds });
+const HOST = (creds.SUPABASE_URL || 'https://rgniqjfooifchyctnbzu.supabase.co').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
 
 function api(path) {
   return new Promise((res, rej) => {

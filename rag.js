@@ -16,13 +16,15 @@ const { spawn, spawnSync } = require('child_process');
 
 const ROOT = __dirname;
 const L = require(path.join(ROOT, 'lib', 'catalog-search.js'));
+const { leerCredenciales, obtenerSupabaseKey } = require(path.join(ROOT, 'scripts', '_lib_credenciales.js'));
 const env = fs.existsSync(path.join(ROOT, '.env')) ? fs.readFileSync(path.join(ROOT, '.env'), 'utf8') : '';
 const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || '').trim();
 const storeName = pick('STORE_NAME') || process.env.STORE_NAME || 'Commerce Store';
 const agentName = pick('AGENT_NAME') || process.env.AGENT_NAME || 'Sales Agent';
-const SB = pick('SUPABASE_URL') || process.env.SUPABASE_URL || 'https://your-project.supabase.co';
-const ANON = pick('SUPABASE_ANON_KEY') || process.env.SUPABASE_ANON_KEY || '';
-const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
+const creds = leerCredenciales();
+const SB = creds.SUPABASE_URL || 'https://your-project.supabase.co';
+const SB_KEY = obtenerSupabaseKey({ credenciales: creds });
+const H = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
 
 // ───────────────────────────────────────────────────────────────────── presentación (Brainless / Claude Code theme)
 const TTY = process.stdout.isTTY;
@@ -853,9 +855,12 @@ async function buscar(consulta) {
   };
   const fakeEnv = {
     SUPABASE_URL: SB,
-    SUPABASE_ANON_KEY: ANON,
-    OPENROUTER_API_KEY: pick('OPENROUTER_API_KEY'),
-    OPENAI_API_KEY: pick('OPENAI_API_KEY'),
+    SUPABASE_SERVICE_ROLE_KEY: creds.SUPABASE_SERVICE_ROLE_KEY,
+    SUPABASE_SERVICE_KEY: creds.SUPABASE_SERVICE_KEY,
+    SUPABASE_ANON_KEY: creds.SUPABASE_ANON_KEY,
+    OPENROUTER_API_KEY: creds.OPENROUTER_API_KEY,
+    OPENAI_API_KEY: creds.OPENAI_API_KEY,
+    OPENAI_API_BASE: creds.OPENAI_API_BASE,
   };
   const run = new Function('query', 'require', '$env', '"use strict"; return (async () => {\n' + body + '\n})();');
   const spin = cargando();

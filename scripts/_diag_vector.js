@@ -15,7 +15,8 @@ const L = require(path.join(ROOT, 'lib', searchLib));
 
 const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
 const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || '').trim();
-const SB = pick('SUPABASE_URL'), ANON = pick('SUPABASE_ANON_KEY'), OAI = pick('OPENAI_API_KEY');
+const { obtenerSupabaseKey } = require('./_lib_credenciales');
+const SB = pick('SUPABASE_URL'), ANON = obtenerSupabaseKey(), OAI = pick('OPENAI_API_KEY');
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
 
 const UMBRAL = 0.45;      // el mismo que usa live_buscar.js

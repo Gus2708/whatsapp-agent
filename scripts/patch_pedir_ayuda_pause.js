@@ -38,7 +38,10 @@ const CODE_CHECK_CHAT_SESSION = `// Check Chat Session via Supabase REST (reempl
 // sin respuesta al cliente, el bot vuelve a responder solo (suprimiendo cierres de cortesía hasta 24h).
 const axios = require('axios');
 const SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';
-const ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';
+const _SB_SVC = (typeof $env !== 'undefined' && ($env.SUPABASE_SERVICE_ROLE_KEY || $env.SUPABASE_SERVICE_KEY)) || (typeof process !== 'undefined' && process.env && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY)) || '';
+const _SB_ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || (typeof process !== 'undefined' && process.env && process.env.SUPABASE_ANON_KEY) || '';
+if (!_SB_SVC && _SB_ANON && typeof globalThis !== 'undefined' && !globalThis.__sbAnonFallbackWarned) { globalThis.__sbAnonFallbackWarned = true; if (typeof console !== 'undefined' && typeof console.warn === 'function') console.warn('[supabase-key] SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SERVICE_KEY not set; falling back to SUPABASE_ANON_KEY'); }
+const ANON = _SB_SVC || _SB_ANON;
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };
 const REACTIVAR_MS = 30 * 60 * 1000; // 30 min sin respuesta al cliente -> el bot retoma
 const CIERRE_HUMANO_MS = 24 * 60 * 60 * 1000; // 24h de supresión para agradecimientos/cierres tras atención humana
@@ -144,7 +147,10 @@ const CODE_SET_CHAT_MANUAL = `// Set Chat Manual via Supabase REST (reemplaza el
 // deje de responder (lo atiende un humano). Reactivacion automatica tras 30 min de silencio.
 const axios = require('axios');
 const SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';
-const ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';
+const _SB_SVC = (typeof $env !== 'undefined' && ($env.SUPABASE_SERVICE_ROLE_KEY || $env.SUPABASE_SERVICE_KEY)) || (typeof process !== 'undefined' && process.env && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY)) || '';
+const _SB_ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || (typeof process !== 'undefined' && process.env && process.env.SUPABASE_ANON_KEY) || '';
+if (!_SB_SVC && _SB_ANON && typeof globalThis !== 'undefined' && !globalThis.__sbAnonFallbackWarned) { globalThis.__sbAnonFallbackWarned = true; if (typeof console !== 'undefined' && typeof console.warn === 'function') console.warn('[supabase-key] SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SERVICE_KEY not set; falling back to SUPABASE_ANON_KEY'); }
+const ANON = _SB_SVC || _SB_ANON;
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };
 ${RESOLVE_ALIASES_SNIPPET}
 let telefono = null;
@@ -165,7 +171,10 @@ const CODE_REGISTRAR_SOLICITUD_AYUDA = `// Registra una solicitud de ayuda (el b
 // que el empleado responda por Reenviar Ayuda o WhatsApp (con reactivacion automatica a los 30m).
 const axios = require('axios');
 const SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || process.env.SUPABASE_URL || '';
-const ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || process.env.SUPABASE_ANON_KEY || '';
+const _SB_SVC = (typeof $env !== 'undefined' && ($env.SUPABASE_SERVICE_ROLE_KEY || $env.SUPABASE_SERVICE_KEY)) || (typeof process !== 'undefined' && process.env && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY)) || '';
+const _SB_ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || (typeof process !== 'undefined' && process.env && process.env.SUPABASE_ANON_KEY) || '';
+if (!_SB_SVC && _SB_ANON && typeof globalThis !== 'undefined' && !globalThis.__sbAnonFallbackWarned) { globalThis.__sbAnonFallbackWarned = true; if (typeof console !== 'undefined' && typeof console.warn === 'function') console.warn('[supabase-key] SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SERVICE_KEY not set; falling back to SUPABASE_ANON_KEY'); }
+const ANON = _SB_SVC || _SB_ANON;
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
 const H_UPSERT = { ...H, Prefer: 'resolution=merge-duplicates' };
 const DEDUP_HORAS = 3;

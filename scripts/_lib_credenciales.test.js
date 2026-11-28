@@ -13,7 +13,15 @@ const { test, mock, beforeEach, afterEach } = require('node:test');
 const fs = require('fs');
 
 const MODULE_PATH = require.resolve('./_lib_credenciales.js');
-const CLAVES = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'OPENAI_API_BASE'];
+const CLAVES = [
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'SUPABASE_SERVICE_KEY',
+  'SUPABASE_ANON_KEY',
+  'OPENAI_API_KEY',
+  'OPENROUTER_API_KEY',
+  'OPENAI_API_BASE',
+];
 const originalReadFileSync = fs.readFileSync;
 const envSnapshot = {};
 
@@ -178,4 +186,52 @@ test('construirEnv({sinVector:true}) leaves OPENROUTER_API_KEY intact', () => {
   assert.equal(env.OPENAI_API_KEY, '');
   assert.equal(env.OPENROUTER_API_KEY, 'sk-router');
   assert.equal(env.SUPABASE_ANON_KEY, 'anon-123');
+});
+
+test('obtenerSupabaseKey prefers SUPABASE_SERVICE_ROLE_KEY over SUPABASE_SERVICE_KEY and SUPABASE_ANON_KEY without warning', () => {
+  const { obtenerSupabaseKey } = cargarConEnv(
+    'SUPABASE_URL=https://x.supabase.co\n' +
+    'SUPABASE_SERVICE_ROLE_KEY=svc-role-secret\n' +
+    'SUPABASE_SERVICE_KEY=svc-alias-secret\n' +
+    'SUPABASE_ANON_KEY=anon-123\n'
+  );
+  const warnings = [];
+  assert.equal(obtenerSupabaseKey({ warn: (m) => warnings.push(m) }), 'svc-role-secret');
+  assert.equal(warnings.length, 0);
+});
+
+test('obtenerSupabaseKey prefers SUPABASE_SERVICE_KEY over SUPABASE_ANON_KEY without warning', () => {
+  const { obtenerSupabaseKey } = cargarConEnv(
+    'SUPABASE_URL=https://x.supabase.co\n' +
+    'SUPABASE_SERVICE_KEY=svc-alias-secret\n' +
+    'SUPABASE_ANON_KEY=anon-123\n'
+  );
+  const warnings = [];
+  assert.equal(obtenerSupabaseKey({ warn: (m) => warnings.push(m) }), 'svc-alias-secret');
+  assert.equal(warnings.length, 0);
+});
+
+test('obtenerSupabaseKey falls back to SUPABASE_ANON_KEY with a one-time warning and never prints key values', () => {
+  const { obtenerSupabaseKey } = cargarConEnv(
+    'SUPABASE_URL=https://x.supabase.co\n' +
+    'SUPABASE_ANON_KEY=anon-secret-value\n'
+  );
+  const warnings = [];
+  assert.equal(obtenerSupabaseKey({ warn: (m) => warnings.push(m) }), 'anon-secret-value');
+  assert.equal(obtenerSupabaseKey({ warn: (m) => warnings.push(m) }), 'anon-secret-value');
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /SUPABASE_SERVICE_ROLE_KEY.*SUPABASE_ANON_KEY/);
+  assert.doesNotMatch(warnings[0], /anon-secret-value/);
+});
+
+test('exigirCredenciales accepts service key alone without requiring SUPABASE_ANON_KEY', () => {
+  const { exigirCredenciales, construirEnv } = cargarConEnv(
+    'SUPABASE_URL=https://x.supabase.co\n' +
+    'SUPABASE_SERVICE_KEY=svc-only\n'
+  );
+  const creds = exigirCredenciales();
+  assert.equal(creds.SUPABASE_SERVICE_KEY, 'svc-only');
+  const env = construirEnv();
+  assert.equal(env.SUPABASE_SERVICE_KEY, 'svc-only');
+  assert.equal(env.SUPABASE_ANON_KEY, '');
 });

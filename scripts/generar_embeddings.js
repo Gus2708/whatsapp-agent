@@ -13,14 +13,12 @@ const crypto = require('crypto');
 const progreso = require('./_progreso.js');
 const norm = require(require('path').join(__dirname, '..', 'lib', 'catalog-search.js')).norm;
 
-const ROOT = path.join(__dirname, '..');
-const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
-const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || '').trim();
+const { leerCredenciales, obtenerSupabaseKey } = require('./_lib_credenciales');
+const creds = leerCredenciales();
 
-const SB = pick('SUPABASE_URL') || pick('SUPABASE_URL');
-const ANON = pick('SUPABASE_ANON_KEY');
-// .env manda, pero se acepta la variable de entorno para probar sin tocar el archivo
-const OR = pick('OPENROUTER_API_KEY') || (process.env.OPENROUTER_API_KEY || '').trim();
+const SB = creds.SUPABASE_URL;
+const ANON = obtenerSupabaseKey({ credenciales: creds });
+const OR = creds.OPENROUTER_API_KEY;
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
 
 const MODELO = 'text-embedding-3-small';            // se guarda en productos_embedding.modelo
@@ -97,7 +95,7 @@ async function embeber(textos) {
 
 (async () => {
   if (!OR) throw new Error('falta OPENROUTER_API_KEY en .env');
-  if (!ANON) throw new Error('falta SUPABASE_ANON_KEY en .env');
+  if (!ANON) throw new Error('falta SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SERVICE_KEY (o SUPABASE_ANON_KEY) en .env');
 
   const c = {
     dim: s => `\x1b[2m${s}\x1b[0m`,

@@ -7,7 +7,8 @@ const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || 
 // buscar_memoria: recupera el cliente desde Supabase (tabla clientes) por telefono.
 const axios = require('axios');
 const SB = pick('SUPABASE_URL');
-const ANON = pick('SUPABASE_ANON_KEY');
+const { obtenerSupabaseKey } = require('./_lib_credenciales');
+const ANON = obtenerSupabaseKey();
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON };
 let { telefono } = query;
 try { const w = $('Webhook Trigger').first().json.body.payload; if (w && w.from) telefono = w.from; } catch (e) {}

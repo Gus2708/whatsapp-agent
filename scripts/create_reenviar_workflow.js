@@ -17,13 +17,14 @@ const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || 
 const BASE = process.env.N8N_API_URL_LOCAL || 'http://127.0.0.1:5678/api/v1';
 const key = pick('N8N_API_KEY');
 const H = { 'X-N8N-API-KEY': key, 'Content-Type': 'application/json', 'accept': 'application/json' };
-const ANON = pick('SUPABASE_ANON_KEY');
-const SB_URL = pick('SUPABASE_URL');
 
 const composeCode = `
 const axios = require('axios');
-const SB = '${SB_URL}';
-const ANON = '${ANON}';
+const SB = (typeof $env !== 'undefined' && $env.SUPABASE_URL) || (typeof process !== 'undefined' && process.env && process.env.SUPABASE_URL) || '';
+const _SB_SVC = (typeof $env !== 'undefined' && ($env.SUPABASE_SERVICE_ROLE_KEY || $env.SUPABASE_SERVICE_KEY)) || (typeof process !== 'undefined' && process.env && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY)) || '';
+const _SB_ANON = (typeof $env !== 'undefined' && $env.SUPABASE_ANON_KEY) || (typeof process !== 'undefined' && process.env && process.env.SUPABASE_ANON_KEY) || '';
+if (!_SB_SVC && _SB_ANON && typeof globalThis !== 'undefined' && !globalThis.__sbAnonFallbackWarned) { globalThis.__sbAnonFallbackWarned = true; if (typeof console !== 'undefined' && typeof console.warn === 'function') console.warn('[supabase-key] SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SERVICE_KEY not set; falling back to SUPABASE_ANON_KEY'); }
+const ANON = _SB_SVC || _SB_ANON;
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
 const RECARGO = 1.40;
 function nUSD(n){ const r = Math.round(Number(n)*100)/100; return Number.isInteger(r) ? String(r) : r.toFixed(2); }

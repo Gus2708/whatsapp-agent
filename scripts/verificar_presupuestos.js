@@ -15,7 +15,8 @@ const env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
 const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || process.env[k] || '').trim();
 
 const N8N_KEY = pick('N8N_API_KEY');
-const ANON = pick('SUPABASE_ANON_KEY');
+const { obtenerSupabaseKey } = require('./_lib_credenciales');
+const ANON = obtenerSupabaseKey();
 const SBHOST = (pick('SUPABASE_URL') || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 

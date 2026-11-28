@@ -31,7 +31,8 @@ const norm = L.norm;
 const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
 const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || '').trim();
 const SB = pick('SUPABASE_URL') || pick('SUPABASE_URL');
-const ANON = pick('SUPABASE_ANON_KEY');
+const { obtenerSupabaseKey } = require('./_lib_credenciales');
+const ANON = obtenerSupabaseKey();
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON };
 
 const TODOS = process.argv.includes('--todos');

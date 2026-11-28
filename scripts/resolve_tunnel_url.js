@@ -25,8 +25,9 @@ function validatedTunnelUrl(raw) {
 
 async function resolveTunnelUrl(service, options = {}) {
   if (!['n8n', 'waha'].includes(service)) throw new Error('service must be n8n or waha');
-  const { supabaseUrl, anonKey, fetchImpl = fetch, now = Date.now() } = options;
-  if (!anonKey) throw new Error('SUPABASE_ANON_KEY is required');
+  const { supabaseUrl, apiKey, serviceKey, anonKey, fetchImpl = fetch, now = Date.now() } = options;
+  const authKey = apiKey || serviceKey || anonKey;
+  if (!authKey) throw new Error('SUPABASE_SERVICE_ROLE_KEY / SUPABASE_ANON_KEY is required');
   const base = validatedSupabaseUrl(supabaseUrl);
   const query = new URL('/rest/v1/tunnel_config', base);
   query.searchParams.set('select', 'servicio,url,tunnel_state,updated_at');
@@ -37,7 +38,7 @@ async function resolveTunnelUrl(service, options = {}) {
   try {
     response = await fetchImpl(query, {
       method: 'GET',
-      headers: { apikey: anonKey },
+      headers: { apikey: authKey, Authorization: `Bearer ${authKey}` },
       redirect: 'manual',
       signal: AbortSignal.timeout(5_000),
     });
@@ -67,11 +68,11 @@ async function resolveTunnelUrl(service, options = {}) {
 }
 
 if (require.main === module) {
-  const { leerCredenciales } = require('./_lib_credenciales');
+  const { leerCredenciales, obtenerSupabaseKey } = require('./_lib_credenciales');
   const credentials = leerCredenciales();
   resolveTunnelUrl(process.argv[2], {
     supabaseUrl: credentials.SUPABASE_URL,
-    anonKey: credentials.SUPABASE_ANON_KEY,
+    apiKey: obtenerSupabaseKey({ credenciales: credentials }),
   }).then(url => process.stdout.write(`${url}\n`), error => {
     process.stderr.write(`${error.message}\n`);
     process.exitCode = 1;

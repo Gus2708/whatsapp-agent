@@ -7,7 +7,8 @@ const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || 
 // guardar_memoria: upsert del cliente en Supabase (tabla clientes), llaveado por telefono.
 const axios = require('axios');
 const SB = pick('SUPABASE_URL');
-const ANON = pick('SUPABASE_ANON_KEY');
+const { obtenerSupabaseKey } = require('./_lib_credenciales');
+const ANON = obtenerSupabaseKey();
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };
 let telefono = query.telefono;
 let nombre = query.nombre || query.name || query.nombre_cliente || query.cliente || '';

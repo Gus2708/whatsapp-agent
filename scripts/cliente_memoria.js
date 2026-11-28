@@ -8,7 +8,8 @@ const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || 
 // Corre en el flujo principal antes del AI Agent. Nunca rompe el flujo (todo en try/catch).
 const axios = require('axios');
 const SB = pick('SUPABASE_URL');
-const ANON = pick('SUPABASE_ANON_KEY');
+const { obtenerSupabaseKey } = require('./_lib_credenciales');
+const ANON = obtenerSupabaseKey();
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };
 let telefono = null, mensaje = '', nombre = null, notas = null;
 try { const p = $('Webhook Trigger').first().json.body.payload; telefono = p && p.from; mensaje = (p && p.body) || ''; } catch (e) {}

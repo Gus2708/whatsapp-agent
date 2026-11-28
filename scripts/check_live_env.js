@@ -9,35 +9,27 @@
 // reports what test:live will actually see.
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
+const { leerCredenciales } = require('./_lib_credenciales');
 
-const ROOT = path.join(__dirname, '..');
 const REQUIRED = [
   'SUPABASE_URL',
-  'SUPABASE_ANON_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY|SUPABASE_SERVICE_KEY|SUPABASE_ANON_KEY',
   'OPENAI_API_KEY',
   'OPENROUTER_API_KEY',
 ];
 
-let envFileContent = '';
-try {
-  envFileContent = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
-} catch (e) {
-  // No .env file: fall through to process.env only (still reported per-name below).
+const creds = leerCredenciales();
+const missing = [];
+if (!creds.SUPABASE_URL) missing.push('SUPABASE_URL');
+if (!(creds.SUPABASE_SERVICE_ROLE_KEY || creds.SUPABASE_SERVICE_KEY || creds.SUPABASE_ANON_KEY)) {
+  missing.push('SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_KEY / SUPABASE_ANON_KEY)');
 }
-
-function pick(name) {
-  const fromFile = ((envFileContent.match(new RegExp('^' + name + '=(.*)$', 'm')) || [])[1] || '').trim();
-  if (fromFile) return fromFile;
-  return String(process.env[name] || '').trim();
-}
-
-const missing = REQUIRED.filter((name) => !pick(name));
+if (!creds.OPENAI_API_KEY) missing.push('OPENAI_API_KEY');
+if (!creds.OPENROUTER_API_KEY) missing.push('OPENROUTER_API_KEY');
 
 if (missing.length > 0) {
   console.error('[test:live] Missing required credential(s): ' + missing.join(', '));
-  console.error('[test:live] Set them in .env (SUPABASE_URL has a hardcoded fallback in rag.js, but the rest do not) before running the live/credentialed suite.');
+  console.error('[test:live] Set them in .env before running the live/credentialed suite.');
   process.exit(1);
 }
 

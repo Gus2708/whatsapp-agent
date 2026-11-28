@@ -2,12 +2,11 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const ROOT = path.join(__dirname, '..');
-const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
-const pick = k => ((env.match(new RegExp('^' + k + '=(.*)$', 'm')) || [])[1] || '').trim();
-const SB = pick('SUPABASE_URL');
-const ANON = pick('SUPABASE_ANON_KEY');
-const OAI = pick('OPENAI_API_KEY') || (process.env.OPENAI_API_KEY || '').trim();
+const { leerCredenciales, obtenerSupabaseKey } = require('./_lib_credenciales');
+const creds = leerCredenciales();
+const SB = creds.SUPABASE_URL;
+const ANON = obtenerSupabaseKey({ credenciales: creds });
+const OAI = creds.OPENAI_API_KEY;
 const H = { apikey: ANON, Authorization: 'Bearer ' + ANON, 'Content-Type': 'application/json' };
 
 const descripciones = [
